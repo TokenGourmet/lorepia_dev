@@ -64,6 +64,11 @@ function isNonnegativeSafeInteger(value: unknown): value is number {
   return typeof value === "number" && Number.isSafeInteger(value) && value >= 0;
 }
 
+function hasOnlyKeys(value: Record<string, unknown>, allowedKeys: string[]): boolean {
+  const allowed = new Set(allowedKeys);
+  return Object.keys(value).every((key) => allowed.has(key));
+}
+
 function describeEventType(value: unknown): string {
   if (!isRecord(value) || !("type" in value)) return "형식 불명";
   return String(value.type ?? "형식 불명");
@@ -107,26 +112,32 @@ function parseStreamEvent(
       }
       return { accepted: true, event: value as StreamEvent };
     case "delta":
-    case "completed":
       if (typeof value.text !== "string") {
         return {
           accepted: false,
-          error: `${value.type} 이벤트의 text가 문자열이 아닙니다.`,
+          error: "delta 이벤트의 text가 문자열이 아닙니다.",
         };
       }
       return { accepted: true, event: value as StreamEvent };
+    case "completed":
     case "cancelled":
-      if (typeof value.partialText !== "string") {
+      if (!hasOnlyKeys(value, ["type", "requestId", "seq"])) {
         return {
           accepted: false,
-          error: "cancelled 이벤트의 partialText가 문자열이 아닙니다.",
+          error: `${value.type} 종료 이벤트에 허용되지 않은 필드가 있습니다.`,
         };
       }
       return { accepted: true, event: value as StreamEvent };
     case "failed":
+      if (!hasOnlyKeys(value, ["type", "requestId", "seq", "error"])) {
+        return {
+          accepted: false,
+          error: "failed 종료 이벤트에 허용되지 않은 필드가 있습니다.",
+        };
+      }
       if (
-        typeof value.partialText !== "string" ||
         !isRecord(value.error) ||
+        !hasOnlyKeys(value.error, ["code", "message"]) ||
         typeof value.error.code !== "string" ||
         typeof value.error.message !== "string"
       ) {
@@ -145,6 +156,7 @@ function parseStreamEvent(
 }
 
 export function expectedSnapshotFrom(
+  state: StreamContractState,
   event: TerminalStreamEvent,
 ): ExpectedTerminalSnapshot {
   if (event.type === "completed") {
@@ -152,7 +164,7 @@ export function expectedSnapshotFrom(
       requestId: event.requestId,
       status: "completed",
       lastSeq: event.seq,
-      text: event.text,
+      text: state.text,
       error: null,
     };
   }
@@ -162,7 +174,7 @@ export function expectedSnapshotFrom(
       requestId: event.requestId,
       status: "cancelled",
       lastSeq: event.seq,
-      text: event.partialText,
+      text: state.text,
       error: null,
     };
   }
@@ -171,7 +183,7 @@ export function expectedSnapshotFrom(
     requestId: event.requestId,
     status: "failed",
     lastSeq: event.seq,
-    text: event.partialText,
+    text: state.text,
     error: event.error,
   };
 }
@@ -249,17 +261,8 @@ export function validateStreamEvent(
 
   const terminalExpectation =
     event.type === "completed" || event.type === "cancelled" || event.type === "failed"
-      ? expectedSnapshotFrom(event)
+      ? expectedSnapshotFrom(state, event)
       : null;
-
-  if (terminalExpectation !== null && terminalExpectation.text !== state.text) {
-    return {
-      accepted: false,
-      shouldAcknowledge: false,
-      error: `${event.type} 이벤트의 최종 텍스트가 accepted delta 누적값과 일치하지 않습니다.`,
-      nextState: state,
-    };
-  }
 
   const nextState: StreamContractState = {
     requestId: state.requestId ?? event.requestId,

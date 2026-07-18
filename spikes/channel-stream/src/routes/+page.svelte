@@ -219,15 +219,12 @@
     if (event.type === "completed") {
       phase = "completed";
       backendStatus = "completed";
-      partialText = event.text;
     } else if (event.type === "cancelled") {
       phase = "cancelled";
       backendStatus = "cancelled";
-      partialText = event.partialText;
     } else {
       phase = "failed";
       backendStatus = "failed";
-      partialText = event.partialText;
       errorMessage = `${event.error.code}: ${event.error.message}`;
     }
   }

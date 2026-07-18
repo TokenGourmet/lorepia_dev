@@ -23,19 +23,16 @@ export type StreamEvent =
       type: "completed";
       requestId: string;
       seq: number;
-      text: string;
     }
   | {
       type: "cancelled";
       requestId: string;
       seq: number;
-      partialText: string;
     }
   | {
       type: "failed";
       requestId: string;
       seq: number;
-      partialText: string;
       error: StreamFailure;
     };
 

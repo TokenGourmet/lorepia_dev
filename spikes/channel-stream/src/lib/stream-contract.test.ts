@@ -70,7 +70,6 @@ describe("stream event contract", () => {
       type: "completed",
       requestId,
       seq: 3,
-      text: "하나둘",
     };
     const terminalResult = accept(state, completed);
     state = terminalResult.nextState;
@@ -89,7 +88,6 @@ describe("stream event contract", () => {
       type: "cancelled",
       requestId,
       seq: 4,
-      partialText: "하나둘",
     });
     expect(secondTerminal.error).toContain("종료 이벤트 이후");
   });
@@ -139,7 +137,6 @@ describe("stream event contract", () => {
       type: "cancelled",
       requestId,
       seq: 2,
-      partialText: "일부",
     }).nextState;
 
     const result = reject(terminal, delta(3));
@@ -184,11 +181,15 @@ describe("stream event contract", () => {
   it.each([
     {
       name: "completed",
-      terminal: { type: "completed", requestId, seq: 2, text: "다른 값" },
+      terminal: { type: "completed", requestId, seq: 2 },
+      status: "completed",
+      error: null,
     },
     {
       name: "cancelled",
-      terminal: { type: "cancelled", requestId, seq: 2, partialText: "다른 값" },
+      terminal: { type: "cancelled", requestId, seq: 2 },
+      status: "cancelled",
+      error: null,
     },
     {
       name: "failed",
@@ -196,22 +197,71 @@ describe("stream event contract", () => {
         type: "failed",
         requestId,
         seq: 2,
-        partialText: "다른 값",
+        error: { code: "MOCK_FAILURE", message: "의도된 실패" },
+      },
+      status: "failed",
+      error: { code: "MOCK_FAILURE", message: "의도된 실패" },
+    },
+  ] as const)(
+    "derives the $name snapshot text from accepted deltas",
+    ({ terminal, status, error }) => {
+      const afterStart = accept(createStreamContractState(), started()).nextState;
+      const afterDelta = accept(afterStart, delta(1, requestId, "누적값")).nextState;
+      const result = accept(afterDelta, terminal);
+
+      expect(result.terminalExpectation).toEqual({
+        requestId,
+        status,
+        lastSeq: 2,
+        text: "누적값",
+        error,
+      });
+      expect(result.nextState).toMatchObject({
+        text: "누적값",
+        terminalSeen: true,
+        expectedTerminal: result.terminalExpectation,
+      });
+    },
+  );
+
+  it.each([
+    {
+      name: "completed.text",
+      terminal: { type: "completed", requestId, seq: 2, text: "누적값" },
+    },
+    {
+      name: "cancelled.partialText",
+      terminal: { type: "cancelled", requestId, seq: 2, partialText: "누적값" },
+    },
+    {
+      name: "failed.partialText",
+      terminal: {
+        type: "failed",
+        requestId,
+        seq: 2,
+        partialText: "누적값",
         error: { code: "MOCK_FAILURE", message: "의도된 실패" },
       },
     },
-  ] as const)(
-    "rejects $name when terminal text differs from accepted delta text",
-    ({ terminal }) => {
-      const afterStart = accept(createStreamContractState(), started()).nextState;
-      const afterDelta = accept(afterStart, delta(1, requestId, "누적값")).nextState;
-      const result = reject(afterDelta, terminal);
+  ])("rejects legacy terminal payload field $name", ({ terminal }) => {
+    const afterStart = accept(createStreamContractState(), started()).nextState;
+    const afterDelta = accept(afterStart, delta(1, requestId, "누적값")).nextState;
+    const result = reject(afterDelta, terminal);
 
-      expect(result.shouldAcknowledge).toBe(false);
-      expect(result.error).toContain("accepted delta 누적값과 일치하지 않습니다");
-      expect(result.nextState.text).toBe("누적값");
-    },
-  );
+    expect(result.error).toContain("허용되지 않은 필드");
+    expect(result.nextState.text).toBe("누적값");
+  });
+
+  it("uses an empty accepted-delta value for a terminal with no deltas", () => {
+    const afterStart = accept(createStreamContractState(), started()).nextState;
+    const result = accept(afterStart, {
+      type: "completed",
+      requestId,
+      seq: 1,
+    });
+
+    expect(result.terminalExpectation?.text).toBe("");
+  });
 });
 
 describe("terminal snapshot contract", () => {
