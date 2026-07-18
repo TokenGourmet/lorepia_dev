@@ -69,6 +69,15 @@ describe("compile-target imported-code profile", () => {
     },
   );
 
+  it.each(["andriod", "ipados", "freebsd"])(
+    "rejects unknown compile target %s instead of enabling research fixtures",
+    (platform) => {
+      expect(() => resolveBuildProfile(platform)).toThrow(
+        /unsupported TAURI_ENV_PLATFORM/,
+      );
+    },
+  );
+
   it("treats desktop Lua as fixture policy, not an implemented runtime claim", () => {
     const profile = resolveBuildProfile("macos");
 

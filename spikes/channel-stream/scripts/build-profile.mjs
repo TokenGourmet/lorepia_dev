@@ -14,6 +14,7 @@ export const STORE_SAFE_PUBLIC_ASSETS = Object.freeze([
 ]);
 
 const STORE_SAFE_MOBILE_PLATFORMS = new Set(["android", "ios"]);
+const DESKTOP_RESEARCH_PLATFORMS = new Set(["macos", "windows", "linux"]);
 const ISOLATION_ROUTE_PATH = fileURLToPath(
   new URL("../src/routes/isolation/+page.svelte", import.meta.url),
 );
@@ -26,10 +27,20 @@ const ISOLATION_ROUTE_PATH = fileURLToPath(
  * @param {string | undefined} tauriPlatform
  */
 export function resolveBuildProfile(tauriPlatform) {
-  const targetPlatform =
-    typeof tauriPlatform === "string" && tauriPlatform.trim().length > 0
-      ? tauriPlatform.trim().toLowerCase()
-      : "desktop";
+  const configuredPlatform =
+    typeof tauriPlatform === "string" ? tauriPlatform.trim().toLowerCase() : "";
+  const targetPlatform = configuredPlatform || "desktop";
+
+  if (
+    targetPlatform !== "desktop" &&
+    !STORE_SAFE_MOBILE_PLATFORMS.has(targetPlatform) &&
+    !DESKTOP_RESEARCH_PLATFORMS.has(targetPlatform)
+  ) {
+    throw new Error(
+      `unsupported TAURI_ENV_PLATFORM ${JSON.stringify(tauriPlatform)}; refusing to select an imported-code build profile`,
+    );
+  }
+
   const storeSafeMobile = STORE_SAFE_MOBILE_PLATFORMS.has(targetPlatform);
 
   return Object.freeze({
