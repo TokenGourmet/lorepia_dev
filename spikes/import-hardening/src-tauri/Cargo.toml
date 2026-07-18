@@ -1,0 +1,28 @@
+[package]
+name = "lorepia-import-hardening-spike"
+version = "0.1.0"
+description = "LorePia M-1 bounded archive and PNG import-hardening probe"
+authors = ["LorePia contributors"]
+edition = "2021"
+license = "Apache-2.0"
+
+[lib]
+name = "spikesimporthardening_lib"
+crate-type = ["staticlib", "cdylib", "rlib"]
+
+[build-dependencies]
+tauri-build = { version = "=2.6.3", features = [] }
+
+[dependencies]
+crc32fast = "=1.5.0"
+flate2 = { version = "=1.1.9", default-features = false, features = ["rust_backend"] }
+png = "=0.18.1"
+serde = { version = "=1.0.228", features = ["derive"] }
+serde_json = "=1.0.145"
+sha2 = "=0.10.9"
+tauri = { version = "=2.11.5", features = [] }
+unicode-normalization = "=0.1.25"
+zip = { version = "=8.6.0", default-features = false, features = ["deflate-flate2"] }
+
+[dev-dependencies]
+tempfile = "=3.27.0"

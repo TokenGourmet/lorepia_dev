@@ -35,6 +35,9 @@ jobs:
           - name: Linux
             runner: ubuntu-22.04
             spike: sqlite-fts
+          - name: Linux
+            runner: ubuntu-22.04
+            spike: import-hardening
           - name: macOS
             runner: macos-26
             spike: channel-stream
@@ -44,6 +47,9 @@ jobs:
           - name: macOS
             runner: macos-26
             spike: sqlite-fts
+          - name: macOS
+            runner: macos-26
+            spike: import-hardening
           - name: Windows
             runner: windows-2022
             spike: channel-stream
@@ -53,6 +59,9 @@ jobs:
           - name: Windows
             runner: windows-2022
             spike: sqlite-fts
+          - name: Windows
+            runner: windows-2022
+            spike: import-hardening
     defaults:
       run:
         working-directory: spikes/${{ matrix.spike }}
@@ -118,7 +127,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        spike: [channel-stream, keychain, sqlite-fts]
+        spike: [channel-stream, keychain, sqlite-fts, import-hardening]
     defaults:
       run:
         shell: bash
@@ -182,7 +191,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        spike: [channel-stream, keychain, sqlite-fts]
+        spike: [channel-stream, keychain, sqlite-fts, import-hardening]
     defaults:
       run:
         shell: bash

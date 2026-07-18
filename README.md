@@ -3,10 +3,10 @@
 LorePia is a local-first, cross-platform AI character chat client in the M-1 risk-removal phase. The current repository contains disposable vertical spikes used to prove or reject the architecture in [`LorePia_기술계획서_v2.md`](LorePia_기술계획서_v2.md); it is not yet the product application.
 
 The current spikes exercise mock SSE-to-Tauri-Channel streaming, an independent
-five-OS credential-store lifecycle, and a file-backed SQLite/FTS5 lifecycle.
-They are intentionally functional and minimal. Product UI, visual design, and
-animation are outside the implementation scope here and remain owner-authored
-work.
+five-OS credential-store lifecycle, a file-backed SQLite/FTS5 lifecycle, and a
+bounded archive/PNG import-hardening lifecycle. They are intentionally
+functional and minimal. Product UI, visual design, and animation are outside
+the implementation scope here and remain owner-authored work.
 
 ## Current scope
 
@@ -17,6 +17,9 @@ work.
   WebView IPC.
 - Verify SQLite migration, reopen persistence, WAL read/write behavior, and
   deterministic Korean substring search without freezing the M1 product schema.
+- Verify bounded ZIP/PNG handling, cross-platform path rejection, inert imported
+  scripts, staged publication, and exact cleanup without freezing the M3 card
+  importer or product limits.
 - Record runtime evidence without treating compilation, a simulator, and a physical device as equivalent.
 - Keep imported JavaScript and Lua disabled in the Store-Safe profile until written policy clearance and the required isolation evidence exist.
 
@@ -30,6 +33,7 @@ No 5-OS runtime support claim is valid until the [M-1 verification matrix](docs/
 ├── spikes/channel-stream/      # Disposable Channel vertical spike
 ├── spikes/keychain/            # Disposable five-OS credential-store spike
 ├── spikes/sqlite-fts/          # Disposable SQLite/FTS5 vertical spike
+├── spikes/import-hardening/    # Disposable archive/PNG defense spike
 ├── .github/workflows/m1.yml    # Desktop and mobile compile verification
 └── LorePia_기술계획서_v2.md    # Current technical plan
 ```
@@ -63,6 +67,12 @@ The SQLite/FTS5 spike uses the same check sequence from `spikes/sqlite-fts`,
 followed by `npm run tauri dev` for a local runtime attempt. It proves only the
 bounded database/search contract in [`docs/m1/sqlite-fts.md`](docs/m1/sqlite-fts.md);
 the full branching chat schema and product database API remain M1 work.
+
+The import-hardening spike uses the same sequence from
+`spikes/import-hardening`. Its one no-argument probe generates a self-authored
+positive/negative corpus and returns bounded proof metadata. It does not expose
+a product file picker or define Character Card conversion; see
+[`docs/m1/import-hardening.md`](docs/m1/import-hardening.md).
 
 `rust-toolchain.toml`, `Cargo.lock`, and `package-lock.json` are application inputs and must be committed. CI uses the pinned Rust toolchain and lockfiles and must not silently refresh dependencies.
 

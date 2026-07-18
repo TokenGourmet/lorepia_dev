@@ -25,18 +25,23 @@ These rows are deliberately separate from the runtime matrix.
 | Windows / Channel | Hosted native compile/test | NOT RUN | Await first `Desktop compile/test (Windows / channel-stream)` run |
 | Windows / keychain | Hosted native compile/test | NOT RUN | Await first `Desktop compile/test (Windows / keychain)` run |
 | Windows / SQLite/FTS5 | Hosted native compile/test | NOT RUN | Await first `Desktop compile/test (Windows / sqlite-fts)` run |
+| Windows / import hardening | Hosted native compile/test | NOT RUN | Await first `Desktop compile/test (Windows / import-hardening)` run |
 | macOS / Channel | Hosted native compile/test | NOT RUN | Await first `Desktop compile/test (macOS / channel-stream)` run |
 | macOS / keychain | Hosted native compile/test | NOT RUN | Await first `Desktop compile/test (macOS / keychain)` run |
 | macOS / SQLite/FTS5 | Hosted native compile/test | NOT RUN | Await first `Desktop compile/test (macOS / sqlite-fts)` run |
+| macOS / import hardening | Hosted native compile/test | NOT RUN | Await first `Desktop compile/test (macOS / import-hardening)` run |
 | Linux / Channel | Hosted native compile/test | NOT RUN | Await first `Desktop compile/test (Linux / channel-stream)` run |
 | Linux / keychain | Hosted native compile/test | NOT RUN | Await first `Desktop compile/test (Linux / keychain)` run |
 | Linux / SQLite/FTS5 | Hosted native compile/test | NOT RUN | Await first `Desktop compile/test (Linux / sqlite-fts)` run |
+| Linux / import hardening | Hosted native compile/test | NOT RUN | Await first `Desktop compile/test (Linux / import-hardening)` run |
 | Android ARM64 / Channel | Hosted cross-compile to debug APK | NOT RUN | Await first `Android compile (channel-stream, no device)` run |
 | Android ARM64 / keychain | Hosted cross-compile to debug APK | NOT RUN | Await first `Android compile (keychain, no device)` run |
 | Android ARM64 / SQLite/FTS5 | Hosted cross-compile to debug APK | NOT RUN | Await first `Android compile (sqlite-fts, no device)` run |
+| Android ARM64 / import hardening | Hosted cross-compile to debug APK | NOT RUN | Await first `Android compile (import-hardening, no device)` run |
 | iOS ARM64 / Channel | Hosted simulator compile | NOT RUN | Await first `iOS simulator compile (channel-stream, no device)` run |
 | iOS ARM64 / keychain | Hosted simulator compile | NOT RUN | Await first `iOS simulator compile (keychain, no device)` run |
 | iOS ARM64 / SQLite/FTS5 | Hosted simulator compile | NOT RUN | Await first `iOS simulator compile (sqlite-fts, no device)` run |
+| iOS ARM64 / import hardening | Hosted simulator compile | NOT RUN | Await first `iOS simulator compile (import-hardening, no device)` run |
 | macOS arm64 / SQLite/FTS5 exact candidate | Local packaged debug `.app` build and physical-host runtime | PASS | [source `39dfef0` record](evidence/sqlite-macos-39dfef0/) |
 | Android ARM64 / SQLite/FTS5 exact candidate | Local cross-compile summary only | NOT RUN | Build exited 0, but no qualifying raw log/artifact or run identity was retained ([observation](evidence/sqlite-mobile-compile-39dfef0/)) |
 | iOS ARM64 / SQLite/FTS5 exact candidate | Local simulator-compile summary only | NOT RUN | Build exited 0, but no qualifying raw log/artifact or run identity was retained ([observation](evidence/sqlite-mobile-compile-39dfef0/)) |
@@ -104,6 +109,7 @@ These environments have been identified for upcoming runs. Inventory alone does 
 | Risu observation notes v1 | NOT RUN | Observation record without copied source |
 | Compatibility fixture provenance | NOT RUN | Risu/card/import fixture set and conversion-difference record are not complete |
 | SQLite FTS fixture provenance | PASS | One synthetic search fixture has self-authored origin, CC0-1.0 permission, byte size, and canonical hash pinned ([fixture record](../../spikes/sqlite-fts/fixtures/README.md)) |
+| Import-hardening fixture provenance | PASS | The 26-case catalog is self-authored, CC0-1.0, and hash-pinned; attack bytes are generated deterministically by the disposable probe ([fixture record](../../spikes/import-hardening/fixtures/README.md)) |
 | Compatibility golden behavior and conversion | NOT RUN | Risu/card/import golden set and conversion differences are not complete |
 | SQLite FTS golden searches | PASS (`7/7`) | Exact expected/actual IDs are in the native transcript; a packaged-app pass screenshot is separate and raw IPC JSON was not retained ([host record](evidence/sqlite-macos-39dfef0/)) |
 | Android reference device fixed | NOT RUN | Model, SoC/RAM, OS/build, power mode |
