@@ -2,12 +2,18 @@
 
 LorePia is a local-first, cross-platform AI character chat client in the M-1 risk-removal phase. The current repository contains disposable vertical spikes used to prove or reject the architecture in [`LorePia_기술계획서_v2.md`](LorePia_기술계획서_v2.md); it is not yet the product application.
 
-The first spike exercises mock SSE-to-Tauri-Channel streaming. It is intentionally functional and minimal. Product UI, visual design, and animation are outside the implementation scope here and remain owner-authored work.
+The first spikes exercise mock SSE-to-Tauri-Channel streaming and an independent
+five-OS credential-store lifecycle. They are intentionally functional and
+minimal. Product UI, visual design, and animation are outside the implementation
+scope here and remain owner-authored work.
 
 ## Current scope
 
 - Prove the Tauri 2 + Rust + Svelte toolchain on Windows, macOS, Linux, Android, and iOS.
 - Verify Channel sequencing, batching, cancellation, backpressure, and partial-result behavior.
+- Verify that OS credential services can complete a native-only
+  absent/create/read/update/delete lifecycle without exposing secret material to
+  WebView IPC.
 - Record runtime evidence without treating compilation, a simulator, and a physical device as equivalent.
 - Keep imported JavaScript and Lua disabled in the Store-Safe profile until written policy clearance and the required isolation evidence exist.
 
@@ -19,6 +25,7 @@ No 5-OS runtime support claim is valid until the [M-1 verification matrix](docs/
 .
 ├── docs/m1/                    # M-1 gates, procedures, and evidence matrix
 ├── spikes/channel-stream/      # Disposable Channel vertical spike
+├── spikes/keychain/            # Disposable five-OS credential-store spike
 ├── .github/workflows/m1.yml    # Desktop and mobile compile verification
 └── LorePia_기술계획서_v2.md    # Current technical plan
 ```
@@ -40,6 +47,11 @@ cargo clippy --locked --manifest-path src-tauri/Cargo.toml --all-targets -- -D w
 cargo check --locked --manifest-path src-tauri/Cargo.toml --all-targets
 npm run tauri dev
 ```
+
+The keychain spike uses the same check sequence from `spikes/keychain`. Its one
+functional button runs the native lifecycle probe; it is not a password or API
+key management UI. Platform behavior and evidence limits are in
+[`docs/m1/keychain.md`](docs/m1/keychain.md).
 
 `rust-toolchain.toml`, `Cargo.lock`, and `package-lock.json` are application inputs and must be committed. CI uses the pinned Rust toolchain and lockfiles and must not silently refresh dependencies.
 

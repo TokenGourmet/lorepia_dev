@@ -19,7 +19,7 @@ env:
 
 jobs:
   desktop:
-    name: Desktop compile/test (${{ matrix.name }})
+    name: Desktop compile/test (${{ matrix.name }} / ${{ matrix.spike }})
     runs-on: ${{ matrix.runner }}
     timeout-minutes: 45
     strategy:
@@ -28,13 +28,25 @@ jobs:
         include:
           - name: Linux
             runner: ubuntu-22.04
+            spike: channel-stream
+          - name: Linux
+            runner: ubuntu-22.04
+            spike: keychain
           - name: macOS
             runner: macos-26
+            spike: channel-stream
+          - name: macOS
+            runner: macos-26
+            spike: keychain
           - name: Windows
             runner: windows-2022
+            spike: channel-stream
+          - name: Windows
+            runner: windows-2022
+            spike: keychain
     defaults:
       run:
-        working-directory: spikes/channel-stream
+        working-directory: spikes/${{ matrix.spike }}
     steps:
       - name: Check out repository
         uses: actions/checkout@v6
@@ -56,7 +68,7 @@ jobs:
         with:
           node-version: 22
           cache: npm
-          cache-dependency-path: spikes/channel-stream/package-lock.json
+          cache-dependency-path: spikes/${{ matrix.spike }}/package-lock.json
 
       - name: Set up Rust
         run: |
@@ -91,13 +103,17 @@ jobs:
         run: cargo check --locked --manifest-path src-tauri/Cargo.toml --all-targets
 
   android-compile:
-    name: Android compile (no device)
+    name: Android compile (${{ matrix.spike }}, no device)
     runs-on: ubuntu-22.04
     timeout-minutes: 60
+    strategy:
+      fail-fast: false
+      matrix:
+        spike: [channel-stream, keychain]
     defaults:
       run:
         shell: bash
-        working-directory: spikes/channel-stream
+        working-directory: spikes/${{ matrix.spike }}
     steps:
       - name: Check out repository
         uses: actions/checkout@v6
@@ -107,7 +123,7 @@ jobs:
         with:
           node-version: 22
           cache: npm
-          cache-dependency-path: spikes/channel-stream/package-lock.json
+          cache-dependency-path: spikes/${{ matrix.spike }}/package-lock.json
 
       - name: Set up Java 21
         uses: actions/setup-java@v5
@@ -135,6 +151,10 @@ jobs:
             npm run tauri android init -- --ci
           fi
 
+      - name: Verify keychain Android NDK context and backup exclusions
+        if: matrix.spike == 'keychain'
+        run: npm run verify:android-wrapper
+
       - name: Compile debug ARM64 APK
         run: npm run tauri android build -- --debug --target aarch64 --apk --ci
 
@@ -147,13 +167,17 @@ jobs:
           } >> "$GITHUB_STEP_SUMMARY"
 
   ios-simulator-compile:
-    name: iOS simulator compile (no device)
+    name: iOS simulator compile (${{ matrix.spike }}, no device)
     runs-on: macos-26
     timeout-minutes: 60
+    strategy:
+      fail-fast: false
+      matrix:
+        spike: [channel-stream, keychain]
     defaults:
       run:
         shell: bash
-        working-directory: spikes/channel-stream
+        working-directory: spikes/${{ matrix.spike }}
     steps:
       - name: Check out repository
         uses: actions/checkout@v6
@@ -163,7 +187,7 @@ jobs:
         with:
           node-version: 22
           cache: npm
-          cache-dependency-path: spikes/channel-stream/package-lock.json
+          cache-dependency-path: spikes/${{ matrix.spike }}/package-lock.json
 
       - name: Set up Rust and iOS simulator target
         run: |

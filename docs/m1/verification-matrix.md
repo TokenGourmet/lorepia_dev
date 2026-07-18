@@ -20,13 +20,18 @@ For each replacement use a link label that makes the level visible, for example 
 
 These rows are deliberately separate from the runtime matrix.
 
-| Target | Evidence level | Current state | Evidence |
+| Target / vertical | Evidence level | Current state | Evidence |
 |---|---|---|---|
-| Windows | Hosted native compile/test | NOT RUN | Await first `M-1 verification / Desktop` run |
-| macOS | Hosted native compile/test | NOT RUN | Await first `M-1 verification / Desktop` run |
-| Linux | Hosted native compile/test | NOT RUN | Await first `M-1 verification / Desktop` run |
-| Android ARM64 | Hosted cross-compile to debug APK | NOT RUN | Await first `Android compile (no device)` run |
-| iOS ARM64 | Hosted simulator compile | NOT RUN | Await first `iOS simulator compile (no device)` run |
+| Windows / Channel | Hosted native compile/test | NOT RUN | Await first `Desktop compile/test (Windows / channel-stream)` run |
+| Windows / keychain | Hosted native compile/test | NOT RUN | Await first `Desktop compile/test (Windows / keychain)` run |
+| macOS / Channel | Hosted native compile/test | NOT RUN | Await first `Desktop compile/test (macOS / channel-stream)` run |
+| macOS / keychain | Hosted native compile/test | NOT RUN | Await first `Desktop compile/test (macOS / keychain)` run |
+| Linux / Channel | Hosted native compile/test | NOT RUN | Await first `Desktop compile/test (Linux / channel-stream)` run |
+| Linux / keychain | Hosted native compile/test | NOT RUN | Await first `Desktop compile/test (Linux / keychain)` run |
+| Android ARM64 / Channel | Hosted cross-compile to debug APK | NOT RUN | Await first `Android compile (channel-stream, no device)` run |
+| Android ARM64 / keychain | Hosted cross-compile to debug APK | NOT RUN | Await first `Android compile (keychain, no device)` run |
+| iOS ARM64 / Channel | Hosted simulator compile | NOT RUN | Await first `iOS simulator compile (channel-stream, no device)` run |
+| iOS ARM64 / keychain | Hosted simulator compile | NOT RUN | Await first `iOS simulator compile (keychain, no device)` run |
 
 ## Isolation baseline observations (not physical-device evidence)
 
@@ -48,6 +53,17 @@ physical-device or cross-platform capability cell above.
 |---|---|---|---|
 | macOS 26.5.2 arm64, locally packaged release `.app` | Local packaged-app effect test | PASS (`18/18`) | [candidate record](evidence/a42d33d-local-isolation.md); direct iframe Tauri transport was absent, so this is not ACL-decision proof |
 | Android 16 / API 36 `sdk_gphone64_arm64`, WebView `133.0.6943.137` | Local emulator runtime | **FAIL** (`15/18`, `18/18` complete) | [candidate record](evidence/a42d33d-local-isolation.md); three direct native callbacks timed out and remain `INCONCLUSIVE`; final monitored sink delta had no extra effect |
+
+## Keychain candidate observations (not physical-device evidence)
+
+This row evaluates exact source commit
+`38ce4c2c73a897a146859d78229b024e43004ffd`. It does not replace or change the
+Android physical-device keychain cell above.
+
+| Platform/runtime | Evidence level | Result | Evidence and limitation |
+|---|---|---|---|
+| macOS 26.5.2 build 25F84, arm64 physical host | Local packaged-app OS-store lifecycle | PASS twice (`7/7`, cleanup proved) | [candidate record](evidence/keychain-macos-host-38ce4c2/); ad-hoc bundle and login Keychain only, with no product SQLite/export/crash-path sentinel scan |
+| Android 16 / API 36 `sdk_gphone64_arm64`, WebView `133.0.6943.137` | Local emulator OS-store lifecycle | PASS (`7/7`, cleanup proved) | [candidate record](evidence/keychain-android-emulator-38ce4c2/); installed APK hash matched the built APK; emulator only, with no product SQLite/export/crash-path sentinel scan |
 
 ## Available local environments (not pass evidence)
 
