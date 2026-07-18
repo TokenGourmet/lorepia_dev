@@ -1,0 +1,42 @@
+# macOS and editor noise
+.DS_Store
+Thumbs.db
+*.swp
+*.swo
+*~
+.idea/
+
+# Local environment and secrets
+.env
+.env.*
+!.env.example
+*.pem
+*.p12
+*.mobileprovision
+*.jks
+*.keystore
+
+# JavaScript/Svelte/Vite
+**/node_modules/
+**/.svelte-kit/
+**/build/
+**/dist/
+**/coverage/
+*.tsbuildinfo
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+
+# Rust
+**/target/
+
+# Android/iOS local build state
+**/.gradle/
+**/local.properties
+**/DerivedData/
+**/*.xcuserstate
+**/xcuserdata/
+
+# Tauri mobile wrappers under src-tauri/gen are source, not generated build
+# output. Keep them tracked; only nested build directories are ignored above.

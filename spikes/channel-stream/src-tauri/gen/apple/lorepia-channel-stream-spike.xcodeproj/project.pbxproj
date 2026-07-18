@@ -1,0 +1,460 @@
+// !$*UTF8*$!
+{
+	archiveVersion = 1;
+	classes = {
+	};
+	objectVersion = 77;
+	objects = {
+
+/* Begin PBXBuildFile section */
+		05D1F3D8352E2FECCA4A364E /* libapp.a in Frameworks */ = {isa = PBXBuildFile; fileRef = 2C19A79E37CD8BC5B51451C3 /* libapp.a */; };
+		0885ABBAB90EC5EBA53A0C63 /* CoreGraphics.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 8CB42E11E12096EF868DD98D /* CoreGraphics.framework */; };
+		105E7BCEC3FA5BAF4023AB49 /* MetalKit.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 5278ECF258AAFB99E6142E48 /* MetalKit.framework */; };
+		1D1587F7DF343811E003D043 /* UIKit.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = E7E4CFAE6F6D2AD032CC3299 /* UIKit.framework */; };
+		1D75F189E43EC0EFE2DA28F8 /* Metal.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 470BD0253DDB4D8DF68D9826 /* Metal.framework */; };
+		25735F782F1C0DE2F1571894 /* assets in Resources */ = {isa = PBXBuildFile; fileRef = 4DC7088429778199103C2F59 /* assets */; };
+		43F1B77DCCE09BA16633B4E3 /* WebKit.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = B9F48D2AD1EEB627B92E215C /* WebKit.framework */; };
+		6405CE3ED97AE34C86998EE8 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 36894C43A19DEC1FCA00D519 /* Assets.xcassets */; };
+		680185C063670942081F4104 /* Security.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 70FF90787B4570ED000B40DF /* Security.framework */; };
+		68F5D6AA8DA80AB801C16C38 /* main.mm in Sources */ = {isa = PBXBuildFile; fileRef = 770884A9A17427B31A9F9141 /* main.mm */; };
+		AC4187EC91B2D35D2F46F87D /* LaunchScreen.storyboard in Resources */ = {isa = PBXBuildFile; fileRef = 06B09E46FFAD7CC0B3458697 /* LaunchScreen.storyboard */; };
+		CC224DDF96EFE84C04BE218C /* QuartzCore.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = B2A8F72F382DD69BDDFC4E82 /* QuartzCore.framework */; };
+/* End PBXBuildFile section */
+
+/* Begin PBXFileReference section */
+		06B09E46FFAD7CC0B3458697 /* LaunchScreen.storyboard */ = {isa = PBXFileReference; lastKnownFileType = file.storyboard; path = LaunchScreen.storyboard; sourceTree = "<group>"; };
+		0C5F5D2552EB677F25F3B7AF /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist; path = Info.plist; sourceTree = "<group>"; };
+		2619ABB248106B7CA43DF433 /* bindings.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = bindings.h; sourceTree = "<group>"; };
+		2C19A79E37CD8BC5B51451C3 /* libapp.a */ = {isa = PBXFileReference; lastKnownFileType = archive.ar; path = libapp.a; sourceTree = "<group>"; };
+		36894C43A19DEC1FCA00D519 /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
+		43370218E4598A2083EFFB92 /* lib.rs */ = {isa = PBXFileReference; path = lib.rs; sourceTree = "<group>"; };
+		470BD0253DDB4D8DF68D9826 /* Metal.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = Metal.framework; path = System/Library/Frameworks/Metal.framework; sourceTree = SDKROOT; };
+		4DC7088429778199103C2F59 /* assets */ = {isa = PBXFileReference; lastKnownFileType = folder; path = assets; sourceTree = SOURCE_ROOT; };
+		5278ECF258AAFB99E6142E48 /* MetalKit.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = MetalKit.framework; path = System/Library/Frameworks/MetalKit.framework; sourceTree = SDKROOT; };
+		70FF90787B4570ED000B40DF /* Security.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = Security.framework; path = System/Library/Frameworks/Security.framework; sourceTree = SDKROOT; };
+		770884A9A17427B31A9F9141 /* main.mm */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.objcpp; path = main.mm; sourceTree = "<group>"; };
+		8CB42E11E12096EF868DD98D /* CoreGraphics.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = CoreGraphics.framework; path = System/Library/Frameworks/CoreGraphics.framework; sourceTree = SDKROOT; };
+		8E895B60C6A64BA64B035DCE /* lorepia-channel-stream-spike_iOS.app */ = {isa = PBXFileReference; includeInIndex = 0; lastKnownFileType = wrapper.application; path = "lorepia-channel-stream-spike_iOS.app"; sourceTree = BUILT_PRODUCTS_DIR; };
+		9A2E838FC55478F6895E97C7 /* lorepia-channel-stream-spike_iOS.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = "lorepia-channel-stream-spike_iOS.entitlements"; sourceTree = "<group>"; };
+		B2A8F72F382DD69BDDFC4E82 /* QuartzCore.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = QuartzCore.framework; path = System/Library/Frameworks/QuartzCore.framework; sourceTree = SDKROOT; };
+		B9F48D2AD1EEB627B92E215C /* WebKit.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = WebKit.framework; path = System/Library/Frameworks/WebKit.framework; sourceTree = SDKROOT; };
+		C8401DEC96C88598FD2FCB16 /* main.rs */ = {isa = PBXFileReference; path = main.rs; sourceTree = "<group>"; };
+		E7E4CFAE6F6D2AD032CC3299 /* UIKit.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = UIKit.framework; path = System/Library/Frameworks/UIKit.framework; sourceTree = SDKROOT; };
+/* End PBXFileReference section */
+
+/* Begin PBXFrameworksBuildPhase section */
+		225B40D3BCBFE99E8843D628 /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				05D1F3D8352E2FECCA4A364E /* libapp.a in Frameworks */,
+				0885ABBAB90EC5EBA53A0C63 /* CoreGraphics.framework in Frameworks */,
+				1D75F189E43EC0EFE2DA28F8 /* Metal.framework in Frameworks */,
+				105E7BCEC3FA5BAF4023AB49 /* MetalKit.framework in Frameworks */,
+				CC224DDF96EFE84C04BE218C /* QuartzCore.framework in Frameworks */,
+				680185C063670942081F4104 /* Security.framework in Frameworks */,
+				1D1587F7DF343811E003D043 /* UIKit.framework in Frameworks */,
+				43F1B77DCCE09BA16633B4E3 /* WebKit.framework in Frameworks */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXFrameworksBuildPhase section */
+
+/* Begin PBXGroup section */
+		06F138D6630C847634194ABF /* lorepia-channel-stream-spike */ = {
+			isa = PBXGroup;
+			children = (
+				770884A9A17427B31A9F9141 /* main.mm */,
+				931A8B17EC3D11AE897ACB64 /* bindings */,
+			);
+			path = "lorepia-channel-stream-spike";
+			sourceTree = "<group>";
+		};
+		44CC1A6BFE1BA975932CB413 /* Externals */ = {
+			isa = PBXGroup;
+			children = (
+			);
+			path = Externals;
+			sourceTree = "<group>";
+		};
+		44F740AAF6B851F3BA90BC9F /* Frameworks */ = {
+			isa = PBXGroup;
+			children = (
+				8CB42E11E12096EF868DD98D /* CoreGraphics.framework */,
+				2C19A79E37CD8BC5B51451C3 /* libapp.a */,
+				470BD0253DDB4D8DF68D9826 /* Metal.framework */,
+				5278ECF258AAFB99E6142E48 /* MetalKit.framework */,
+				B2A8F72F382DD69BDDFC4E82 /* QuartzCore.framework */,
+				70FF90787B4570ED000B40DF /* Security.framework */,
+				E7E4CFAE6F6D2AD032CC3299 /* UIKit.framework */,
+				B9F48D2AD1EEB627B92E215C /* WebKit.framework */,
+			);
+			name = Frameworks;
+			sourceTree = "<group>";
+		};
+		4983517EC3051264EF925475 /* src */ = {
+			isa = PBXGroup;
+			children = (
+				43370218E4598A2083EFFB92 /* lib.rs */,
+				C8401DEC96C88598FD2FCB16 /* main.rs */,
+			);
+			name = src;
+			path = ../../src;
+			sourceTree = "<group>";
+		};
+		77A460646F5C98D22F8A7E16 = {
+			isa = PBXGroup;
+			children = (
+				4DC7088429778199103C2F59 /* assets */,
+				36894C43A19DEC1FCA00D519 /* Assets.xcassets */,
+				06B09E46FFAD7CC0B3458697 /* LaunchScreen.storyboard */,
+				44CC1A6BFE1BA975932CB413 /* Externals */,
+				B697150C2F0F81CBBD71674A /* lorepia-channel-stream-spike_iOS */,
+				AF27720866970C81D968226F /* Sources */,
+				4983517EC3051264EF925475 /* src */,
+				44F740AAF6B851F3BA90BC9F /* Frameworks */,
+				FE3BC1D548ED19C2CB9B164F /* Products */,
+			);
+			sourceTree = "<group>";
+		};
+		931A8B17EC3D11AE897ACB64 /* bindings */ = {
+			isa = PBXGroup;
+			children = (
+				2619ABB248106B7CA43DF433 /* bindings.h */,
+			);
+			path = bindings;
+			sourceTree = "<group>";
+		};
+		AF27720866970C81D968226F /* Sources */ = {
+			isa = PBXGroup;
+			children = (
+				06F138D6630C847634194ABF /* lorepia-channel-stream-spike */,
+			);
+			path = Sources;
+			sourceTree = "<group>";
+		};
+		B697150C2F0F81CBBD71674A /* lorepia-channel-stream-spike_iOS */ = {
+			isa = PBXGroup;
+			children = (
+				0C5F5D2552EB677F25F3B7AF /* Info.plist */,
+				9A2E838FC55478F6895E97C7 /* lorepia-channel-stream-spike_iOS.entitlements */,
+			);
+			path = "lorepia-channel-stream-spike_iOS";
+			sourceTree = "<group>";
+		};
+		FE3BC1D548ED19C2CB9B164F /* Products */ = {
+			isa = PBXGroup;
+			children = (
+				8E895B60C6A64BA64B035DCE /* lorepia-channel-stream-spike_iOS.app */,
+			);
+			name = Products;
+			sourceTree = "<group>";
+		};
+/* End PBXGroup section */
+
+/* Begin PBXNativeTarget section */
+		F32B5D72287634ED76938338 /* lorepia-channel-stream-spike_iOS */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = D6EB0E3D56263E436F4C801E /* Build configuration list for PBXNativeTarget "lorepia-channel-stream-spike_iOS" */;
+			buildPhases = (
+				FC31EC7BE7F5E5BC8BD45927 /* Build Rust Code */,
+				6D176C0A73C5CAA262DF44C6 /* Sources */,
+				BF8BDAA0D788B0AA36B8FB44 /* Resources */,
+				225B40D3BCBFE99E8843D628 /* Frameworks */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+			);
+			name = "lorepia-channel-stream-spike_iOS";
+			packageProductDependencies = (
+			);
+			productName = "lorepia-channel-stream-spike_iOS";
+			productReference = 8E895B60C6A64BA64B035DCE /* lorepia-channel-stream-spike_iOS.app */;
+			productType = "com.apple.product-type.application";
+		};
+/* End PBXNativeTarget section */
+
+/* Begin PBXProject section */
+		AD0D505E41D04EC8CB2144B1 /* Project object */ = {
+			isa = PBXProject;
+			attributes = {
+				BuildIndependentTargetsInParallel = YES;
+				LastUpgradeCheck = 1430;
+				TargetAttributes = {
+				};
+			};
+			buildConfigurationList = 05AE4D4791CF2EF7409BFAA7 /* Build configuration list for PBXProject "lorepia-channel-stream-spike" */;
+			developmentRegion = en;
+			hasScannedForEncodings = 0;
+			knownRegions = (
+				Base,
+				en,
+			);
+			mainGroup = 77A460646F5C98D22F8A7E16;
+			minimizedProjectReferenceProxies = 1;
+			preferredProjectObjectVersion = 77;
+			productRefGroup = FE3BC1D548ED19C2CB9B164F /* Products */;
+			projectDirPath = "";
+			projectRoot = "";
+			targets = (
+				F32B5D72287634ED76938338 /* lorepia-channel-stream-spike_iOS */,
+			);
+		};
+/* End PBXProject section */
+
+/* Begin PBXResourcesBuildPhase section */
+		BF8BDAA0D788B0AA36B8FB44 /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				6405CE3ED97AE34C86998EE8 /* Assets.xcassets in Resources */,
+				AC4187EC91B2D35D2F46F87D /* LaunchScreen.storyboard in Resources */,
+				25735F782F1C0DE2F1571894 /* assets in Resources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXResourcesBuildPhase section */
+
+/* Begin PBXShellScriptBuildPhase section */
+		FC31EC7BE7F5E5BC8BD45927 /* Build Rust Code */ = {
+			isa = PBXShellScriptBuildPhase;
+			alwaysOutOfDate = 1;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			inputFileListPaths = (
+			);
+			inputPaths = (
+			);
+			name = "Build Rust Code";
+			outputFileListPaths = (
+			);
+			outputPaths = (
+				"$(SRCROOT)/Externals/x86_64/${CONFIGURATION}/libapp.a",
+				"$(SRCROOT)/Externals/arm64/${CONFIGURATION}/libapp.a",
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+			shellPath = /bin/sh;
+			shellScript = "npm run -- tauri ios xcode-script -v --platform ${PLATFORM_DISPLAY_NAME:?} --sdk-root ${SDKROOT:?} --framework-search-paths \"${FRAMEWORK_SEARCH_PATHS:?}\" --header-search-paths \"${HEADER_SEARCH_PATHS:?}\" --gcc-preprocessor-definitions \"${GCC_PREPROCESSOR_DEFINITIONS:-}\" --configuration ${CONFIGURATION:?} ${FORCE_COLOR} ${ARCHS:?}";
+		};
+/* End PBXShellScriptBuildPhase section */
+
+/* Begin PBXSourcesBuildPhase section */
+		6D176C0A73C5CAA262DF44C6 /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				68F5D6AA8DA80AB801C16C38 /* main.mm in Sources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXSourcesBuildPhase section */
+
+/* Begin XCBuildConfiguration section */
+		0B5114BD5990C395DC0D809F /* release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ALWAYS_SEARCH_USER_PATHS = NO;
+				CLANG_ANALYZER_NONNULL = YES;
+				CLANG_ANALYZER_NUMBER_OBJECT_CONVERSION = YES_AGGRESSIVE;
+				CLANG_CXX_LANGUAGE_STANDARD = "gnu++14";
+				CLANG_CXX_LIBRARY = "libc++";
+				CLANG_ENABLE_MODULES = YES;
+				CLANG_ENABLE_OBJC_ARC = YES;
+				CLANG_ENABLE_OBJC_WEAK = YES;
+				CLANG_WARN_BLOCK_CAPTURE_AUTORELEASING = YES;
+				CLANG_WARN_BOOL_CONVERSION = YES;
+				CLANG_WARN_COMMA = YES;
+				CLANG_WARN_CONSTANT_CONVERSION = YES;
+				CLANG_WARN_DEPRECATED_OBJC_IMPLEMENTATIONS = YES;
+				CLANG_WARN_DIRECT_OBJC_ISA_USAGE = YES_ERROR;
+				CLANG_WARN_DOCUMENTATION_COMMENTS = YES;
+				CLANG_WARN_EMPTY_BODY = YES;
+				CLANG_WARN_ENUM_CONVERSION = YES;
+				CLANG_WARN_INFINITE_RECURSION = YES;
+				CLANG_WARN_INT_CONVERSION = YES;
+				CLANG_WARN_NON_LITERAL_NULL_CONVERSION = YES;
+				CLANG_WARN_OBJC_IMPLICIT_RETAIN_SELF = YES;
+				CLANG_WARN_OBJC_LITERAL_CONVERSION = YES;
+				CLANG_WARN_OBJC_ROOT_CLASS = YES_ERROR;
+				CLANG_WARN_QUOTED_INCLUDE_IN_FRAMEWORK_HEADER = YES;
+				CLANG_WARN_RANGE_LOOP_ANALYSIS = YES;
+				CLANG_WARN_STRICT_PROTOTYPES = YES;
+				CLANG_WARN_SUSPICIOUS_MOVE = YES;
+				CLANG_WARN_UNGUARDED_AVAILABILITY = YES_AGGRESSIVE;
+				CLANG_WARN_UNREACHABLE_CODE = YES;
+				CLANG_WARN__DUPLICATE_METHOD_MATCH = YES;
+				COPY_PHASE_STRIP = NO;
+				DEBUG_INFORMATION_FORMAT = "dwarf-with-dsym";
+				ENABLE_NS_ASSERTIONS = NO;
+				ENABLE_STRICT_OBJC_MSGSEND = YES;
+				GCC_C_LANGUAGE_STANDARD = gnu11;
+				GCC_NO_COMMON_BLOCKS = YES;
+				GCC_WARN_64_TO_32_BIT_CONVERSION = YES;
+				GCC_WARN_ABOUT_RETURN_TYPE = YES_ERROR;
+				GCC_WARN_UNDECLARED_SELECTOR = YES;
+				GCC_WARN_UNINITIALIZED_AUTOS = YES_AGGRESSIVE;
+				GCC_WARN_UNUSED_FUNCTION = YES;
+				GCC_WARN_UNUSED_VARIABLE = YES;
+				IPHONEOS_DEPLOYMENT_TARGET = 14.0;
+				MTL_ENABLE_DEBUG_INFO = NO;
+				MTL_FAST_MATH = YES;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SDKROOT = iphoneos;
+				SWIFT_COMPILATION_MODE = wholemodule;
+				SWIFT_OPTIMIZATION_LEVEL = "-O";
+				SWIFT_VERSION = 5.0;
+			};
+			name = release;
+		};
+		506E9EE64BCAE4C8C7502CB0 /* debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ALWAYS_EMBED_SWIFT_STANDARD_LIBRARIES = YES;
+				ARCHS = (
+					arm64,
+				);
+				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+				CODE_SIGN_ENTITLEMENTS = "lorepia-channel-stream-spike_iOS/lorepia-channel-stream-spike_iOS.entitlements";
+				CODE_SIGN_IDENTITY = "iPhone Developer";
+				ENABLE_BITCODE = NO;
+				"EXCLUDED_ARCHS[sdk=iphoneos*]" = x86_64;
+				FRAMEWORK_SEARCH_PATHS = (
+					"$(inherited)",
+					"\".\"",
+				);
+				INFOPLIST_FILE = "lorepia-channel-stream-spike_iOS/Info.plist";
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+				);
+				"LIBRARY_SEARCH_PATHS[arch=arm64]" = "$(inherited) $(PROJECT_DIR)/Externals/arm64/$(CONFIGURATION) $(SDKROOT)/usr/lib/swift $(DEVELOPER_DIR)/Toolchains/XcodeDefault.xctoolchain/usr/lib/swift/$(PLATFORM_NAME) $(DEVELOPER_DIR)/Toolchains/XcodeDefault.xctoolchain/usr/lib/swift-5.0/$(PLATFORM_NAME)";
+				"LIBRARY_SEARCH_PATHS[arch=x86_64]" = "$(inherited) $(PROJECT_DIR)/Externals/x86_64/$(CONFIGURATION) $(SDKROOT)/usr/lib/swift $(DEVELOPER_DIR)/Toolchains/XcodeDefault.xctoolchain/usr/lib/swift/$(PLATFORM_NAME) $(DEVELOPER_DIR)/Toolchains/XcodeDefault.xctoolchain/usr/lib/swift-5.0/$(PLATFORM_NAME)";
+				PRODUCT_BUNDLE_IDENTIFIER = dev.lorepia.spike.channelstream;
+				PRODUCT_NAME = "LorePia Channel Spike";
+				SDKROOT = iphoneos;
+				TARGETED_DEVICE_FAMILY = "1,2";
+				VALID_ARCHS = arm64;
+			};
+			name = debug;
+		};
+		801E5D02D2042F5BC701A340 /* debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ALWAYS_SEARCH_USER_PATHS = NO;
+				CLANG_ANALYZER_NONNULL = YES;
+				CLANG_ANALYZER_NUMBER_OBJECT_CONVERSION = YES_AGGRESSIVE;
+				CLANG_CXX_LANGUAGE_STANDARD = "gnu++14";
+				CLANG_CXX_LIBRARY = "libc++";
+				CLANG_ENABLE_MODULES = YES;
+				CLANG_ENABLE_OBJC_ARC = YES;
+				CLANG_ENABLE_OBJC_WEAK = YES;
+				CLANG_WARN_BLOCK_CAPTURE_AUTORELEASING = YES;
+				CLANG_WARN_BOOL_CONVERSION = YES;
+				CLANG_WARN_COMMA = YES;
+				CLANG_WARN_CONSTANT_CONVERSION = YES;
+				CLANG_WARN_DEPRECATED_OBJC_IMPLEMENTATIONS = YES;
+				CLANG_WARN_DIRECT_OBJC_ISA_USAGE = YES_ERROR;
+				CLANG_WARN_DOCUMENTATION_COMMENTS = YES;
+				CLANG_WARN_EMPTY_BODY = YES;
+				CLANG_WARN_ENUM_CONVERSION = YES;
+				CLANG_WARN_INFINITE_RECURSION = YES;
+				CLANG_WARN_INT_CONVERSION = YES;
+				CLANG_WARN_NON_LITERAL_NULL_CONVERSION = YES;
+				CLANG_WARN_OBJC_IMPLICIT_RETAIN_SELF = YES;
+				CLANG_WARN_OBJC_LITERAL_CONVERSION = YES;
+				CLANG_WARN_OBJC_ROOT_CLASS = YES_ERROR;
+				CLANG_WARN_QUOTED_INCLUDE_IN_FRAMEWORK_HEADER = YES;
+				CLANG_WARN_RANGE_LOOP_ANALYSIS = YES;
+				CLANG_WARN_STRICT_PROTOTYPES = YES;
+				CLANG_WARN_SUSPICIOUS_MOVE = YES;
+				CLANG_WARN_UNGUARDED_AVAILABILITY = YES_AGGRESSIVE;
+				CLANG_WARN_UNREACHABLE_CODE = YES;
+				CLANG_WARN__DUPLICATE_METHOD_MATCH = YES;
+				COPY_PHASE_STRIP = NO;
+				DEBUG_INFORMATION_FORMAT = dwarf;
+				ENABLE_STRICT_OBJC_MSGSEND = YES;
+				ENABLE_TESTABILITY = YES;
+				GCC_C_LANGUAGE_STANDARD = gnu11;
+				GCC_DYNAMIC_NO_PIC = NO;
+				GCC_NO_COMMON_BLOCKS = YES;
+				GCC_OPTIMIZATION_LEVEL = 0;
+				GCC_PREPROCESSOR_DEFINITIONS = (
+					"$(inherited)",
+					"DEBUG=1",
+				);
+				GCC_WARN_64_TO_32_BIT_CONVERSION = YES;
+				GCC_WARN_ABOUT_RETURN_TYPE = YES_ERROR;
+				GCC_WARN_UNDECLARED_SELECTOR = YES;
+				GCC_WARN_UNINITIALIZED_AUTOS = YES_AGGRESSIVE;
+				GCC_WARN_UNUSED_FUNCTION = YES;
+				GCC_WARN_UNUSED_VARIABLE = YES;
+				IPHONEOS_DEPLOYMENT_TARGET = 14.0;
+				MTL_ENABLE_DEBUG_INFO = INCLUDE_SOURCE;
+				MTL_FAST_MATH = YES;
+				ONLY_ACTIVE_ARCH = YES;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SDKROOT = iphoneos;
+				SWIFT_ACTIVE_COMPILATION_CONDITIONS = DEBUG;
+				SWIFT_OPTIMIZATION_LEVEL = "-Onone";
+				SWIFT_VERSION = 5.0;
+			};
+			name = debug;
+		};
+		FDB8C6B64943EE4B84E31A6E /* release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ALWAYS_EMBED_SWIFT_STANDARD_LIBRARIES = YES;
+				ARCHS = (
+					arm64,
+				);
+				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+				CODE_SIGN_ENTITLEMENTS = "lorepia-channel-stream-spike_iOS/lorepia-channel-stream-spike_iOS.entitlements";
+				CODE_SIGN_IDENTITY = "iPhone Developer";
+				ENABLE_BITCODE = NO;
+				"EXCLUDED_ARCHS[sdk=iphoneos*]" = x86_64;
+				FRAMEWORK_SEARCH_PATHS = (
+					"$(inherited)",
+					"\".\"",
+				);
+				INFOPLIST_FILE = "lorepia-channel-stream-spike_iOS/Info.plist";
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+				);
+				"LIBRARY_SEARCH_PATHS[arch=arm64]" = "$(inherited) $(PROJECT_DIR)/Externals/arm64/$(CONFIGURATION) $(SDKROOT)/usr/lib/swift $(DEVELOPER_DIR)/Toolchains/XcodeDefault.xctoolchain/usr/lib/swift/$(PLATFORM_NAME) $(DEVELOPER_DIR)/Toolchains/XcodeDefault.xctoolchain/usr/lib/swift-5.0/$(PLATFORM_NAME)";
+				"LIBRARY_SEARCH_PATHS[arch=x86_64]" = "$(inherited) $(PROJECT_DIR)/Externals/x86_64/$(CONFIGURATION) $(SDKROOT)/usr/lib/swift $(DEVELOPER_DIR)/Toolchains/XcodeDefault.xctoolchain/usr/lib/swift/$(PLATFORM_NAME) $(DEVELOPER_DIR)/Toolchains/XcodeDefault.xctoolchain/usr/lib/swift-5.0/$(PLATFORM_NAME)";
+				PRODUCT_BUNDLE_IDENTIFIER = dev.lorepia.spike.channelstream;
+				PRODUCT_NAME = "LorePia Channel Spike";
+				SDKROOT = iphoneos;
+				TARGETED_DEVICE_FAMILY = "1,2";
+				VALID_ARCHS = arm64;
+			};
+			name = release;
+		};
+/* End XCBuildConfiguration section */
+
+/* Begin XCConfigurationList section */
+		05AE4D4791CF2EF7409BFAA7 /* Build configuration list for PBXProject "lorepia-channel-stream-spike" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				801E5D02D2042F5BC701A340 /* debug */,
+				0B5114BD5990C395DC0D809F /* release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = debug;
+		};
+		D6EB0E3D56263E436F4C801E /* Build configuration list for PBXNativeTarget "lorepia-channel-stream-spike_iOS" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				506E9EE64BCAE4C8C7502CB0 /* debug */,
+				FDB8C6B64943EE4B84E31A6E /* release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = debug;
+		};
+/* End XCConfigurationList section */
+	};
+	rootObject = AD0D505E41D04EC8CB2144B1 /* Project object */;
+}

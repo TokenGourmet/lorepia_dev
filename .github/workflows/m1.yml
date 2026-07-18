@@ -1,0 +1,191 @@
+name: M-1 verification
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: m1-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  CARGO_TERM_COLOR: always
+  RUST_BACKTRACE: "1"
+
+jobs:
+  desktop:
+    name: Desktop compile/test (${{ matrix.name }})
+    runs-on: ${{ matrix.runner }}
+    timeout-minutes: 45
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - name: Linux
+            runner: ubuntu-22.04
+          - name: macOS
+            runner: macos-26
+          - name: Windows
+            runner: windows-2022
+    defaults:
+      run:
+        working-directory: spikes/channel-stream
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v6
+
+      - name: Install Linux Tauri dependencies
+        if: runner.os == 'Linux'
+        run: |
+          sudo apt-get update
+          sudo apt-get install --yes \
+            build-essential \
+            libayatana-appindicator3-dev \
+            librsvg2-dev \
+            libssl-dev \
+            libwebkit2gtk-4.1-dev \
+            libxdo-dev
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v6
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: spikes/channel-stream/package-lock.json
+
+      - name: Set up Rust
+        run: |
+          rustup toolchain install 1.97.1 --profile minimal --component rustfmt --component clippy --no-self-update
+          rustc --version --verbose
+
+      - name: Install locked JavaScript dependencies
+        run: npm ci
+
+      - name: Run frontend contract tests
+        run: npm test
+
+      - name: Audit JavaScript dependencies at moderate severity
+        run: npm audit --audit-level=moderate
+
+      - name: Check Svelte and TypeScript
+        run: npm run check
+
+      - name: Build frontend
+        run: npm run build
+
+      - name: Check Rust formatting
+        run: cargo fmt --manifest-path src-tauri/Cargo.toml --all -- --check
+
+      - name: Run Rust tests
+        run: cargo test --locked --manifest-path src-tauri/Cargo.toml --all-targets
+
+      - name: Lint Rust
+        run: cargo clippy --locked --manifest-path src-tauri/Cargo.toml --all-targets -- -D warnings
+
+      - name: Check all Rust targets
+        run: cargo check --locked --manifest-path src-tauri/Cargo.toml --all-targets
+
+  android-compile:
+    name: Android compile (no device)
+    runs-on: ubuntu-22.04
+    timeout-minutes: 60
+    defaults:
+      run:
+        shell: bash
+        working-directory: spikes/channel-stream
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v6
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v6
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: spikes/channel-stream/package-lock.json
+
+      - name: Set up Rust and Android target
+        run: |
+          rustup toolchain install 1.97.1 --profile minimal --no-self-update
+          rustup target add --toolchain 1.97.1 aarch64-linux-android
+          rustc --version --verbose
+
+      - name: Select hosted Android NDK
+        run: |
+          test -n "${ANDROID_NDK_LATEST_HOME:-}"
+          echo "NDK_HOME=$ANDROID_NDK_LATEST_HOME" >> "$GITHUB_ENV"
+
+      - name: Install locked JavaScript dependencies
+        run: npm ci
+
+      - name: Initialize disposable Android wrapper when absent
+        run: |
+          if [[ ! -d src-tauri/gen/android ]]; then
+            npm run tauri android init -- --ci
+          fi
+
+      - name: Compile debug ARM64 APK
+        run: npm run tauri android build -- --debug --target aarch64 --apk --ci
+
+      - name: Record compile-only scope
+        run: |
+          {
+            echo "### Android evidence scope"
+            echo ""
+            echo "The ARM64 debug APK compiled. No emulator or physical device was launched."
+          } >> "$GITHUB_STEP_SUMMARY"
+
+  ios-simulator-compile:
+    name: iOS simulator compile (no device)
+    runs-on: macos-26
+    timeout-minutes: 60
+    defaults:
+      run:
+        shell: bash
+        working-directory: spikes/channel-stream
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v6
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v6
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: spikes/channel-stream/package-lock.json
+
+      - name: Set up Rust and iOS simulator target
+        run: |
+          rustup toolchain install 1.97.1 --profile minimal --no-self-update
+          rustup target add --toolchain 1.97.1 aarch64-apple-ios-sim
+          rustc --version --verbose
+
+      - name: Verify Xcode and CocoaPods
+        run: |
+          xcodebuild -version
+          pod --version
+
+      - name: Install locked JavaScript dependencies
+        run: npm ci
+
+      - name: Initialize disposable iOS wrapper when absent
+        run: |
+          if [[ ! -d src-tauri/gen/apple ]]; then
+            npm run tauri ios init -- --ci
+          fi
+
+      - name: Compile debug ARM64 simulator app
+        run: npm run tauri ios build -- --debug --target aarch64-sim --ci --no-sign
+
+      - name: Record compile-only scope
+        run: |
+          {
+            echo "### iOS evidence scope"
+            echo ""
+            echo "The ARM64 simulator target compiled. No simulator or physical device was launched."
+          } >> "$GITHUB_STEP_SUMMARY"
