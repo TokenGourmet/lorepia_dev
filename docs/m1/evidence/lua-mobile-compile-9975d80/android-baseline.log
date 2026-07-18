@@ -1,0 +1,30 @@
+UTC_START=2026-07-18T23:01:57Z
+WORKTREE_ROOT=/private/tmp/lorepia-lua-fix-android.QF8rdK
+WORKDIR=/private/tmp/lorepia-lua-fix-android.QF8rdK/spikes/lua-limits
+HEAD=9975d80521c61d5c25bc9509c609439cfa371d58
+GIT_STATUS_BEGIN
+## HEAD (no branch)
+GIT_STATUS_END
+PACKAGE_LOCK_SHA256=049d114c3b4c672e38bb24a897bdd2702371b7ad7bebc7ae3f106465a73d93b5  package-lock.json
+CARGO_LOCK_SHA256=0f99c5dc2d5faad92b9926fe67b0c53a1d7a821059f91bac67942d2d746a3307  src-tauri/Cargo.lock
+PACKAGE_JSON_SHA256=d05c3a59117d5c993eb8f7ff3d7b6de3b42b4a29ed07e681f74636a93bc568a8  package.json
+CARGO_TOML_SHA256=a12c5b6504fbddcf675e8d57c811c9f67e997a9a6a211030deeb48e8b8770fdc  src-tauri/Cargo.toml
+NODE=v22.23.0
+NPM=10.9.8
+RUSTC=rustc 1.97.1 (8bab26f4f 2026-07-14)
+CARGO=cargo 1.97.1 (c980f4866 2026-06-30)
+RUST_TARGET=aarch64-linux-android
+JAVA_HOME=/opt/homebrew/opt/openjdk@21/libexec/openjdk.jdk/Contents/Home
+openjdk version "21.0.11" 2026-04-21
+OpenJDK Runtime Environment Homebrew (build 21.0.11)
+OpenJDK 64-Bit Server VM Homebrew (build 21.0.11, mixed mode, sharing)
+ANDROID_HOME=/Users/codexer/Library/Android/lorepia-sdk
+NDK_HOME=/Users/codexer/Library/Android/lorepia-sdk/ndk/28.2.13676358
+Pkg.Desc = Android NDK
+Pkg.Revision = 28.2.13676358
+Pkg.BaseRevision = 28.2.13676358
+Pkg.ReleaseName = r28c
+GEN_ANDROID_PRESENT=no
+NODE_MODULES_PRESENT=no
+TARGET_PRESENT=no
+UTC_END=2026-07-18T23:01:57Z

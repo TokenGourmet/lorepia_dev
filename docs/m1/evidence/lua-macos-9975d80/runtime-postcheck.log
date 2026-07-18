@@ -1,0 +1,9 @@
++zsh:2> date -u +%Y-%m-%dT%H:%M:%SZ
+2026-07-18T23:04:42Z
++zsh:3> pgrep -fl lorepia-lua-limits-spike
++zsh:4> printf 'process_check_exit=%s\n' 1
+process_check_exit=1
++zsh:5> find /Users/codexer/Library/Logs/DiagnosticReports -maxdepth 1 -type f -print
++zsh:5> grep -Ei 'lorepia.*lua|lua.*lorepia'
++zsh:6> printf 'matching_diagnostic_report_check_exit=%s\n' 1
+matching_diagnostic_report_check_exit=1

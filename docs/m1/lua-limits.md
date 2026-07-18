@@ -92,6 +92,12 @@ not retain base-library globals and does not rely on an `ALL_SAFE` convenience
 set. Before any fixture loads, the native harness proves all of these globals
 are absent:
 
+This is a VM-surface claim, not a binary-symbol claim. The vendored Lua archive
+still contains compiled `luaopen_io`, `luaopen_os`, `luaopen_package`, and
+`luaopen_debug` implementations; the probe does not initialize or expose them
+in its global table. Evidence must not describe this as stripping those object
+files from the application binary.
+
 ```text
 os io package debug require dofile loadfile load collectgarbage
 pcall xpcall coroutine print warn
@@ -192,6 +198,10 @@ named runners. Android CI builds an ARM64 debug APK and iOS CI builds an ARM64
 simulator app without launching it. Those are compile-only. A simulator or
 emulator runtime is still simulated evidence. None changes a physical Lua
 capability cell or the physical `Lua budget and stdlib removal` negative cell.
+For the iOS Lua target, CI additionally requires vendored Lua object presence
+in `libapp.a`, representative definitions in the final Mach-O, no unresolved
+Lua symbols, and no external Lua dynamic-library dependency. These checks prove
+the compile/link boundary only, not VM behavior.
 
 ## Evidence this spike does not claim
 

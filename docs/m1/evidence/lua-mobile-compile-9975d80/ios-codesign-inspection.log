@@ -1,0 +1,53 @@
+display_app_exit=0
+Executable=/private/tmp/lorepia-lua-fix-ios.OExxQw/spikes/lua-limits/src-tauri/gen/apple/build/arm64-sim/LorePia Lua Limits Spike.app/LorePia Lua Limits Spike
+Identifier=LorePia Lua Limits Spike
+Format=app bundle with Mach-O thin (arm64)
+CodeDirectory v=20400 size=686673 flags=0x20002(adhoc,linker-signed) hashes=21455+0 location=embedded
+VersionPlatform=7
+VersionMin=917504
+VersionSDK=1705216
+Hash type=sha256 size=32
+CandidateCDHash sha256=e795f65d05484b8a84ce8caa56727ec437c255be
+CandidateCDHashFull sha256=e795f65d05484b8a84ce8caa56727ec437c255be3bd20b74a6a35836cd1dfc86
+Hash choices=sha256
+CMSDigest=e795f65d05484b8a84ce8caa56727ec437c255be3bd20b74a6a35836cd1dfc86
+CMSDigestType=2
+Executable Segment base=0
+Executable Segment limit=22647644
+Executable Segment flags=0x1
+Page size=4096
+CDHash=e795f65d05484b8a84ce8caa56727ec437c255be
+Signature=adhoc
+Info.plist=not bound
+TeamIdentifier=not set
+Sealed Resources=none
+Internal requirements=none
+display_executable_exit=0
+Executable=/private/tmp/lorepia-lua-fix-ios.OExxQw/spikes/lua-limits/src-tauri/gen/apple/build/arm64-sim/LorePia Lua Limits Spike.app/LorePia Lua Limits Spike
+Identifier=LorePia Lua Limits Spike
+Format=app bundle with Mach-O thin (arm64)
+CodeDirectory v=20400 size=686673 flags=0x20002(adhoc,linker-signed) hashes=21455+0 location=embedded
+VersionPlatform=7
+VersionMin=917504
+VersionSDK=1705216
+Hash type=sha256 size=32
+CandidateCDHash sha256=e795f65d05484b8a84ce8caa56727ec437c255be
+CandidateCDHashFull sha256=e795f65d05484b8a84ce8caa56727ec437c255be3bd20b74a6a35836cd1dfc86
+Hash choices=sha256
+CMSDigest=e795f65d05484b8a84ce8caa56727ec437c255be3bd20b74a6a35836cd1dfc86
+CMSDigestType=2
+Executable Segment base=0
+Executable Segment limit=22647644
+Executable Segment flags=0x1
+Page size=4096
+CDHash=e795f65d05484b8a84ce8caa56727ec437c255be
+Signature=adhoc
+Info.plist=not bound
+TeamIdentifier=not set
+Sealed Resources=none
+Internal requirements=none
+verify_app_exit=1
+/private/tmp/lorepia-lua-fix-ios.OExxQw/spikes/lua-limits/src-tauri/gen/apple/build/arm64-sim/LorePia Lua Limits Spike.app: code has no resources but signature indicates they must be present
+entitlements_exit=0
+Executable=/private/tmp/lorepia-lua-fix-ios.OExxQw/spikes/lua-limits/src-tauri/gen/apple/build/arm64-sim/LorePia Lua Limits Spike.app/LorePia Lua Limits Spike
+warning: Specifying ':' in the path is deprecated and will not work in a future release

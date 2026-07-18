@@ -239,6 +239,36 @@ jobs:
       - name: Compile debug ARM64 simulator app
         run: npm run tauri ios build -- --debug --target aarch64-sim --ci --no-sign
 
+      - name: Verify vendored Lua is embedded in the iOS product
+        if: matrix.spike == 'lua-limits'
+        run: |
+          app_dir="$(find src-tauri/gen/apple/build/arm64-sim -maxdepth 1 -type d -name '*.app' -print -quit)"
+          test -n "$app_dir"
+          executable_name="$(/usr/libexec/PlistBuddy -c 'Print :CFBundleExecutable' "$app_dir/Info.plist")"
+          executable="$app_dir/$executable_name"
+          test -f "$executable"
+
+          libapp="$(find src-tauri/gen/apple/Externals/arm64/debug -type f -name libapp.a -print -quit)"
+          test -n "$libapp"
+          ar -t "$libapp" > "$RUNNER_TEMP/lua-libapp-members.txt"
+          grep -E '(^|-)lapi\.o$' "$RUNNER_TEMP/lua-libapp-members.txt" > /dev/null
+
+          nm -gU "$executable" > "$RUNNER_TEMP/lua-defined-symbols.txt"
+          grep -E '[[:space:]]T[[:space:]]_lua_newstate$' "$RUNNER_TEMP/lua-defined-symbols.txt" > /dev/null
+          grep -E '[[:space:]]T[[:space:]]_luaL_newstate$' "$RUNNER_TEMP/lua-defined-symbols.txt" > /dev/null
+          grep -E '[[:space:]]T[[:space:]]_lua_pcallk$' "$RUNNER_TEMP/lua-defined-symbols.txt" > /dev/null
+
+          nm -u "$executable" > "$RUNNER_TEMP/lua-undefined-symbols.txt"
+          if grep -E '[[:space:]]_lua(L)?[A-Za-z0-9_]*$' "$RUNNER_TEMP/lua-undefined-symbols.txt" > /dev/null; then
+            echo "unresolved Lua symbol remained in the final iOS executable" >&2
+            exit 1
+          fi
+          otool -L "$executable" > "$RUNNER_TEMP/lua-linked-libraries.txt"
+          if tail -n +2 "$RUNNER_TEMP/lua-linked-libraries.txt" | grep -Ei 'lua' > /dev/null; then
+            echo "final iOS executable depends on an external Lua library" >&2
+            exit 1
+          fi
+
       - name: Record compile-only scope
         run: |
           {

@@ -1,0 +1,30 @@
+Window: "LorePia M-1 Lua Limits Probe", App: LorePia Lua Limits Spike.
+0 standard window LorePia M-1 Lua Limits Probe, Secondary Actions: Raise
+	1 scroll area
+		2 HTML content Description: LorePia M-1 Lua Limits 실증, URL: tauri://localhost
+			3 container
+				4 heading M-1 Lua Limits 실증, Value: 1
+					5 text M-1 Lua Limits 실증
+				6 button Lua 한도 검증 실행
+				7 text Lua 실행 한도 검증 통과
+정책: m1-lua-limits-v1
+fixture catalog SHA-256: 9ea567d6901ec39412e73f439ee9ea7d47538baea4d1a92cd409c9f3e9b97db5
+런타임: Lua 5.4 / mlua 0.12.0
+검증 케이스: 완료·검증 8 / 제한 중단 3
+시간/명령 한도: 50ms / 100000
+메모리 한도: 8388608 bytes
+위험 stdlib·보호호출·coroutine 우회: 제거됨
+적대 fixture 이후 host 회복: 확인
+	8 close button
+	9 full screen button Help: this button also has an action to zoom the window, Secondary Actions: zoom the window
+	10 minimize button
+	11 text LorePia M-1 Lua Limits Probe
+12 menu bar
+	13 LorePia Lua Limits Spike
+	14 File
+	15 Edit
+	16 View
+	17 Window
+	18 Help
+
+The focused UI element is 2 HTML content Description: LorePia M-1 Lua Limits 실증, URL: tauri://localhost

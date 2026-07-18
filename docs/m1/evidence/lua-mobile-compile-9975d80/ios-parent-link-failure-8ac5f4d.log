@@ -1,0 +1,43 @@
+libapp_path=/private/tmp/lorepia-lua-ios-evidence.t0TsCh/libapp-arm64-debug.partial.a
+libapp_archs=arm64
+libapp_bytes=346746712
+libapp_sha256=7cdb056b53ad268934282ab0f099b9736c183b3c83a6c48d729f696a71b2de44
+libapp_lua_c_member_count=0
+libapp_mlua_rust_member_count=16
+liblua_path=/private/tmp/lorepia-lua-ios-evidence.t0TsCh/liblua5.4-arm64-sim.a
+liblua_archs=arm64
+liblua_bytes=1132048
+liblua_sha256=9bf55e928e93e59f5a9a2e2f20e2e0c8d5aa0bb7830a76086043bce38c1ae7ac
+liblua_total_archive_entries=33
+liblua_lua_c_member_count=32
+liblua_definition_for_luaL_callmeta:
+0000000000002050 T _luaL_callmeta
+mlua_sys_link_metadata:
+cargo:rustc-link-search=native=/private/tmp/lorepia-lua-ios.hwoI9x/spikes/lua-limits/src-tauri/target/aarch64-apple-ios-sim/debug/build/mlua-sys-cb5d597c9c6b95e3/out/lib
+cargo:rustc-link-lib=static:-bundle=lua5.4
+generated_project_dependencies:
+        LIBRARY_SEARCH_PATHS[arch=arm64]: $(inherited) $(PROJECT_DIR)/Externals/arm64/$(CONFIGURATION) $(SDKROOT)/usr/lib/swift $(DEVELOPER_DIR)/Toolchains/XcodeDefault.xctoolchain/usr/lib/swift/$(PLATFORM_NAME) $(DEVELOPER_DIR)/Toolchains/XcodeDefault.xctoolchain/usr/lib/swift-5.0/$(PLATFORM_NAME)
+        ALWAYS_EMBED_SWIFT_STANDARD_LIBRARIES: true
+        EXCLUDED_ARCHS[sdk=iphoneos*]: x86_64
+      groups: [app]
+    dependencies:
+      - framework: libapp.a
+        embed: false
+      - sdk: CoreGraphics.framework
+      - sdk: Metal.framework
+      - sdk: MetalKit.framework
+linker_failure:
+Undefined symbols for architecture arm64:
+  "_luaL_callmeta", referenced from:
+      __RNvNvMs4_NtCshB8mGgGVU8b_4mlua8userdataNtB7_11AnyUserData19invoke_tostring_dbg7do_call in libapp.a[672](mlua-00934477c52d38ee.mlua.ccfc6171cb838635-cgu.12.rcgu.o)
+      __RNvNvMs4_NtCshB8mGgGVU8b_4mlua8userdataNtB7_11AnyUserData19invoke_tostring_dbg7do_call in libapp.a[672](mlua-00934477c52d38ee.mlua.ccfc6171cb838635-cgu.12.rcgu.o)
+      __RNvNvMs4_NtCshB8mGgGVU8b_4mlua8userdataNtB7_11AnyUserData7destroy7do_call in libapp.a[672](mlua-00934477c52d38ee.mlua.ccfc6171cb838635-cgu.12.rcgu.o)
+  "_luaL_checkstack", referenced from:
+ld: symbol(s) not found for architecture arm64
+/tmp/lorepia-lua-ios.hwoI9x/spikes/lua-limits/src-tauri/gen/apple/lorepia-lua-limits-spike.xcodeproj: lorepia-lua-limits-spike_iOS: clang++: error: linker command failed with exit code 1 (use -v to see invocation)
+note: Using codesigning identity override: ""
+note: Run script build phase 'Build Rust Code' will be run during every build because the option to run the script phase "Based on dependency analysis" is unchecked. (in target 'lorepia-lua-limits-spike_iOS' from project 'lorepia-lua-limits-spike')
+** ARCHIVE FAILED **
+
+failed to archive iOS app: Failed to archive via `xcodebuild`: command ["xcodebuild"] exited with code 65
+       Error failed to archive iOS app: Failed to archive via `xcodebuild`: command ["xcodebuild"] exited with code 65

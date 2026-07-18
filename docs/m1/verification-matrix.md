@@ -9,7 +9,7 @@ This is the evidence index for the current commit, not a roadmap checkbox list. 
 | Platform | SQLite / FTS5 | Lua limits | File import | Keychain | Channel stream | Audio |
 |---|---|---|---|---|---|---|
 | Windows physical machine | NOT RUN | NOT RUN | NOT RUN | NOT RUN | NOT RUN | NOT RUN |
-| macOS physical machine | PASS ([host record](evidence/sqlite-macos-39dfef0/)) | NOT RUN | NOT RUN | NOT RUN | NOT RUN | NOT RUN |
+| macOS physical machine | PASS ([host record](evidence/sqlite-macos-39dfef0/)) | PASS ([host record](evidence/lua-macos-9975d80/)) | NOT RUN | NOT RUN | NOT RUN | NOT RUN |
 | Linux physical machine | NOT RUN | NOT RUN | NOT RUN | NOT RUN | NOT RUN | NOT RUN |
 | Android physical device | NOT RUN | NOT RUN | NOT RUN | NOT RUN | NOT RUN | NOT RUN |
 | iOS physical device | NOT RUN | NOT RUN | NOT RUN | NOT RUN | NOT RUN | NOT RUN |
@@ -51,6 +51,9 @@ These rows are deliberately separate from the runtime matrix.
 | macOS arm64 / import-hardening exact candidate | Local packaged debug `.app` build and physical-host synthetic-core runtime | PASS twice (`26/26` each) | [source `46af753` record](evidence/import-hardening-macos-46af753/); no picker or external file was used, so File import and Archive/import hardening cells remain `NOT RUN` |
 | Android ARM64 / import-hardening exact candidate | Local cross-compile to debug APK, no device | PASS (compile only) | [source `46af753` record](evidence/import-hardening-mobile-compile-46af753/); APK metadata and debug signature were inspected, but install/runtime/import remain `NOT RUN` |
 | iOS ARM64 / import-hardening exact candidate | Local simulator compile with `--no-sign`, no booted simulator | PASS (compile only) | [source `46af753` record](evidence/import-hardening-mobile-compile-46af753/); simulator-app metadata was inspected, but install/runtime/import remain `NOT RUN` |
+| macOS arm64 / Lua-limits exact candidate | Local packaged debug `.app` build and physical-host runtime | PASS twice (`11/11` each) | [source `9975d80` record](evidence/lua-macos-9975d80/); fixed self-authored corpus only, with no imported Lua or product scripting API |
+| Android ARM64 / Lua-limits exact candidate | Local cross-compile to debug APK, no device | PASS (compile only) | [source `9975d80` record](evidence/lua-mobile-compile-9975d80/); APK metadata and debug signature were inspected, but install/runtime/Lua execution remain `NOT RUN` |
+| iOS ARM64 / Lua-limits exact candidate | Local simulator compile with `--no-sign`, no booted simulator | PASS (compile only) | [source `9975d80` record](evidence/lua-mobile-compile-9975d80/); vendored Lua final-link symbols and app metadata were inspected, but install/runtime/Lua execution remain `NOT RUN` |
 | Android ARM64 / SQLite/FTS5 exact candidate | Local cross-compile summary only | NOT RUN | Build exited 0, but no qualifying raw log/artifact or run identity was retained ([observation](evidence/sqlite-mobile-compile-39dfef0/)) |
 | iOS ARM64 / SQLite/FTS5 exact candidate | Local simulator-compile summary only | NOT RUN | Build exited 0, but no qualifying raw log/artifact or run identity was retained ([observation](evidence/sqlite-mobile-compile-39dfef0/)) |
 
@@ -103,7 +106,7 @@ These environments have been identified for upcoming runs. Inventory alone does 
 |---|---|---|---|---|---|---|
 | Archive/import hardening | NOT RUN | NOT RUN | NOT RUN | NOT RUN | NOT RUN | None |
 | Regex budget | NOT RUN | NOT RUN | NOT RUN | NOT RUN | NOT RUN | None |
-| Lua budget and stdlib removal | NOT RUN | NOT RUN | NOT RUN | NOT RUN | NOT RUN | None |
+| Lua budget and stdlib removal | NOT RUN | PASS ([host record](evidence/lua-macos-9975d80/)) | NOT RUN | NOT RUN | NOT RUN | Fixed pure-Lua corpus proved instruction/allocator interruption, forbidden-global absence, and host recovery; this is VM non-exposure, not binary object removal, and imported Lua remains disabled |
 | JavaScript watchdog | NOT RUN | NOT RUN | NOT RUN | NOT RUN | NOT RUN | Cooperative same-event-loop watchdog cannot handle a busy loop; imported JS execution remains blocked ([baseline](isolation.md)) |
 | iframe IPC and broker denial | NOT RUN | NOT RUN | NOT RUN | NOT RUN | NOT RUN | Unsafe Android emulator baseline preserved; broker candidate retires demonstrated privileged wrappers. Same-process Tauri plugin WebView rejected after shared Channel queue audit; current eight-command spike uses a version-pinned 4096-byte transport mitigation, while imported execution stays off ([isolation](isolation.md), [Channel decision](channel-ipc-boundary.md)) |
 | Final HTML sanitizer | NOT RUN | NOT RUN | NOT RUN | NOT RUN | NOT RUN | None |

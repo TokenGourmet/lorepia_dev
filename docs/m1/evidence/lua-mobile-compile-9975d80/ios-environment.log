@@ -1,0 +1,37 @@
+captured_utc=2026-07-18T23:01:58Z
+repo=/private/tmp/lorepia-lua-fix-ios.OExxQw
+head=9975d80521c61d5c25bc9509c609439cfa371d58
+git_status:
+## HEAD (no branch)
+ProductName:		macOS
+ProductVersion:		26.5.2
+BuildVersion:		25F84
+arm64
+2026-07-19 08:01:58.813 system_profiler[56863:2949018] hw.cpufamily: 0x6f5129ac
+      Model Name: Mac mini
+      Model Identifier: Mac16,10
+      Chip: Apple M4
+      Memory: 16 GB
+v22.23.0
+10.9.8
+rustc 1.97.1 (8bab26f4f 2026-07-14)
+binary: rustc
+commit-hash: 8bab26f4f68e0e26f0bb7960be334d5b520ea452
+commit-date: 2026-07-14
+host: aarch64-apple-darwin
+release: 1.97.1
+LLVM version: 22.1.6
+cargo 1.97.1 (c980f4866 2026-06-30)
+aarch64-apple-ios-sim
+Xcode 26.6
+Build version 17F113
+1.16.2
+iOS 26.5 (26.5 - 23F77) - com.apple.CoreSimulator.SimRuntime.iOS-26-5
+source_hashes:
+049d114c3b4c672e38bb24a897bdd2702371b7ad7bebc7ae3f106465a73d93b5  /private/tmp/lorepia-lua-fix-ios.OExxQw/spikes/lua-limits/package-lock.json
+0f99c5dc2d5faad92b9926fe67b0c53a1d7a821059f91bac67942d2d746a3307  /private/tmp/lorepia-lua-fix-ios.OExxQw/spikes/lua-limits/src-tauri/Cargo.lock
+9ea567d6901ec39412e73f439ee9ea7d47538baea4d1a92cd409c9f3e9b97db5  /private/tmp/lorepia-lua-fix-ios.OExxQw/spikes/lua-limits/fixtures/catalog.json
+source_sizes:
+/private/tmp/lorepia-lua-fix-ios.OExxQw/spikes/lua-limits/package-lock.json 66834 bytes
+/private/tmp/lorepia-lua-fix-ios.OExxQw/spikes/lua-limits/src-tauri/Cargo.lock 108938 bytes
+/private/tmp/lorepia-lua-fix-ios.OExxQw/spikes/lua-limits/fixtures/catalog.json 1376 bytes
