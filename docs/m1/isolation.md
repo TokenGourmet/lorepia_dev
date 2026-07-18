@@ -17,9 +17,11 @@ observations below do not change any physical-device cell in
 - The immediate fallback retires the demonstrated privileged raw wrappers and
   routes their allowed operations through a Rust broker protected by a
   host-only, cryptographically random 256-bit session token. The combined
-  disposable spike still has four raw Channel transport commands; production
-  isolation must broker them or move plugin execution to a separately scoped
-  WebView.
+  disposable spike still has four raw Channel transport commands. A later
+  Tauri 2.11.5 source audit found that a separately scoped same-process Tauri
+  WebView is also insufficient because large Channel data uses an ACL-exempt,
+  process-global fetch queue without WebView ownership binding. See
+  [`channel-ipc-boundary.md`](channel-ipc-boundary.md).
 - Tauri deserializes the outer command envelope before the Rust broker runs.
   Consequently, the broker's 512 KiB request bound, rate limit, and in-flight
   cap do not prevent the first allocation and parse of an oversized direct IPC
@@ -36,6 +38,8 @@ observations below do not change any physical-device cell in
   event loop is blocked. Imported JavaScript execution therefore remains
   blocked pending a terminable execution boundary and platform evidence.
 - Store-Safe mobile builds keep imported JavaScript and imported Lua **OFF**.
+  An executable iframe in the privileged main WebView is not an allowed
+  fallback.
 
 ## Expected invariant
 
@@ -143,8 +147,8 @@ requirements. They are exit criteria, not a claim that the current candidate
 already proves every item:
 
 1. Privileged raw wrappers are removed immediately. Before production use, all
-   remaining raw app commands are either moved behind the broker or made
-   unreachable from the plugin WebView through a separately scoped capability.
+   remaining raw app commands must be unreachable from imported execution. A
+   second stock Tauri WebView in the same process does not satisfy this item.
 2. The trusted host creates a fresh CSPRNG 256-bit session token. The token is
    never placed in the plugin URL, iframe DOM, plugin-readable storage, or
    plugin `postMessage` payload.
@@ -172,17 +176,24 @@ until its execution can be terminated independently while the host stays
 responsive under a busy loop. The Store-Safe profile therefore continues to
 import JavaScript and Lua as inert/quarantined data only.
 
+Commit `f7a3270` additionally keeps each current Channel event and JSON command
+response within a 4096-byte application budget, below the audited Tauri
+large-payload threshold. Terminal events no longer repeat the accumulated text;
+the final snapshot returns byte-length and SHA-256 receipts. This prevents the
+current eight-command spike from entering the shared large-response queue, but
+it is a version-pinned mitigation rather than a general Tauri isolation fix.
+
 ## Evidence needed to replace this baseline
 
 - Retained raw logs and screenshots for the exact candidate commit.
 - Runtime negative tests on Windows, macOS, Linux, a physical Android device,
   and a physical iOS device.
-- Proof that every state-changing raw app command is unavailable to the plugin
-  surface; the combined spike's four Channel commands currently fail this exit
-  condition.
+- Proof that every state-changing raw app command is unavailable to imported
+  execution; the research iframe still shares the privileged `main` WebView
+  label and cannot satisfy this exit condition on Android.
 - A transport-level payload/admission test proving oversized direct IPC is
-  rejected before Tauri constructs the full command argument, or evidence from
-  the selected separately scoped plugin WebView design.
+  rejected before Tauri constructs the full command argument. Stock Tauri's
+  same-process WebView capability split is not sufficient evidence.
 - Missing/wrong/stale/replayed 256-bit broker-token tests with an unchanged
   native side-effect counter.
 - A busy-loop test proving that the host remains usable and can terminate the

@@ -8,8 +8,12 @@ This disposable Tauri 2 + SvelteKit application validates LorePia's native-to-we
 - Every event carries a request ID and a contiguous, monotonically increasing sequence number.
 - The producer batches mock upstream chunks in a configured 16-50 ms window.
 - The frontend acknowledges consumed sequence numbers. A bounded in-flight window prevents an unbounded producer queue, and consumer delay expands the effective batching window without dropping text.
-- Cancellation produces one `cancelled` terminal event and preserves the exact partial text and last sequence in the backend snapshot.
-- Deterministic failure injection produces one `failed` terminal event with the same recovery snapshot guarantees.
+- Cancellation produces one `cancelled` terminal event and preserves the exact partial text in the backend state; the final snapshot proves its byte length and SHA-256 with the last sequence.
+- Deterministic failure injection produces one `failed` terminal event with the same receipt guarantees.
+- Every serialized event and JSON command response in the eight-command spike
+  stays within a 4096-byte application budget. Oversized deltas are split on
+  UTF-8 boundaries, and terminal snapshots return byte-length/SHA-256 receipts
+  instead of repeating up to 1 MiB of text.
 
 The mock proves the transport and lifecycle mechanics only. It does not claim real provider SSE, mobile physical-device behavior, persistence, or production performance.
 
@@ -23,16 +27,21 @@ failed on an Android 16/API 36 emulator when the iframe invoked
 host-only 256-bit-token Rust broker fallback, and remaining same-event-loop busy
 loop blocker are documented in
 [`../../docs/m1/isolation.md`](../../docs/m1/isolation.md). Store-Safe mobile
-imports keep JavaScript and Lua disabled.
+imports keep JavaScript and Lua disabled. Their builds omit the plugin-frame
+assets and replace this route with a status-only page; unknown non-empty Tauri
+platform values fail the build instead of enabling the desktop research fixture.
 
 This combined disposable spike still registers the four raw Channel transport
-commands for its main window. The broker is the only path to the fixture's
-sanitizer and probe sinks, not yet the only native command path. Production work
-must broker those remaining commands or move plugin execution to a separately
-scoped WebView. Tauri also decodes the outer IPC command arguments before the
-Rust broker's size and admission checks run, so those checks do not bound the
-first allocation of an oversized direct command. That pre-handler boundary is
-another reason this harness is not a production plugin runtime.
+commands for its trusted `main` WebView. The broker is the only path to the
+fixture's sanitizer and probe sinks, not yet the only native command path. A
+same-process Tauri-managed plugin WebView is not selected as the production
+boundary: in audited Tauri 2.11.5, large Channel data uses an ACL-exempt global
+fetch queue without destination-WebView ownership binding. The 4096-byte budget
+keeps this spike's known responses off that queue; it does not patch Tauri or
+make the research iframe safe. Tauri also decodes outer IPC command arguments
+before the Rust broker's size and admission checks run, so those checks do not
+bound the first allocation of an oversized direct command. See
+[`../../docs/m1/channel-ipc-boundary.md`](../../docs/m1/channel-ipc-boundary.md).
 
 ## Run checks
 
@@ -44,6 +53,8 @@ npm test
 npm audit --audit-level=moderate
 npm run check
 npm run build
+TAURI_ENV_PLATFORM=android npm run build
+TAURI_ENV_PLATFORM=ios npm run build
 cargo fmt --manifest-path src-tauri/Cargo.toml --all -- --check
 cargo test --locked --manifest-path src-tauri/Cargo.toml --all-targets
 cargo clippy --locked --manifest-path src-tauri/Cargo.toml --all-targets -- -D warnings

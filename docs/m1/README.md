@@ -2,7 +2,7 @@
 
 M-1 exists to remove architecture risk before LorePia's production workspace and plugin API are frozen. A demo, a successful compile, or an undocumented manual check is not enough to close it.
 
-The current state is recorded in [`verification-matrix.md`](verification-matrix.md). The preserved cross-platform unsafe isolation baseline and selected fallback are recorded in [`isolation.md`](isolation.md). Every claim must point to reproducible evidence from the exact commit being evaluated.
+The current state is recorded in [`verification-matrix.md`](verification-matrix.md). The preserved cross-platform unsafe isolation baseline and selected fallback are recorded in [`isolation.md`](isolation.md). The audited Tauri Channel queue behavior and bounded-transport decision are recorded in [`channel-ipc-boundary.md`](channel-ipc-boundary.md). Every claim must point to reproducible evidence from the exact commit being evaluated.
 
 ## Result vocabulary
 
@@ -96,13 +96,23 @@ only proved transport absence on that runtime. See [`isolation.md`](isolation.md
 
 Until written policy clearance exists, Store-Safe builds must not execute imported JavaScript **or imported Lua**. Imported packages may be inspected and quarantined as inert data, but executable payloads remain disabled. Declarative templates and data binding are the only imported behavior allowed in this profile.
 
+Commits `07ff9c9` and `3f511f2` enforce that rule at build time for Android and
+iOS: the executable iframe fixture is excluded from the emitted asset graph,
+the isolation route is replaced with a status-only route, and a post-build
+verifier rejects fixture assets or runtime markers. An unknown non-empty Tauri
+target fails the build instead of falling back to the desktop research profile.
+These are source/build-artifact checks; they do not change any physical-device
+matrix cell.
+
 The selected host-only 256-bit-token Rust broker fallback addresses the
 privileged sanitizer/probe command path, but not a synchronous busy loop sharing
-the host event loop. The disposable combined spike still exposes four Channel
-transport commands to its one Tauri window; those commands must be brokered or
-moved to a separately scoped WebView before this can become a production plugin
-runtime.
-That unresolved blocker is preserved in [`isolation.md`](isolation.md).
+the host event loop. A stock separately scoped Tauri WebView is also not the
+production answer: Tauri 2.11.5's large Channel fetch queue is process-global,
+uses predictable numeric IDs, and does not bind a fetch to the destination
+WebView. The spike now constrains its own events and JSON responses to a 4096
+byte budget, but imported execution remains off until an independently
+terminable boundary with a bounded transport exists. See
+[`channel-ipc-boundary.md`](channel-ipc-boundary.md).
 
 Enabling either language requires all of the following:
 

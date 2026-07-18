@@ -68,10 +68,10 @@ These environments have been identified for upcoming runs. Inventory alone does 
 | Regex budget | NOT RUN | NOT RUN | NOT RUN | NOT RUN | NOT RUN | None |
 | Lua budget and stdlib removal | NOT RUN | NOT RUN | NOT RUN | NOT RUN | NOT RUN | None |
 | JavaScript watchdog | NOT RUN | NOT RUN | NOT RUN | NOT RUN | NOT RUN | Cooperative same-event-loop watchdog cannot handle a busy loop; imported JS execution remains blocked ([baseline](isolation.md)) |
-| iframe IPC and broker denial | NOT RUN | NOT RUN | NOT RUN | NOT RUN | NOT RUN | Unsafe Android emulator baseline preserved; candidate removes the retired privileged wrappers and uses a host-only 256-bit-token Rust broker, but the combined spike still has four raw Channel transport commands ([record](isolation.md)) |
+| iframe IPC and broker denial | NOT RUN | NOT RUN | NOT RUN | NOT RUN | NOT RUN | Unsafe Android emulator baseline preserved; broker candidate retires demonstrated privileged wrappers. Same-process Tauri plugin WebView rejected after shared Channel queue audit; current eight-command spike uses a version-pinned 4096-byte transport mitigation, while imported execution stays off ([isolation](isolation.md), [Channel decision](channel-ipc-boundary.md)) |
 | Final HTML sanitizer | NOT RUN | NOT RUN | NOT RUN | NOT RUN | NOT RUN | None |
 | Plugin network default-deny | NOT RUN | NOT RUN | NOT RUN | NOT RUN | NOT RUN | None |
-| Store-Safe imported-code lockout | NOT RUN | NOT RUN | NOT RUN | NOT RUN | NOT RUN | Imported JS and Lua remain disabled |
+| Store-Safe imported-code lockout | NOT RUN | NOT RUN | NOT RUN | NOT RUN | NOT RUN | Android/iOS source and simulated-build checks omit executable fixture assets, replace the isolation route, scan output markers, and reject unknown targets (`07ff9c9`, `3f511f2`); packaged/physical-device evidence remains required ([decision](channel-ipc-boundary.md)) |
 
 ## Compatibility, performance, and policy decisions
 
