@@ -4,6 +4,13 @@
   "description": "Capability for the main window",
   "windows": ["main"],
   "permissions": [
-    "core:default"
+    "core:default",
+    "allow-start-mock-stream",
+    "allow-ack-stream",
+    "allow-cancel-stream",
+    "allow-get-stream-snapshot",
+    "allow-sanitize-plugin-html",
+    "allow-privileged-probe",
+    "allow-privileged-probe-count"
   ]
 }

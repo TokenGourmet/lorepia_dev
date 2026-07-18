@@ -1,6 +1,6 @@
 use serde::{Deserialize, Serialize};
 use std::{
-    collections::{HashMap, VecDeque},
+    collections::{HashMap, HashSet, VecDeque},
     sync::{
         atomic::{AtomicBool, AtomicU64, Ordering},
         Arc, Mutex,
@@ -18,6 +18,9 @@ const DEFAULT_CHUNK_INTERVAL_MS: u64 = 8;
 const DEFAULT_ACK_TIMEOUT_MS: u64 = 1_000;
 const MAX_REQUESTS: usize = 128;
 const NO_TERMINAL_SEQ: u64 = u64::MAX;
+const MAX_PLUGIN_HTML_BYTES: usize = 65_536;
+
+static PRIVILEGED_PROBE_CALLS: AtomicU64 = AtomicU64::new(0);
 
 #[derive(Debug, Clone, Serialize, PartialEq, Eq)]
 #[serde(rename_all = "camelCase")]
@@ -557,6 +560,21 @@ struct StreamSnapshot {
 }
 
 #[derive(Debug, Clone, Serialize, PartialEq, Eq)]
+#[serde(rename_all = "camelCase")]
+struct SanitizedHtmlResponse {
+    html: String,
+    input_bytes: usize,
+    output_bytes: usize,
+}
+
+#[derive(Debug, Clone, Serialize, PartialEq, Eq)]
+#[serde(rename_all = "camelCase")]
+struct PrivilegedProbeResponse {
+    sentinel: &'static str,
+    call_count: u64,
+}
+
+#[derive(Debug, Clone, Serialize, PartialEq, Eq)]
 struct CommandError {
     code: String,
     message: String,
@@ -603,6 +621,75 @@ impl CommandError {
     fn internal(message: impl Into<String>) -> Self {
         Self::new("INTERNAL", message)
     }
+
+    fn html_too_large() -> Self {
+        Self::new(
+            "HTML_TOO_LARGE",
+            format!("plugin HTML must be at most {MAX_PLUGIN_HTML_BYTES} bytes"),
+        )
+    }
+}
+
+fn sanitize_plugin_html_value(input: &str) -> Result<SanitizedHtmlResponse, CommandError> {
+    if input.len() > MAX_PLUGIN_HTML_BYTES {
+        return Err(CommandError::html_too_large());
+    }
+
+    // This is an intentionally small presentation-only vocabulary. In
+    // particular there are no links, media, style-bearing attributes, form
+    // controls, SVG/MathML, or URL-bearing elements.
+    let allowed_tags = HashSet::from([
+        "p",
+        "br",
+        "strong",
+        "em",
+        "code",
+        "pre",
+        "ul",
+        "ol",
+        "li",
+        "blockquote",
+        "span",
+    ]);
+    let clean_content_tags = HashSet::from([
+        "script", "style", "iframe", "object", "embed", "svg", "math", "template", "form",
+        "noscript",
+    ]);
+
+    let mut builder = ammonia::Builder::default();
+    builder
+        .tags(allowed_tags)
+        .tag_attributes(HashMap::new())
+        .generic_attributes(HashSet::new())
+        .url_schemes(HashSet::new())
+        .url_relative(ammonia::UrlRelative::Deny)
+        .clean_content_tags(clean_content_tags);
+
+    let html = builder.clean(input).to_string();
+    Ok(SanitizedHtmlResponse {
+        input_bytes: input.len(),
+        output_bytes: html.len(),
+        html,
+    })
+}
+
+#[tauri::command]
+fn sanitize_plugin_html(html: String) -> Result<SanitizedHtmlResponse, CommandError> {
+    sanitize_plugin_html_value(&html)
+}
+
+#[tauri::command]
+fn privileged_probe() -> PrivilegedProbeResponse {
+    let call_count = PRIVILEGED_PROBE_CALLS.fetch_add(1, Ordering::SeqCst) + 1;
+    PrivilegedProbeResponse {
+        sentinel: "LOREPIA_PRIVILEGED_COMMAND_REACHED",
+        call_count,
+    }
+}
+
+#[tauri::command]
+fn privileged_probe_count() -> u64 {
+    PRIVILEGED_PROBE_CALLS.load(Ordering::SeqCst)
 }
 
 #[tauri::command]
@@ -944,7 +1031,10 @@ pub fn run() {
             start_mock_stream,
             ack_stream,
             cancel_stream,
-            get_stream_snapshot
+            get_stream_snapshot,
+            sanitize_plugin_html,
+            privileged_probe,
+            privileged_probe_count
         ])
         .run(tauri::generate_context!())
         .expect("error while running LorePia Channel spike");
@@ -953,6 +1043,84 @@ pub fn run() {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn plugin_html_sanitizer_keeps_only_the_presentation_subset() {
+        let input = concat!(
+            "<!--marker--><p id='x' class='y' style='color:red' onclick='attack()'>safe ",
+            "<strong data-x='1'>bold</strong><a href='javascript:attack()'>link</a></p>",
+            "<script>attack()</script><style>body{display:none}</style>",
+            "<svg><script>svgAttack()</script><text>svg text</text></svg>",
+            "<math><mtext>math text</mtext></math>",
+            "<iframe srcdoc='<script>frameAttack()</script>'>frame text</iframe>",
+            "<form action='https://example.invalid'><input name='secret'>form text</form>",
+            "<img src='data:text/html,attack' onerror='attack()'>",
+            "<blockquote><em>quoted</em><br><code>code</code></blockquote>"
+        );
+
+        let result = sanitize_plugin_html_value(input).unwrap();
+
+        assert_eq!(result.input_bytes, input.len());
+        assert_eq!(result.output_bytes, result.html.len());
+        assert!(result
+            .html
+            .contains("<p>safe <strong>bold</strong>link</p>"));
+        assert!(result
+            .html
+            .contains("<blockquote><em>quoted</em><br><code>code</code></blockquote>"));
+        for forbidden in [
+            "<!--",
+            "onclick",
+            "style=",
+            "class=",
+            "href=",
+            "javascript:",
+            "data:",
+            "<script",
+            "attack()",
+            "<style",
+            "<svg",
+            "svg text",
+            "<math",
+            "math text",
+            "<iframe",
+            "frame text",
+            "<form",
+            "form text",
+            "<input",
+            "<img",
+        ] {
+            assert!(
+                !result.html.contains(forbidden),
+                "sanitized HTML retained forbidden content {forbidden:?}: {}",
+                result.html
+            );
+        }
+    }
+
+    #[test]
+    fn plugin_html_sanitizer_enforces_the_utf8_byte_limit() {
+        let exact_ascii_limit = "x".repeat(MAX_PLUGIN_HTML_BYTES);
+        let accepted = sanitize_plugin_html_value(&exact_ascii_limit).unwrap();
+        assert_eq!(accepted.input_bytes, MAX_PLUGIN_HTML_BYTES);
+
+        let oversized_ascii = "x".repeat(MAX_PLUGIN_HTML_BYTES + 1);
+        let error = sanitize_plugin_html_value(&oversized_ascii).unwrap_err();
+        assert_eq!(error.code, "HTML_TOO_LARGE");
+
+        let exact_multibyte_floor = "한".repeat(MAX_PLUGIN_HTML_BYTES / "한".len());
+        assert!(exact_multibyte_floor.len() <= MAX_PLUGIN_HTML_BYTES);
+        sanitize_plugin_html_value(&exact_multibyte_floor).unwrap();
+
+        let oversized_multibyte = format!("{exact_multibyte_floor}한");
+        assert!(oversized_multibyte.len() > MAX_PLUGIN_HTML_BYTES);
+        assert_eq!(
+            sanitize_plugin_html_value(&oversized_multibyte)
+                .unwrap_err()
+                .code,
+            "HTML_TOO_LARGE"
+        );
+    }
 
     fn config(batch_window_ms: u64, max_in_flight: usize) -> ValidatedConfig {
         ValidatedConfig {

@@ -366,6 +366,7 @@
 </svelte:head>
 
 <main>
+  <nav><a href="/isolation">플러그인 격리 실증 열기</a></nav>
   <header>
     <h1>M-1 Channel 스트리밍 실증</h1>
     <p>결정론적 mock 스트림의 순서, ACK, 중단, 부분 텍스트 저장 상태를 확인합니다.</p>

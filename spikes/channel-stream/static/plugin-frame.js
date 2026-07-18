@@ -1,0 +1,479 @@
+"use strict";
+
+(() => {
+  const PROTOCOL_VERSION = 1;
+  const BROKER_TIMEOUT_MS = 2_000;
+  const PROBE_TIMEOUT_MS = 2_000;
+  const DETAIL_LIMIT = 256;
+  const NONCE_PATTERN = /^[0-9a-f]{32,128}$/;
+  const REQUEST_ID_PATTERN = /^[A-Za-z0-9][A-Za-z0-9_-]{0,63}$/;
+  const RESPONSE_SUCCESS_KEYS = [
+    "version",
+    "type",
+    "sessionNonce",
+    "requestId",
+    "ok",
+    "result",
+  ];
+  const RESPONSE_ERROR_KEYS = [
+    "version",
+    "type",
+    "sessionNonce",
+    "requestId",
+    "ok",
+    "error",
+  ];
+  const ERROR_KEYS = ["code", "message"];
+  const WATCHDOG_PING_KEYS = ["type", "sessionId", "seq"];
+  const RUN_SUITE_KEYS = ["type", "sessionNonce"];
+  const SET_WATCHDOG_MODE_KEYS = ["type", "sessionNonce", "mode"];
+  const DANGEROUS_HTML =
+    '<p onclick="attack()">safe<script>attack()</' +
+    "script>" +
+    '<img src="x" onerror="attack()"><a href="javascript:attack()">link</a></p>';
+
+  const sessionNonce = new URL(window.location.href).searchParams.get("session");
+  if (sessionNonce === null || !NONCE_PATTERN.test(sessionNonce)) return;
+
+  let watchdogMode = "normal";
+  let suiteRunning = false;
+  let runSequence = 0;
+  let requestSequence = 0;
+  const pendingBrokerRequests = new Map();
+
+  function isPlainRecord(value) {
+    return (
+      typeof value === "object" &&
+      value !== null &&
+      !Array.isArray(value) &&
+      Object.getPrototypeOf(value) === Object.prototype
+    );
+  }
+
+  function hasExactKeys(value, expected) {
+    if (!isPlainRecord(value)) return false;
+    const keys = Object.keys(value);
+    return (
+      keys.length === expected.length &&
+      expected.every((key) => Object.prototype.hasOwnProperty.call(value, key))
+    );
+  }
+
+  function boundedDetail(value) {
+    let detail;
+    if (typeof value === "string") {
+      detail = value;
+    } else if (value instanceof Error) {
+      detail = `${value.name}: ${value.message}`;
+    } else {
+      try {
+        detail = JSON.stringify(value);
+      } catch {
+        detail = String(value);
+      }
+    }
+    if (typeof detail !== "string" || detail.length === 0) detail = "No detail";
+    return detail.slice(0, DETAIL_LIMIT);
+  }
+
+  function postToHost(message) {
+    parent.postMessage(message, "*");
+  }
+
+  function postTestResult(testId, passed, detail) {
+    postToHost({
+      type: "lorepia:plugin:test-result",
+      sessionNonce,
+      testId,
+      passed,
+      detail: boundedDetail(detail),
+    });
+  }
+
+  function nextRequestId(label) {
+    requestSequence += 1;
+    return `suite-${runSequence}-${requestSequence}-${label}`.slice(0, 64);
+  }
+
+  function withTimeout(promise, timeoutMs, label) {
+    return new Promise((resolve, reject) => {
+      const timer = window.setTimeout(() => {
+        reject(new Error(`${label} timed out after ${timeoutMs}ms`));
+      }, timeoutMs);
+
+      Promise.resolve(promise).then(
+        (value) => {
+          window.clearTimeout(timer);
+          resolve(value);
+        },
+        (error) => {
+          window.clearTimeout(timer);
+          reject(error);
+        },
+      );
+    });
+  }
+
+  function parseBrokerResponse(value) {
+    if (!isPlainRecord(value) || value.type !== "response") return null;
+    if (
+      value.version !== PROTOCOL_VERSION ||
+      value.sessionNonce !== sessionNonce ||
+      typeof value.requestId !== "string" ||
+      !REQUEST_ID_PATTERN.test(value.requestId)
+    ) {
+      return null;
+    }
+
+    if (value.ok === true) {
+      return hasExactKeys(value, RESPONSE_SUCCESS_KEYS) ? value : null;
+    }
+
+    if (
+      value.ok !== false ||
+      !hasExactKeys(value, RESPONSE_ERROR_KEYS) ||
+      !hasExactKeys(value.error, ERROR_KEYS) ||
+      typeof value.error.code !== "string" ||
+      typeof value.error.message !== "string" ||
+      value.error.message.length > DETAIL_LIMIT
+    ) {
+      return null;
+    }
+    return value;
+  }
+
+  function brokerRequest(method, payload, options = {}) {
+    const requestId = options.requestId ?? nextRequestId("broker");
+    const request = {
+      version: PROTOCOL_VERSION,
+      type: "request",
+      sessionNonce,
+      requestId,
+      method,
+      payload,
+      ...(options.extraEnvelope ?? {}),
+    };
+
+    return new Promise((resolve, reject) => {
+      if (pendingBrokerRequests.has(requestId)) {
+        reject(new Error("A broker request with this id is already pending"));
+        return;
+      }
+
+      const timer = window.setTimeout(() => {
+        pendingBrokerRequests.delete(requestId);
+        reject(new Error(`broker request ${requestId} timed out`));
+      }, BROKER_TIMEOUT_MS);
+      pendingBrokerRequests.set(requestId, { resolve, timer });
+      postToHost(request);
+    });
+  }
+
+  function receiveBrokerResponse(value) {
+    const response = parseBrokerResponse(value);
+    if (response === null) return false;
+
+    const pending = pendingBrokerRequests.get(response.requestId);
+    if (pending === undefined) return true;
+    pendingBrokerRequests.delete(response.requestId);
+    window.clearTimeout(pending.timer);
+    pending.resolve(response);
+    return true;
+  }
+
+  function testParentDocumentBlocked() {
+    try {
+      void parent.document.documentElement;
+      return { passed: false, detail: "parent.document was readable" };
+    } catch (error) {
+      return {
+        passed: true,
+        detail: `parent.document blocked (${boundedDetail(error)})`,
+      };
+    }
+  }
+
+  function testLocalStorageBlocked() {
+    const key = "lorepia-isolation-probe";
+    try {
+      window.localStorage.setItem(key, "should-not-persist");
+      window.localStorage.removeItem(key);
+      return { passed: false, detail: "localStorage write succeeded" };
+    } catch (error) {
+      return {
+        passed: true,
+        detail: `localStorage blocked (${boundedDetail(error)})`,
+      };
+    }
+  }
+
+  function testWindowOpenBlocked() {
+    try {
+      const opened = window.open("about:blank", "_blank");
+      if (opened === null) {
+        return { passed: true, detail: "window.open returned null" };
+      }
+      try {
+        opened.close();
+      } catch {
+        // The unexpected popup is already a failed test; cleanup is best effort.
+      }
+      return { passed: false, detail: "window.open returned a WindowProxy" };
+    } catch (error) {
+      return {
+        passed: true,
+        detail: `window.open blocked (${boundedDetail(error)})`,
+      };
+    }
+  }
+
+  async function testExternalFetchBlocked() {
+    let violation = null;
+    let acceptViolation;
+    const violationPromise = new Promise((resolve) => {
+      acceptViolation = resolve;
+    });
+    const onViolation = (event) => {
+      if (
+        event.effectiveDirective === "connect-src" ||
+        event.violatedDirective === "connect-src"
+      ) {
+        violation = {
+          effectiveDirective: event.effectiveDirective,
+          blockedURI: event.blockedURI,
+        };
+        acceptViolation(violation);
+      }
+    };
+    document.addEventListener("securitypolicyviolation", onViolation);
+
+    let fetchRejected = false;
+    try {
+      await withTimeout(
+        fetch("https://example.invalid/lorepia-plugin-csp-probe", {
+          cache: "no-store",
+          credentials: "omit",
+          mode: "cors",
+        }),
+        PROBE_TIMEOUT_MS,
+        "external fetch",
+      );
+    } catch {
+      fetchRejected = true;
+    }
+
+    try {
+      await withTimeout(violationPromise, PROBE_TIMEOUT_MS, "CSP violation event");
+    } catch {
+      // The result below records the missing violation as a failed probe.
+    }
+    document.removeEventListener("securitypolicyviolation", onViolation);
+    return {
+      passed: fetchRejected && violation !== null,
+      detail:
+        fetchRejected && violation !== null
+          ? `fetch rejected; ${violation.effectiveDirective} blocked ${violation.blockedURI}`
+          : `fetchRejected=${fetchRejected}; cspViolation=${violation !== null}`,
+    };
+  }
+
+  async function testDirectTauriInvokeBlocked() {
+    try {
+      const internals = globalThis.__TAURI_INTERNALS__;
+      if (internals === undefined || typeof internals.invoke !== "function") {
+        return { passed: true, detail: "Tauri invoke is not exposed in the frame" };
+      }
+
+      await withTimeout(
+        internals.invoke("privileged_probe"),
+        PROBE_TIMEOUT_MS,
+        "direct privileged invoke",
+      );
+      return {
+        passed: false,
+        detail: "Direct privileged_probe invocation succeeded",
+      };
+    } catch (error) {
+      return {
+        passed: true,
+        detail: `Direct privileged_probe invocation blocked (${boundedDetail(error)})`,
+      };
+    }
+  }
+
+  async function testBrokerStateRead() {
+    const response = await brokerRequest("state.read", {});
+    return {
+      passed: response.ok === true,
+      detail: response.ok
+        ? "state.read returned a broker result"
+        : `state.read failed with ${response.error.code}`,
+    };
+  }
+
+  async function testBrokerSanitize() {
+    const response = await brokerRequest("render.sanitize", {
+      html: DANGEROUS_HTML,
+    });
+    if (!response.ok) {
+      return {
+        passed: false,
+        detail: `render.sanitize failed with ${response.error.code}`,
+      };
+    }
+
+    const html =
+      isPlainRecord(response.result) && typeof response.result.html === "string"
+        ? response.result.html
+        : null;
+    const unsafe =
+      html === null ||
+      /<script|<img|onerror|onclick|javascript:/i.test(html) ||
+      !html.includes("safe");
+    return {
+      passed: !unsafe,
+      detail:
+        html === null
+          ? "render.sanitize did not return result.html"
+          : `sanitized=${boundedDetail(html)}`,
+    };
+  }
+
+  async function testBrokerNetworkDenied() {
+    const response = await brokerRequest("network.fetch", {
+      url: "https://example.invalid/lorepia-broker-probe",
+    });
+    return {
+      passed: response.ok === false && response.error.code === "NETWORK_DENIED",
+      detail: response.ok
+        ? "network.fetch unexpectedly succeeded"
+        : `network.fetch returned ${response.error.code}`,
+    };
+  }
+
+  async function testBrokerSecretDenied() {
+    const response = await brokerRequest("secret.read", {});
+    return {
+      passed:
+        response.ok === false && response.error.code === "PERMISSION_DENIED",
+      detail: response.ok
+        ? "secret.read unexpectedly succeeded"
+        : `secret.read returned ${response.error.code}`,
+    };
+  }
+
+  async function testBrokerReplayRejected() {
+    const requestId = nextRequestId("replay");
+    const first = await brokerRequest("state.read", {}, { requestId });
+    if (!first.ok) {
+      return {
+        passed: false,
+        detail: `replay setup failed with ${first.error.code}`,
+      };
+    }
+
+    const second = await brokerRequest("state.read", {}, { requestId });
+    return {
+      passed: second.ok === false && second.error.code === "REPLAYED_REQUEST",
+      detail: second.ok
+        ? "replayed request unexpectedly succeeded"
+        : `replayed request returned ${second.error.code}`,
+    };
+  }
+
+  async function testUnknownEnvelopeRejected() {
+    const response = await brokerRequest("state.read", {}, {
+      extraEnvelope: { unexpected: true },
+    });
+    return {
+      passed:
+        response.ok === false && response.error.code === "MALFORMED_REQUEST",
+      detail: response.ok
+        ? "request with unknown envelope field unexpectedly succeeded"
+        : `unknown envelope field returned ${response.error.code}`,
+    };
+  }
+
+  const TESTS = [
+    ["parent-document-blocked", testParentDocumentBlocked],
+    ["local-storage-blocked", testLocalStorageBlocked],
+    ["window-open-blocked", testWindowOpenBlocked],
+    ["external-fetch-csp-blocked", testExternalFetchBlocked],
+    ["direct-tauri-invoke-blocked", testDirectTauriInvokeBlocked],
+    ["broker-state-read", testBrokerStateRead],
+    ["broker-render-sanitize", testBrokerSanitize],
+    ["broker-network-denied", testBrokerNetworkDenied],
+    ["broker-secret-permission-denied", testBrokerSecretDenied],
+    ["broker-replay-rejected", testBrokerReplayRejected],
+    ["broker-unknown-field-rejected", testUnknownEnvelopeRejected],
+  ];
+
+  async function runSuite() {
+    if (suiteRunning) return;
+    suiteRunning = true;
+    runSequence += 1;
+
+    try {
+      for (const [testId, test] of TESTS) {
+        try {
+          const result = await test();
+          postTestResult(testId, result.passed === true, result.detail);
+        } catch (error) {
+          postTestResult(testId, false, boundedDetail(error));
+        }
+      }
+    } finally {
+      suiteRunning = false;
+    }
+  }
+
+  function receiveWatchdogPing(value) {
+    if (
+      !hasExactKeys(value, WATCHDOG_PING_KEYS) ||
+      value.type !== "lorepia:watchdog:ping" ||
+      typeof value.sessionId !== "string" ||
+      value.sessionId.length === 0 ||
+      value.sessionId.length > 128 ||
+      !Number.isSafeInteger(value.seq) ||
+      value.seq < 1
+    ) {
+      return false;
+    }
+
+    if (watchdogMode === "normal") {
+      postToHost({
+        type: "lorepia:watchdog:pong",
+        sessionId: value.sessionId,
+        seq: value.seq,
+      });
+    }
+    return true;
+  }
+
+  window.addEventListener("message", (event) => {
+    if (event.source !== parent) return;
+    const value = event.data;
+
+    if (receiveBrokerResponse(value) || receiveWatchdogPing(value)) return;
+
+    if (
+      hasExactKeys(value, SET_WATCHDOG_MODE_KEYS) &&
+      value.type === "lorepia:plugin:set-watchdog-mode" &&
+      value.sessionNonce === sessionNonce &&
+      (value.mode === "normal" || value.mode === "silent")
+    ) {
+      watchdogMode = value.mode;
+      return;
+    }
+
+    if (
+      hasExactKeys(value, RUN_SUITE_KEYS) &&
+      value.type === "lorepia:plugin:run-suite" &&
+      value.sessionNonce === sessionNonce
+    ) {
+      void runSuite();
+    }
+  });
+
+  postToHost({ type: "lorepia:plugin:ready", sessionNonce });
+})();

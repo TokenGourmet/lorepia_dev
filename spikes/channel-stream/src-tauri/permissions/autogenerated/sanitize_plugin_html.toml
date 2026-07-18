@@ -1,0 +1,11 @@
+# Automatically generated - DO NOT EDIT!
+
+[[permission]]
+identifier = "allow-sanitize-plugin-html"
+description = "Enables the sanitize_plugin_html command without any pre-configured scope."
+commands.allow = ["sanitize_plugin_html"]
+
+[[permission]]
+identifier = "deny-sanitize-plugin-html"
+description = "Denies the sanitize_plugin_html command without any pre-configured scope."
+commands.deny = ["sanitize_plugin_html"]
