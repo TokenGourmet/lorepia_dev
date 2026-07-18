@@ -2,7 +2,7 @@
 
 M-1 exists to remove architecture risk before LorePia's production workspace and plugin API are frozen. A demo, a successful compile, or an undocumented manual check is not enough to close it.
 
-The current state is recorded in [`verification-matrix.md`](verification-matrix.md). The preserved cross-platform unsafe isolation baseline and selected fallback are recorded in [`isolation.md`](isolation.md). The audited Tauri Channel queue behavior and bounded-transport decision are recorded in [`channel-ipc-boundary.md`](channel-ipc-boundary.md). The independent five-OS credential-store boundary is recorded in [`keychain.md`](keychain.md). The disposable SQLite/FTS5 probe contract is recorded in [`sqlite-fts.md`](sqlite-fts.md), and the disposable archive/PNG defense contract is recorded in [`import-hardening.md`](import-hardening.md). Every claim must point to reproducible evidence from the exact commit being evaluated.
+The current state is recorded in [`verification-matrix.md`](verification-matrix.md). The preserved cross-platform unsafe isolation baseline and selected fallback are recorded in [`isolation.md`](isolation.md). The audited Tauri Channel queue behavior and bounded-transport decision are recorded in [`channel-ipc-boundary.md`](channel-ipc-boundary.md). The independent five-OS credential-store boundary is recorded in [`keychain.md`](keychain.md). The disposable SQLite/FTS5 probe contract is recorded in [`sqlite-fts.md`](sqlite-fts.md), the disposable archive/PNG defense contract in [`import-hardening.md`](import-hardening.md), and the diagnostic Lua 5.4 limit contract in [`lua-limits.md`](lua-limits.md). Every claim must point to reproducible evidence from the exact commit being evaluated.
 
 ## Result vocabulary
 
@@ -137,16 +137,17 @@ M-1 may close only when all statements below are true:
 
 `.github/workflows/m1.yml` performs:
 
-- Windows/macOS/Linux: the Channel, keychain, SQLite/FTS5, and import-hardening spikes independently run
+- Windows/macOS/Linux: the Channel, keychain, SQLite/FTS5, import-hardening,
+  and Lua-limit spikes independently run
   `npm ci`, frontend contract tests, Svelte/TypeScript check, frontend build,
   Rust format, Rust tests, Clippy with warnings denied, and Rust check.
-- Android: all four spikes compile a debug ARM64 APK on a hosted runner. The
+- Android: all five spikes compile a debug ARM64 APK on a hosted runner. The
   keychain job also verifies its committed NDK-context hook and backup
   exclusions before compilation.
-- iOS: all four spikes compile a debug ARM64 simulator target on a hosted macOS
+- iOS: all five spikes compile a debug ARM64 simulator target on a hosted macOS
   runner.
 
 Hosted CI does not claim audio output, keychain UI/service behavior, SQLite
-file-locking/search runtime behavior, WebView isolation, platform document-picker
-behavior, or physical-device smoke. Those remain matrix work with real-device
-evidence.
+file-locking/search runtime behavior, Lua runtime-limit behavior, WebView
+isolation, platform document-picker behavior, or physical-device smoke. Those
+remain matrix work with real-device evidence.

@@ -26,22 +26,27 @@ These rows are deliberately separate from the runtime matrix.
 | Windows / keychain | Hosted native compile/test | NOT RUN | Await first `Desktop compile/test (Windows / keychain)` run |
 | Windows / SQLite/FTS5 | Hosted native compile/test | NOT RUN | Await first `Desktop compile/test (Windows / sqlite-fts)` run |
 | Windows / import hardening | Hosted native compile/test | NOT RUN | Await first `Desktop compile/test (Windows / import-hardening)` run |
+| Windows / Lua limits | Hosted native compile/test | NOT RUN | Await first `Desktop compile/test (Windows / lua-limits)` run |
 | macOS / Channel | Hosted native compile/test | NOT RUN | Await first `Desktop compile/test (macOS / channel-stream)` run |
 | macOS / keychain | Hosted native compile/test | NOT RUN | Await first `Desktop compile/test (macOS / keychain)` run |
 | macOS / SQLite/FTS5 | Hosted native compile/test | NOT RUN | Await first `Desktop compile/test (macOS / sqlite-fts)` run |
 | macOS / import hardening | Hosted native compile/test | NOT RUN | Await first `Desktop compile/test (macOS / import-hardening)` run |
+| macOS / Lua limits | Hosted native compile/test | NOT RUN | Await first `Desktop compile/test (macOS / lua-limits)` run |
 | Linux / Channel | Hosted native compile/test | NOT RUN | Await first `Desktop compile/test (Linux / channel-stream)` run |
 | Linux / keychain | Hosted native compile/test | NOT RUN | Await first `Desktop compile/test (Linux / keychain)` run |
 | Linux / SQLite/FTS5 | Hosted native compile/test | NOT RUN | Await first `Desktop compile/test (Linux / sqlite-fts)` run |
 | Linux / import hardening | Hosted native compile/test | NOT RUN | Await first `Desktop compile/test (Linux / import-hardening)` run |
+| Linux / Lua limits | Hosted native compile/test | NOT RUN | Await first `Desktop compile/test (Linux / lua-limits)` run |
 | Android ARM64 / Channel | Hosted cross-compile to debug APK | NOT RUN | Await first `Android compile (channel-stream, no device)` run |
 | Android ARM64 / keychain | Hosted cross-compile to debug APK | NOT RUN | Await first `Android compile (keychain, no device)` run |
 | Android ARM64 / SQLite/FTS5 | Hosted cross-compile to debug APK | NOT RUN | Await first `Android compile (sqlite-fts, no device)` run |
 | Android ARM64 / import hardening | Hosted cross-compile to debug APK | NOT RUN | Await first `Android compile (import-hardening, no device)` run |
+| Android ARM64 / Lua limits | Hosted cross-compile to debug APK | NOT RUN | Await first `Android compile (lua-limits, no device)` run |
 | iOS ARM64 / Channel | Hosted simulator compile | NOT RUN | Await first `iOS simulator compile (channel-stream, no device)` run |
 | iOS ARM64 / keychain | Hosted simulator compile | NOT RUN | Await first `iOS simulator compile (keychain, no device)` run |
 | iOS ARM64 / SQLite/FTS5 | Hosted simulator compile | NOT RUN | Await first `iOS simulator compile (sqlite-fts, no device)` run |
 | iOS ARM64 / import hardening | Hosted simulator compile | NOT RUN | Await first `iOS simulator compile (import-hardening, no device)` run |
+| iOS ARM64 / Lua limits | Hosted simulator compile | NOT RUN | Await first `iOS simulator compile (lua-limits, no device)` run |
 | macOS arm64 / SQLite/FTS5 exact candidate | Local packaged debug `.app` build and physical-host runtime | PASS | [source `39dfef0` record](evidence/sqlite-macos-39dfef0/) |
 | macOS arm64 / import-hardening exact candidate | Local packaged debug `.app` build and physical-host synthetic-core runtime | PASS twice (`26/26` each) | [source `46af753` record](evidence/import-hardening-macos-46af753/); no picker or external file was used, so File import and Archive/import hardening cells remain `NOT RUN` |
 | Android ARM64 / import-hardening exact candidate | Local cross-compile to debug APK, no device | PASS (compile only) | [source `46af753` record](evidence/import-hardening-mobile-compile-46af753/); APK metadata and debug signature were inspected, but install/runtime/import remain `NOT RUN` |

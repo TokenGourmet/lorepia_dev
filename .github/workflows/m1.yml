@@ -38,6 +38,9 @@ jobs:
           - name: Linux
             runner: ubuntu-22.04
             spike: import-hardening
+          - name: Linux
+            runner: ubuntu-22.04
+            spike: lua-limits
           - name: macOS
             runner: macos-26
             spike: channel-stream
@@ -50,6 +53,9 @@ jobs:
           - name: macOS
             runner: macos-26
             spike: import-hardening
+          - name: macOS
+            runner: macos-26
+            spike: lua-limits
           - name: Windows
             runner: windows-2022
             spike: channel-stream
@@ -62,6 +68,9 @@ jobs:
           - name: Windows
             runner: windows-2022
             spike: import-hardening
+          - name: Windows
+            runner: windows-2022
+            spike: lua-limits
     defaults:
       run:
         working-directory: spikes/${{ matrix.spike }}
@@ -127,7 +136,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        spike: [channel-stream, keychain, sqlite-fts, import-hardening]
+        spike: [channel-stream, keychain, sqlite-fts, import-hardening, lua-limits]
     defaults:
       run:
         shell: bash
@@ -191,7 +200,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        spike: [channel-stream, keychain, sqlite-fts, import-hardening]
+        spike: [channel-stream, keychain, sqlite-fts, import-hardening, lua-limits]
     defaults:
       run:
         shell: bash

@@ -1,0 +1,14 @@
+return os == nil
+  and io == nil
+  and package == nil
+  and debug == nil
+  and require == nil
+  and dofile == nil
+  and loadfile == nil
+  and load == nil
+  and collectgarbage == nil
+  and pcall == nil
+  and xpcall == nil
+  and coroutine == nil
+  and print == nil
+  and warn == nil

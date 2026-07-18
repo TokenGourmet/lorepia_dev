@@ -1,0 +1,44 @@
+{
+  "protocolVersion": "m1-lua-limits-fixtures-v1",
+  "policyVersion": "m1-lua-limits-v1",
+  "origin": "self-authored",
+  "license": "CC0-1.0",
+  "fixtures": [
+    {
+      "fixtureId": "allowed",
+      "file": "allowed.lua",
+      "sourceBytes": 78,
+      "sourceSha256": "a77c3e6430bd50fb97b19b1389679757496fbb77122c99a447bd1e02955d8846"
+    },
+    {
+      "fixtureId": "infinite-loop",
+      "file": "infinite-loop.lua",
+      "sourceBytes": 18,
+      "sourceSha256": "ca4214690b93596df8df780783dabb39c0ae2709189d89a02276e39539f2ec1b"
+    },
+    {
+      "fixtureId": "recursive-pressure",
+      "file": "recursive-pressure.lua",
+      "sourceBytes": 69,
+      "sourceSha256": "a112019c8418f708e82c620c252cab1fffa436bda7f0c57d5d5601110dcc7bbe"
+    },
+    {
+      "fixtureId": "allocator-pressure",
+      "file": "allocator-pressure.lua",
+      "sourceBytes": 112,
+      "sourceSha256": "91b6256628e808f00cb73138410d33b7268af39c90835fc3d3ca210b52c561c8"
+    },
+    {
+      "fixtureId": "forbidden-globals",
+      "file": "forbidden-globals.lua",
+      "sourceBytes": 281,
+      "sourceSha256": "e1fa1c6ef964c4d4d7f20da8c77ebefed8e36088488d32a0d84f2979eb7e2933"
+    },
+    {
+      "fixtureId": "bypass-surfaces",
+      "file": "bypass-surfaces.lua",
+      "sourceBytes": 121,
+      "sourceSha256": "9325642a6b6a9b439a3a530a993b92e1bf8ba9a5417a890c0fdbfd02b0f0a0ae"
+    }
+  ]
+}
