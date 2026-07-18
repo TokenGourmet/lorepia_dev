@@ -1,0 +1,35 @@
+INSPECTION_UTC=2026-07-18T22:26:55Z
+APP_PATH=/tmp/lorepia-import-evidence.DTpYl8/worktree/spikes/import-hardening/src-tauri/gen/apple/build/arm64-sim/LorePia Import Hardening Spike.app
+APP_SIZE_KIB=88492
+FILE_COUNT=9
+
+EXECUTABLE_PATH=/tmp/lorepia-import-evidence.DTpYl8/worktree/spikes/import-hardening/src-tauri/gen/apple/build/arm64-sim/LorePia Import Hardening Spike.app/LorePia Import Hardening Spike
+EXECUTABLE_SIZE_BYTES=90312784
+404db0e5aae05e99fe2000deb04cfab800e8b45e3be0f22917bee3c28cdbbda1  LorePia Import Hardening Spike
+Mach-O 64-bit executable arm64
+INFO_PLIST_SIZE_BYTES=1334
+fc4ce1e88ea90e87efe08773741162d7f18de42113272d3b448fb2f63c77c9a8  Info.plist
+CFBundleIdentifier=dev.lorepia.spike.importhardening
+CFBundleSupportedPlatforms[0]=iPhoneSimulator
+DTSDKName=iphonesimulator26.5
+MinimumOSVersion=14.0
+SORTED_REGULAR_FILE_MANIFEST_SHA256=3400d3b94104f35940ef8d6d0d65457bf368830dd6453f45026c359996ab90a3
+
+Executable=/private/tmp/lorepia-import-evidence.DTpYl8/worktree/spikes/import-hardening/src-tauri/gen/apple/build/arm64-sim/LorePia Import Hardening Spike.app/LorePia Import Hardening Spike
+Identifier=LorePia Import Hardening Spike
+Format=app bundle with Mach-O thin (arm64)
+CodeDirectory v=20400 size=700247 flags=0x20002(adhoc,linker-signed) hashes=21879+0 location=embedded
+Hash type=sha256 size=32
+CandidateCDHash sha256=8fe1aeed15a8ec7fb9e88c71b3b293f1119b6dd5
+CandidateCDHashFull sha256=8fe1aeed15a8ec7fb9e88c71b3b293f1119b6dd5e2c6af08ee8abfbd65d47d04
+Hash choices=sha256
+CMSDigest=8fe1aeed15a8ec7fb9e88c71b3b293f1119b6dd5e2c6af08ee8abfbd65d47d04
+CMSDigestType=2
+CDHash=8fe1aeed15a8ec7fb9e88c71b3b293f1119b6dd5
+Signature=adhoc
+Info.plist=not bound
+TeamIdentifier=not set
+Sealed Resources=none
+Internal requirements=none
+STRICT_VERIFY_MESSAGE=code has no resources but signature indicates they must be present
+STRICT_VERIFY_EXIT=1

@@ -1,0 +1,517 @@
+SESSION_START_UTC=2026-07-18T22:22:44Z
+SOURCE_ROOT=/tmp/lorepia-import-android.0BFBPJ/src
+WORKING_DIRECTORY=/tmp/lorepia-import-android.0BFBPJ/src/spikes/import-hardening
+JAVA_HOME=/opt/homebrew/opt/openjdk@21
+ANDROID_HOME=/Users/codexer/Library/Android/lorepia-sdk
+ANDROID_SDK_ROOT=/Users/codexer/Library/Android/lorepia-sdk
+NDK_HOME=/Users/codexer/Library/Android/lorepia-sdk/ndk/28.2.13676358
+
+COMMAND: git rev-parse HEAD
+46af7539dfc564ba2fc4c8009401878965799fc3
+
+COMMAND: git status --short --branch
+## HEAD (no branch)
+
+COMMAND: uname -a
+Darwin [REDACTED_HOSTNAME] 25.5.0 Darwin Kernel Version 25.5.0: Tue Jun  9 22:26:22 PDT 2026; root:xnu-12377.121.10~1/RELEASE_ARM64_T8132 arm64
+
+COMMAND: sw_vers
+ProductName:		macOS
+ProductVersion:		26.5.2
+BuildVersion:		25F84
+
+COMMAND: node --version
+v22.23.0
+
+COMMAND: npm --version
+10.9.8
+
+COMMAND: java -version
+openjdk version "21.0.11" 2026-04-21
+OpenJDK Runtime Environment Homebrew (build 21.0.11)
+OpenJDK 64-Bit Server VM Homebrew (build 21.0.11, mixed mode, sharing)
+
+COMMAND: javac -version
+javac 21.0.11
+
+COMMAND: rustc --version --verbose
+rustc 1.97.1 (8bab26f4f 2026-07-14)
+binary: rustc
+commit-hash: 8bab26f4f68e0e26f0bb7960be334d5b520ea452
+commit-date: 2026-07-14
+host: aarch64-apple-darwin
+release: 1.97.1
+LLVM version: 22.1.6
+
+COMMAND: cargo --version --verbose
+cargo 1.97.1 (c980f4866 2026-06-30)
+release: 1.97.1
+commit-hash: c980f4866141969fab6254a680546a277789d6f0
+commit-date: 2026-06-30
+host: aarch64-apple-darwin
+libgit2: 1.9.2 (sys:0.20.4 vendored)
+libcurl: 8.7.1 (sys:0.4.88+curl-8.20.0 system ssl:(SecureTransport) LibreSSL/3.3.6)
+ssl: OpenSSL 3.6.2 7 Apr 2026
+os: Mac OS 26.5.2 [64-bit]
+
+COMMAND: rustup target list --toolchain 1.97.1 --installed
+aarch64-apple-darwin
+aarch64-apple-ios
+aarch64-apple-ios-sim
+aarch64-linux-android
+armv7-linux-androideabi
+i686-linux-android
+x86_64-apple-ios
+x86_64-linux-android
+
+COMMAND: NDK source.properties
+Pkg.Desc = Android NDK
+Pkg.Revision = 28.2.13676358
+Pkg.BaseRevision = 28.2.13676358
+Pkg.ReleaseName = r28c
+
+COMMAND: Android SDK package directories
+/Users/codexer/Library/Android/lorepia-sdk/build-tools/35.0.0
+/Users/codexer/Library/Android/lorepia-sdk/build-tools/36.1.0
+/Users/codexer/Library/Android/lorepia-sdk/platforms/android-36
+
+COMMAND: lock and catalog SHA-256
+becfe28991b1977f9a825df51761ff028b84c4a80511b9d3abcc8d6ee27ada99  package-lock.json
+a55919478e93b45740329e9f64432ddf146b51d151fae9915b526bdf3cc9fc19  src-tauri/Cargo.lock
+484a313423d4e91c792818fb64097d96f8efb7c4a31befe96a1d3f739bfe5eb2  fixtures/import-cases-v1.json
+
+COMMAND: npm ci
+
+added 87 packages, and audited 88 packages in 671ms
+
+21 packages are looking for funding
+  run `npm fund` for details
+
+3 low severity vulnerabilities
+
+To address all issues (including breaking changes), run:
+  npm audit fix --force
+
+Run `npm audit` for details.
+
+COMMAND: npm run tauri -- --version
+
+> @lorepia/spike-import-hardening@0.1.0 tauri
+> tauri --version
+
+tauri-cli 2.11.4
+
+COMMAND: npm run tauri android init -- --ci
+
+> @lorepia/spike-import-hardening@0.1.0 tauri
+> tauri android init --ci
+
+        Info Using installed NDK: /Users/codexer/Library/Android/lorepia-sdk/ndk/28.2.13676358
+Generating Android Studio project...
+        Info "/private/tmp/lorepia-import-android.0BFBPJ/src/spikes/import-hardening/src-tauri" relative to "/private/tmp/lorepia-import-android.0BFBPJ/src/spikes/import-hardening/src-tauri/gen/android/lorepia_import_hardening_spike" is "../../../"
+victory: Project generated successfully!
+    Make cool apps! 🌻 🐕 🎉
+
+COMMAND: src-tauri/gen/android/gradlew --version
+
+------------------------------------------------------------
+Gradle 8.14.3
+------------------------------------------------------------
+
+Build time:    2025-07-04 13:15:44 UTC
+Revision:      e5ee1df3d88b8ca3a8074787a94f373e3090e1db
+
+Kotlin:        2.0.21
+Groovy:        3.0.24
+Ant:           Apache Ant(TM) version 1.10.15 compiled on August 25 2024
+Launcher JVM:  21.0.11 (Homebrew 21.0.11)
+Daemon JVM:    /opt/homebrew/Cellar/openjdk@21/21.0.11/libexec/openjdk.jdk/Contents/Home (no JDK specified, using current Java home)
+OS:            Mac OS X 26.5.2 aarch64
+
+
+COMMAND: npm run tauri android build -- --debug --target aarch64 --apk --ci
+
+> @lorepia/spike-import-hardening@0.1.0 tauri
+> tauri android build --debug --target aarch64 --apk --ci
+
+        Info Using installed NDK: /Users/codexer/Library/Android/lorepia-sdk/ndk/28.2.13676358
+        Info Looking up installed tauri packages to check mismatched versions...
+     Running beforeBuildCommand `npm run build`
+
+> @lorepia/spike-import-hardening@0.1.0 build
+> vite build
+
+vite v8.1.5 building ssr environment for production...
+transforming...✓ 148 modules transformed.
+rendering chunks...
+vite v8.1.5 building client environment for production...
+transforming...✓ 159 modules transformed.
+rendering chunks...
+computing gzip size...
+.svelte-kit/output/client/_app/version.json                        0.02 kB │ gzip:  0.04 kB
+.svelte-kit/output/client/.vite/manifest.json                      2.28 kB │ gzip:  0.48 kB
+.svelte-kit/output/client/_app/immutable/chunks/xihTtKlq.js        0.06 kB │ gzip:  0.08 kB
+.svelte-kit/output/client/_app/immutable/entry/start.-MkspGNk.js   0.07 kB │ gzip:  0.08 kB
+.svelte-kit/output/client/_app/immutable/nodes/0.DuWwUfcX.js       0.21 kB │ gzip:  0.18 kB
+.svelte-kit/output/client/_app/immutable/nodes/1.0Z6w_w9j.js       0.62 kB │ gzip:  0.35 kB
+.svelte-kit/output/client/_app/immutable/chunks/Bjy-W4x2.js        1.36 kB │ gzip:  0.65 kB
+.svelte-kit/output/client/_app/immutable/entry/app.D4CenlXP.js     3.92 kB │ gzip:  1.82 kB
+.svelte-kit/output/client/_app/immutable/nodes/2.BNUF49-s.js      11.03 kB │ gzip:  4.23 kB
+.svelte-kit/output/client/_app/immutable/chunks/C7pd6SbA.js       26.68 kB │ gzip: 10.32 kB
+.svelte-kit/output/client/_app/immutable/chunks/C4DT2ZEi.js       36.72 kB │ gzip: 14.06 kB
+
+✓ built in 82ms
+computing gzip size...
+.svelte-kit/output/server/.vite/manifest.json                   2.94 kB │ gzip:  0.51 kB
+.svelte-kit/output/server/entries/pages/_layout.ts.js           0.07 kB │ gzip:  0.09 kB
+.svelte-kit/output/server/env.js                                0.22 kB │ gzip:  0.14 kB
+.svelte-kit/output/server/entries/fallbacks/layout.svelte.js    0.28 kB │ gzip:  0.21 kB
+.svelte-kit/output/server/chunks/env.js                         0.28 kB │ gzip:  0.17 kB
+.svelte-kit/output/server/internal.js                           0.40 kB │ gzip:  0.19 kB
+.svelte-kit/output/server/chunks/internal2.js                   0.87 kB │ gzip:  0.38 kB
+.svelte-kit/output/server/entries/pages/_page.svelte.js         1.17 kB │ gzip:  0.70 kB
+.svelte-kit/output/server/entries/fallbacks/error.svelte.js     5.12 kB │ gzip:  1.97 kB
+.svelte-kit/output/server/chunks/exports.js                     9.00 kB │ gzip:  2.96 kB
+.svelte-kit/output/server/chunks/shared.js                     10.57 kB │ gzip:  3.38 kB
+.svelte-kit/output/server/chunks/internal.js                   25.42 kB │ gzip:  7.86 kB
+.svelte-kit/output/server/chunks/utils.js                      31.76 kB │ gzip:  9.35 kB
+.svelte-kit/output/server/remote-entry.js                      54.47 kB │ gzip: 12.01 kB
+.svelte-kit/output/server/index.js                            125.81 kB │ gzip: 31.88 kB
+.svelte-kit/output/server/chunks/server.js                    126.32 kB │ gzip: 32.77 kB
+
+✓ built in 1.02s
+
+Run npm run preview to preview your production build locally.
+
+> Using @sveltejs/adapter-static
+  Wrote site to "build"
+  ✔ done
+   Compiling proc-macro2 v1.0.106
+   Compiling unicode-ident v1.0.24
+   Compiling quote v1.0.46
+   Compiling libc v0.2.186
+   Compiling serde_core v1.0.228
+   Compiling siphasher v1.0.3
+   Compiling fastrand v2.4.1
+   Compiling icu_normalizer_data v2.2.0
+   Compiling icu_properties_data v2.2.0
+   Compiling serde v1.0.228
+   Compiling phf_shared v0.13.1
+   Compiling stable_deref_trait v1.2.1
+   Compiling parking_lot_core v0.9.12
+   Compiling cfg-if v1.0.4
+   Compiling memchr v2.8.3
+   Compiling phf_generator v0.13.1
+   Compiling smallvec v1.15.2
+   Compiling phf_codegen v0.13.1
+   Compiling winnow v1.0.4
+   Compiling version_check v0.9.5
+   Compiling thiserror v1.0.69
+   Compiling itoa v1.0.18
+   Compiling typeid v1.0.3
+   Compiling hashbrown v0.17.1
+   Compiling equivalent v1.0.2
+   Compiling toml_parser v1.1.2+spec-1.1.0
+   Compiling syn v2.0.119
+   Compiling string_cache_codegen v0.6.1
+   Compiling num-conv v0.2.2
+   Compiling time-core v0.1.9
+   Compiling indexmap v2.14.0
+   Compiling erased-serde v0.4.10
+   Compiling web_atoms v0.2.5
+   Compiling litemap v0.8.2
+   Compiling ident_case v1.0.1
+   Compiling strsim v0.11.1
+   Compiling writeable v0.6.3
+   Compiling serde_json v1.0.145
+   Compiling thiserror v2.0.18
+   Compiling generic-array v0.14.7
+   Compiling selectors v0.36.1
+   Compiling utf8_iter v1.0.4
+   Compiling ryu v1.0.23
+   Compiling scopeguard v1.2.0
+   Compiling anyhow v1.0.104
+   Compiling new_debug_unreachable v1.0.6
+   Compiling lock_api v0.4.14
+   Compiling getrandom v0.4.3
+   Compiling precomputed-hash v0.1.1
+   Compiling toml_writer v1.1.2+spec-1.1.0
+   Compiling ctor-proc-macro v0.0.7
+   Compiling parking_lot v0.12.5
+   Compiling toml_datetime v1.1.1+spec-1.1.0
+   Compiling serde_spanned v1.1.1
+   Compiling string_cache v0.9.0
+   Compiling semver v1.0.28
+   Compiling dtoa v1.0.11
+   Compiling log v0.4.33
+   Compiling autocfg v1.5.1
+   Compiling percent-encoding v2.3.2
+   Compiling crc32fast v1.5.0
+   Compiling form_urlencoded v1.2.2
+   Compiling dtoa-short v0.3.5
+   Compiling tendril v0.5.1
+   Compiling aho-corasick v1.1.4
+   Compiling unic-char-range v0.9.0
+   Compiling alloc-no-stdlib v2.0.4
+   Compiling camino v1.2.4
+   Compiling synstructure v0.13.2
+   Compiling darling_core v0.23.0
+   Compiling indexmap v1.9.3
+   Compiling uuid v1.24.0
+   Compiling byteorder v1.5.0
+   Compiling unic-common v0.9.0
+   Compiling regex-syntax v0.8.11
+   Compiling unic-ucd-version v0.9.0
+   Compiling alloc-stdlib v0.2.4
+   Compiling serde_derive_internals v0.29.1
+   Compiling unic-char-property v0.9.0
+   Compiling toml v1.1.3+spec-1.1.0
+   Compiling regex-automata v0.4.16
+   Compiling servo_arc v0.4.3
+   Compiling rustc-hash v2.1.3
+   Compiling schemars v0.8.22
+   Compiling fnv v1.0.7
+   Compiling powerfmt v0.2.0
+   Compiling bit-vec v0.8.0
+   Compiling hashbrown v0.12.3
+   Compiling futures-core v0.3.33
+   Compiling bitflags v2.13.1
+   Compiling pin-project-lite v0.2.17
+   Compiling deranged v0.5.8
+   Compiling serde_derive v1.0.228
+   Compiling zerofrom-derive v0.1.7
+   Compiling yoke-derive v0.8.2
+   Compiling zerovec-derive v0.11.3
+   Compiling displaydoc v0.2.6
+   Compiling phf_macros v0.13.1
+   Compiling thiserror-impl v1.0.69
+   Compiling derive_more-impl v2.1.1
+   Compiling cssparser-macros v0.6.1
+   Compiling darling_macro v0.23.0
+   Compiling thiserror-impl v2.0.18
+   Compiling regex v1.13.1
+   Compiling phf v0.13.1
+   Compiling darling v0.23.0
+   Compiling zerofrom v0.1.8
+   Compiling derive_more v2.1.1
+   Compiling cssparser v0.36.0
+   Compiling serde_with_macros v3.21.0
+   Compiling markup5ever v0.38.0
+   Compiling html5ever v0.38.0
+   Compiling yoke v0.8.3
+   Compiling time v0.3.53
+   Compiling schemars_derive v0.8.22
+   Compiling jni-sys-macros v0.4.1
+   Compiling bit-set v0.8.0
+   Compiling cfb v0.7.3
+   Compiling unic-ucd-ident v0.9.0
+   Compiling brotli-decompressor v5.0.3
+   Compiling quick-xml v0.41.0
+   Compiling same-file v1.0.6
+   Compiling dyn-clone v1.0.20
+   Compiling base64 v0.21.7
+   Compiling foldhash v0.2.0
+   Compiling zerovec v0.11.6
+   Compiling zerotrie v0.2.4
+   Compiling base64 v0.22.1
+   Compiling bytes v1.12.1
+   Compiling jni-sys v0.3.1
+   Compiling dunce v1.0.5
+   Compiling swift-rs v1.0.7
+   Compiling jsonptr v0.6.3
+   Compiling cargo-platform v0.1.9
+   Compiling cargo_metadata v0.19.2
+   Compiling http v1.4.2
+   Compiling json-patch v3.0.1
+   Compiling plist v1.10.0
+   Compiling tinystr v0.8.3
+   Compiling potential_utf v0.1.5
+   Compiling icu_locale_core v2.2.0
+   Compiling icu_collections v2.2.0
+   Compiling dom_query v0.27.0
+   Compiling brotli v8.0.4
+   Compiling walkdir v2.5.0
+   Compiling infer v0.19.0
+   Compiling jni-sys v0.4.1
+   Compiling serde-untagged v0.1.9
+   Compiling serde_with v3.21.0
+   Compiling icu_provider v2.2.0
+   Compiling ctor v0.8.0
+   Compiling icu_normalizer v2.2.0
+   Compiling icu_properties v2.2.0
+   Compiling find-msvc-tools v0.1.9
+   Compiling glob v0.3.3
+   Compiling shlex v2.0.1
+   Compiling cc v1.3.0
+   Compiling rustc_version v0.4.1
+   Compiling toml_edit v0.25.13+spec-1.1.0
+   Compiling idna_adapter v1.2.2
+   Compiling idna v1.1.0
+   Compiling toml_datetime v0.7.5+spec-1.1.0
+   Compiling url v2.5.8
+   Compiling socket2 v0.6.5
+   Compiling mio v1.2.2
+   Compiling time-macros v0.2.31
+   Compiling option-ext v0.2.0
+   Compiling simd-adler32 v0.3.10
+   Compiling urlpattern v0.3.0
+   Compiling winnow v0.7.15
+   Compiling rustversion v1.0.23
+   Compiling once_cell v1.21.4
+   Compiling typenum v1.20.1
+   Compiling tokio v1.53.0
+   Compiling dirs-sys v0.5.0
+   Compiling proc-macro-crate v3.5.0
+   Compiling embed-resource v3.0.11
+   Compiling tauri-utils v2.9.3
+   Compiling heck v0.5.0
+   Compiling toml v0.9.12+spec-1.1.0
+   Compiling adler2 v2.0.1
+   Compiling crossbeam-utils v0.8.22
+   Compiling miniz_oxide v0.8.9
+   Compiling cargo_toml v0.22.3
+   Compiling num_enum_derive v0.7.6
+   Compiling tauri-winres v0.3.6
+   Compiling dirs v6.0.0
+   Compiling http-body v1.1.0
+   Compiling combine v4.6.7
+   Compiling cookie v0.18.1
+   Compiling httparse v1.10.1
+   Compiling raw-window-handle v0.6.2
+   Compiling cesu8 v1.1.0
+   Compiling futures-task v0.3.33
+   Compiling slab v0.4.12
+   Compiling futures-util v0.3.33
+   Compiling num_enum v0.7.6
+   Compiling flate2 v1.1.9
+   Compiling block-buffer v0.10.4
+   Compiling crypto-common v0.1.7
+   Compiling fdeflate v0.3.7
+   Compiling ndk-sys v0.6.0+11769913
+   Compiling dpi v0.1.2
+   Compiling try-lock v0.2.5
+   Compiling tower-service v0.3.3
+   Compiling bitflags v1.3.2
+   Compiling jni v0.21.1
+   Compiling ndk v0.9.0
+   Compiling png v0.17.16
+   Compiling want v0.3.1
+   Compiling digest v0.10.7
+   Compiling crossbeam-channel v0.5.16
+   Compiling tauri-build v2.6.3
+   Compiling tracing-core v0.1.36
+   Compiling tao-macros v0.1.3
+   Compiling futures-channel v0.3.33
+   Compiling sync_wrapper v1.0.2
+   Compiling cpufeatures v0.2.17
+   Compiling tower-layer v0.3.3
+   Compiling wry v0.55.1
+   Compiling tauri-runtime v2.11.3
+   Compiling atomic-waker v1.1.2
+   Compiling hyper v1.10.1
+   Compiling tower v0.5.3
+   Compiling sha2 v0.10.9
+   Compiling tracing v0.1.44
+   Compiling ico v0.5.0
+   Compiling getrandom v0.3.4
+   Compiling futures-sink v0.3.33
+   Compiling ipnet v2.12.0
+   Compiling tauri-runtime-wry v2.11.4
+   Compiling hyper-util v0.1.20
+   Compiling tauri-codegen v2.6.3
+   Compiling tokio-util v0.7.18
+   Compiling tower-http v0.6.11
+   Compiling tao v0.35.3
+   Compiling http-body-util v0.1.4
+   Compiling serialize-to-javascript-impl v0.1.2
+   Compiling tinyvec_macros v0.1.1
+   Compiling tinyvec v1.12.0
+   Compiling reqwest v0.13.4
+   Compiling serialize-to-javascript v0.1.2
+   Compiling serde_repr v0.1.20
+   Compiling mime v0.3.17
+   Compiling typed-path v0.12.3
+   Compiling png v0.18.1
+   Compiling unicode-normalization v0.1.25
+   Compiling zip v8.6.0
+   Compiling tauri v2.11.5
+   Compiling tauri-macros v2.6.3
+   Compiling lorepia-import-hardening-spike v0.1.0 (/private/tmp/lorepia-import-android.0BFBPJ/src/spikes/import-hardening/src-tauri)
+    Finished `dev` profile [unoptimized + debuginfo] target(s) in 40.82s
+        Info symlinking lib "/private/tmp/lorepia-import-android.0BFBPJ/src/spikes/import-hardening/src-tauri/target/aarch64-linux-android/debug/libspikesimporthardening_lib.so" in jniLibs dir "/private/tmp/lorepia-import-android.0BFBPJ/src/spikes/import-hardening/src-tauri/gen/android/app/src/main/jniLibs/arm64-v8a"
+        Info "/private/tmp/lorepia-import-android.0BFBPJ/src/spikes/import-hardening/src-tauri/target/aarch64-linux-android/debug/libspikesimporthardening_lib.so" requires shared lib "libandroid.so"
+        Info "/private/tmp/lorepia-import-android.0BFBPJ/src/spikes/import-hardening/src-tauri/target/aarch64-linux-android/debug/libspikesimporthardening_lib.so" requires shared lib "libdl.so"
+        Info "/private/tmp/lorepia-import-android.0BFBPJ/src/spikes/import-hardening/src-tauri/target/aarch64-linux-android/debug/libspikesimporthardening_lib.so" requires shared lib "liblog.so"
+        Info "/private/tmp/lorepia-import-android.0BFBPJ/src/spikes/import-hardening/src-tauri/target/aarch64-linux-android/debug/libspikesimporthardening_lib.so" requires shared lib "libm.so"
+        Info "/private/tmp/lorepia-import-android.0BFBPJ/src/spikes/import-hardening/src-tauri/target/aarch64-linux-android/debug/libspikesimporthardening_lib.so" requires shared lib "libc.so"
+        Info symlink at "/private/tmp/lorepia-import-android.0BFBPJ/src/spikes/import-hardening/src-tauri/gen/android/app/src/main/jniLibs/arm64-v8a/libspikesimporthardening_lib.so" points to "/private/tmp/lorepia-import-android.0BFBPJ/src/spikes/import-hardening/src-tauri/target/aarch64-linux-android/debug/libspikesimporthardening_lib.so"
+w: file:///private/tmp/lorepia-import-android.0BFBPJ/src/spikes/import-hardening/src-tauri/gen/android/buildSrc/src/main/java/dev/lorepia/spike/importhardening/kotlin/BuildTask.kt:53:17 'exec(Action<in ExecSpec!>): ExecResult' is deprecated. Deprecated in Java
+        Info connection; remote_addr=127.0.0.1:51459 conn_id=0
+
+> @lorepia/spike-import-hardening@0.1.0 tauri
+> tauri android android-studio-script --target aarch64
+
+        Info Using installed NDK: /Users/codexer/Library/Android/lorepia-sdk/ndk/28.2.13676358
+   Compiling wry v0.55.1
+   Compiling tauri v2.11.5
+   Compiling lorepia-import-hardening-spike v0.1.0 (/private/tmp/lorepia-import-android.0BFBPJ/src/spikes/import-hardening/src-tauri)
+   Compiling tauri-runtime-wry v2.11.4
+w: file:///Users/codexer/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/tauri-2.11.5/mobile/android/src/main/java/app/tauri/AppPlugin.kt:35:37 'onBackPressed(): Unit' is deprecated. Deprecated in Java
+w: file:///Users/codexer/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/tauri-2.11.5/mobile/android/src/main/java/app/tauri/plugin/Plugin.kt:107:5 'onDestroy(): Unit' is deprecated. use onDestroy(activity: AppCompatActivity) instead
+w: file:///Users/codexer/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/tauri-2.11.5/mobile/android/src/main/java/app/tauri/plugin/Plugin.kt:112:5 'onRestart(): Unit' is deprecated. use onRestart(activity: AppCompatActivity) instead
+w: file:///Users/codexer/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/tauri-2.11.5/mobile/android/src/main/java/app/tauri/plugin/PluginMethodData.kt:11:23 Parameter 'methodDecorator' is never used
+    Finished `dev` profile [unoptimized + debuginfo] target(s) in 6.47s
+        Info symlinking lib "/private/tmp/lorepia-import-android.0BFBPJ/src/spikes/import-hardening/src-tauri/target/aarch64-linux-android/debug/libspikesimporthardening_lib.so" in jniLibs dir "/private/tmp/lorepia-import-android.0BFBPJ/src/spikes/import-hardening/src-tauri/gen/android/app/src/main/jniLibs/arm64-v8a"
+        Info "/private/tmp/lorepia-import-android.0BFBPJ/src/spikes/import-hardening/src-tauri/target/aarch64-linux-android/debug/libspikesimporthardening_lib.so" requires shared lib "libandroid.so"
+        Info "/private/tmp/lorepia-import-android.0BFBPJ/src/spikes/import-hardening/src-tauri/target/aarch64-linux-android/debug/libspikesimporthardening_lib.so" requires shared lib "libdl.so"
+        Info "/private/tmp/lorepia-import-android.0BFBPJ/src/spikes/import-hardening/src-tauri/target/aarch64-linux-android/debug/libspikesimporthardening_lib.so" requires shared lib "liblog.so"
+        Info "/private/tmp/lorepia-import-android.0BFBPJ/src/spikes/import-hardening/src-tauri/target/aarch64-linux-android/debug/libspikesimporthardening_lib.so" requires shared lib "libm.so"
+        Info "/private/tmp/lorepia-import-android.0BFBPJ/src/spikes/import-hardening/src-tauri/target/aarch64-linux-android/debug/libspikesimporthardening_lib.so" requires shared lib "libc.so"
+Java compiler version 21 has deprecated support for compiling with source/target version 8.
+Try one of the following options:
+    1. [Recommended] Use Java toolchain with a lower language version
+    2. Set a higher source/target version
+    3. Use a lower version of the JDK running the build (if you're not using Java toolchain)
+For more details on how to configure these settings, see https://developer.android.com/build/jdks.
+To suppress this warning, set android.javaCompile.suppressSourceTargetDeprecationWarning=true in gradle.properties.
+warning: [options] source value 8 is obsolete and will be removed in a future release
+warning: [options] target value 8 is obsolete and will be removed in a future release
+warning: [options] To suppress warnings about obsolete options, use -Xlint:-options.
+3 warnings
+w: file:///private/tmp/lorepia-import-android.0BFBPJ/src/spikes/import-hardening/src-tauri/gen/android/app/src/main/java/dev/lorepia/spike/importhardening/generated/RustWebView.kt:26:18 'setter for databaseEnabled: Boolean' is deprecated. Deprecated in Java
+w: file:///private/tmp/lorepia-import-android.0BFBPJ/src/spikes/import-hardening/src-tauri/gen/android/app/src/main/java/dev/lorepia/spike/importhardening/generated/WryActivity.kt:69:46 'onBackPressed(): Unit' is deprecated. This method has been deprecated in favor of using the
+      {@link OnBackPressedDispatcher} via {@link #getOnBackPressedDispatcher()}.
+      The OnBackPressedDispatcher controls how back button events are dispatched
+      to one or more {@link OnBackPressedCallback} objects.
+Java compiler version 21 has deprecated support for compiling with source/target version 8.
+Try one of the following options:
+    1. [Recommended] Use Java toolchain with a lower language version
+    2. Set a higher source/target version
+    3. Use a lower version of the JDK running the build (if you're not using Java toolchain)
+For more details on how to configure these settings, see https://developer.android.com/build/jdks.
+To suppress this warning, set android.javaCompile.suppressSourceTargetDeprecationWarning=true in gradle.properties.
+warning: [options] source value 8 is obsolete and will be removed in a future release
+warning: [options] target value 8 is obsolete and will be removed in a future release
+warning: [options] To suppress warnings about obsolete options, use -Xlint:-options.
+3 warnings
+
+[Incubating] Problems report is available at: file:///private/tmp/lorepia-import-android.0BFBPJ/src/spikes/import-hardening/src-tauri/gen/android/build/reports/problems/problems-report.html
+
+Deprecated Gradle features were used in this build, making it incompatible with Gradle 9.0.
+
+You can use '--warning-mode all' to show the individual deprecation warnings and determine if they come from your own scripts or plugins.
+
+For more on this, please refer to https://docs.gradle.org/8.14.3/userguide/command_line_interface.html#sec:command_line_warnings in the Gradle documentation.
+    Finished 1 APK at:
+        /private/tmp/lorepia-import-android.0BFBPJ/src/spikes/import-hardening/src-tauri/gen/android/app/build/outputs/apk/universal/debug/app-universal-debug.apk
+
+
+COMMAND: find generated APKs
+src-tauri/gen/android/app/build/outputs/apk/universal/debug/app-universal-debug.apk
+
+COMMAND: git status --short --branch
+## HEAD (no branch)
+?? src-tauri/gen/
+
+SESSION_END_UTC=2026-07-18T22:23:56Z
+SESSION_EXIT_STATUS=0

@@ -44,6 +44,8 @@ These rows are deliberately separate from the runtime matrix.
 | iOS ARM64 / import hardening | Hosted simulator compile | NOT RUN | Await first `iOS simulator compile (import-hardening, no device)` run |
 | macOS arm64 / SQLite/FTS5 exact candidate | Local packaged debug `.app` build and physical-host runtime | PASS | [source `39dfef0` record](evidence/sqlite-macos-39dfef0/) |
 | macOS arm64 / import-hardening exact candidate | Local packaged debug `.app` build and physical-host synthetic-core runtime | PASS twice (`26/26` each) | [source `46af753` record](evidence/import-hardening-macos-46af753/); no picker or external file was used, so File import and Archive/import hardening cells remain `NOT RUN` |
+| Android ARM64 / import-hardening exact candidate | Local cross-compile to debug APK, no device | PASS (compile only) | [source `46af753` record](evidence/import-hardening-mobile-compile-46af753/); APK metadata and debug signature were inspected, but install/runtime/import remain `NOT RUN` |
+| iOS ARM64 / import-hardening exact candidate | Local simulator compile with `--no-sign`, no booted simulator | PASS (compile only) | [source `46af753` record](evidence/import-hardening-mobile-compile-46af753/); simulator-app metadata was inspected, but install/runtime/import remain `NOT RUN` |
 | Android ARM64 / SQLite/FTS5 exact candidate | Local cross-compile summary only | NOT RUN | Build exited 0, but no qualifying raw log/artifact or run identity was retained ([observation](evidence/sqlite-mobile-compile-39dfef0/)) |
 | iOS ARM64 / SQLite/FTS5 exact candidate | Local simulator-compile summary only | NOT RUN | Build exited 0, but no qualifying raw log/artifact or run identity was retained ([observation](evidence/sqlite-mobile-compile-39dfef0/)) |
 

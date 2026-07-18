@@ -1,0 +1,174 @@
+INSPECTION_UTC=2026-07-18T22:24:06Z
+APK_PATH=/tmp/lorepia-import-android.0BFBPJ/src/spikes/import-hardening/src-tauri/gen/android/app/build/outputs/apk/universal/debug/app-universal-debug.apk
+APK_SIZE_BYTES=142155091
+b90586ab22d106db12c2f99c9ec03b5ea95b939da25ae401211e59462ca31d97  /tmp/lorepia-import-android.0BFBPJ/src/spikes/import-hardening/src-tauri/gen/android/app/build/outputs/apk/universal/debug/app-universal-debug.apk
+
+AAPT_BADGING_BEGIN
+package: name='dev.lorepia.spike.importhardening' versionCode='1000' versionName='0.1.0' platformBuildVersionName='16' platformBuildVersionCode='36' compileSdkVersion='36' compileSdkVersionCodename='16'
+sdkVersion:'24'
+targetSdkVersion:'36'
+uses-permission: name='android.permission.INTERNET'
+uses-permission: name='dev.lorepia.spike.importhardening.DYNAMIC_RECEIVER_NOT_EXPORTED_PERMISSION'
+application-label:'LorePia Import Hardening Spike'
+application-label-af:'LorePia Import Hardening Spike'
+application-label-am:'LorePia Import Hardening Spike'
+application-label-ar:'LorePia Import Hardening Spike'
+application-label-as:'LorePia Import Hardening Spike'
+application-label-az:'LorePia Import Hardening Spike'
+application-label-be:'LorePia Import Hardening Spike'
+application-label-bg:'LorePia Import Hardening Spike'
+application-label-bn:'LorePia Import Hardening Spike'
+application-label-bs:'LorePia Import Hardening Spike'
+application-label-ca:'LorePia Import Hardening Spike'
+application-label-cs:'LorePia Import Hardening Spike'
+application-label-da:'LorePia Import Hardening Spike'
+application-label-de:'LorePia Import Hardening Spike'
+application-label-el:'LorePia Import Hardening Spike'
+application-label-en-AU:'LorePia Import Hardening Spike'
+application-label-en-CA:'LorePia Import Hardening Spike'
+application-label-en-GB:'LorePia Import Hardening Spike'
+application-label-en-IN:'LorePia Import Hardening Spike'
+application-label-en-XC:'LorePia Import Hardening Spike'
+application-label-es:'LorePia Import Hardening Spike'
+application-label-es-419:'LorePia Import Hardening Spike'
+application-label-es-US:'LorePia Import Hardening Spike'
+application-label-et:'LorePia Import Hardening Spike'
+application-label-eu:'LorePia Import Hardening Spike'
+application-label-fa:'LorePia Import Hardening Spike'
+application-label-fi:'LorePia Import Hardening Spike'
+application-label-fr:'LorePia Import Hardening Spike'
+application-label-fr-CA:'LorePia Import Hardening Spike'
+application-label-gl:'LorePia Import Hardening Spike'
+application-label-gu:'LorePia Import Hardening Spike'
+application-label-hi:'LorePia Import Hardening Spike'
+application-label-hr:'LorePia Import Hardening Spike'
+application-label-hu:'LorePia Import Hardening Spike'
+application-label-hy:'LorePia Import Hardening Spike'
+application-label-in:'LorePia Import Hardening Spike'
+application-label-is:'LorePia Import Hardening Spike'
+application-label-it:'LorePia Import Hardening Spike'
+application-label-iw:'LorePia Import Hardening Spike'
+application-label-ja:'LorePia Import Hardening Spike'
+application-label-ka:'LorePia Import Hardening Spike'
+application-label-kk:'LorePia Import Hardening Spike'
+application-label-km:'LorePia Import Hardening Spike'
+application-label-kn:'LorePia Import Hardening Spike'
+application-label-ko:'LorePia Import Hardening Spike'
+application-label-ky:'LorePia Import Hardening Spike'
+application-label-lo:'LorePia Import Hardening Spike'
+application-label-lt:'LorePia Import Hardening Spike'
+application-label-lv:'LorePia Import Hardening Spike'
+application-label-mk:'LorePia Import Hardening Spike'
+application-label-ml:'LorePia Import Hardening Spike'
+application-label-mn:'LorePia Import Hardening Spike'
+application-label-mr:'LorePia Import Hardening Spike'
+application-label-ms:'LorePia Import Hardening Spike'
+application-label-my:'LorePia Import Hardening Spike'
+application-label-nb:'LorePia Import Hardening Spike'
+application-label-ne:'LorePia Import Hardening Spike'
+application-label-nl:'LorePia Import Hardening Spike'
+application-label-or:'LorePia Import Hardening Spike'
+application-label-pa:'LorePia Import Hardening Spike'
+application-label-pl:'LorePia Import Hardening Spike'
+application-label-pt:'LorePia Import Hardening Spike'
+application-label-pt-BR:'LorePia Import Hardening Spike'
+application-label-pt-PT:'LorePia Import Hardening Spike'
+application-label-ro:'LorePia Import Hardening Spike'
+application-label-ru:'LorePia Import Hardening Spike'
+application-label-si:'LorePia Import Hardening Spike'
+application-label-sk:'LorePia Import Hardening Spike'
+application-label-sl:'LorePia Import Hardening Spike'
+application-label-sq:'LorePia Import Hardening Spike'
+application-label-sr:'LorePia Import Hardening Spike'
+application-label-sr-Latn:'LorePia Import Hardening Spike'
+application-label-sv:'LorePia Import Hardening Spike'
+application-label-sw:'LorePia Import Hardening Spike'
+application-label-ta:'LorePia Import Hardening Spike'
+application-label-te:'LorePia Import Hardening Spike'
+application-label-th:'LorePia Import Hardening Spike'
+application-label-tl:'LorePia Import Hardening Spike'
+application-label-tr:'LorePia Import Hardening Spike'
+application-label-uk:'LorePia Import Hardening Spike'
+application-label-ur:'LorePia Import Hardening Spike'
+application-label-uz:'LorePia Import Hardening Spike'
+application-label-vi:'LorePia Import Hardening Spike'
+application-label-zh-CN:'LorePia Import Hardening Spike'
+application-label-zh-HK:'LorePia Import Hardening Spike'
+application-label-zh-TW:'LorePia Import Hardening Spike'
+application-label-zu:'LorePia Import Hardening Spike'
+application-icon-120:'res/mipmap-mdpi-v4/ic_launcher.png'
+application-icon-160:'res/mipmap-mdpi-v4/ic_launcher.png'
+application-icon-240:'res/mipmap-hdpi-v4/ic_launcher.png'
+application-icon-320:'res/mipmap-xhdpi-v4/ic_launcher.png'
+application-icon-480:'res/mipmap-xxhdpi-v4/ic_launcher.png'
+application-icon-640:'res/mipmap-xxxhdpi-v4/ic_launcher.png'
+application-icon-65534:'res/mipmap-mdpi-v4/ic_launcher.png'
+application: label='LorePia Import Hardening Spike' icon='res/mipmap-mdpi-v4/ic_launcher.png'
+application-debuggable
+launchable-activity: name='dev.lorepia.spike.importhardening.MainActivity'  label='LorePia Import Hardening Spike' icon=''
+leanback-launchable-activity: name='dev.lorepia.spike.importhardening.MainActivity'  label='LorePia Import Hardening Spike' icon='' banner=''
+feature-group: label=''
+  uses-feature-not-required: name='android.software.leanback'
+  uses-feature: name='android.hardware.faketouch'
+  uses-implied-feature: name='android.hardware.faketouch' reason='default feature for all apps'
+main
+other-receivers
+supports-screens: 'small' 'normal' 'large' 'xlarge'
+supports-any-density: 'true'
+locales: '--_--' 'af' 'am' 'ar' 'as' 'az' 'be' 'bg' 'bn' 'bs' 'ca' 'cs' 'da' 'de' 'el' 'en-AU' 'en-CA' 'en-GB' 'en-IN' 'en-XC' 'es' 'es-419' 'es-US' 'et' 'eu' 'fa' 'fi' 'fr' 'fr-CA' 'gl' 'gu' 'hi' 'hr' 'hu' 'hy' 'in' 'is' 'it' 'iw' 'ja' 'ka' 'kk' 'km' 'kn' 'ko' 'ky' 'lo' 'lt' 'lv' 'mk' 'ml' 'mn' 'mr' 'ms' 'my' 'nb' 'ne' 'nl' 'or' 'pa' 'pl' 'pt' 'pt-BR' 'pt-PT' 'ro' 'ru' 'si' 'sk' 'sl' 'sq' 'sr' 'sr-Latn' 'sv' 'sw' 'ta' 'te' 'th' 'tl' 'tr' 'uk' 'ur' 'uz' 'vi' 'zh-CN' 'zh-HK' 'zh-TW' 'zu'
+densities: '120' '160' '240' '320' '480' '640' '65534'
+native-code: 'arm64-v8a'
+AAPT_BADGING_END
+
+NATIVE_ENTRIES_BEGIN
+lib/arm64-v8a/libspikesimporthardening_lib.so
+NATIVE_ENTRIES_END
+
+SIGNATURE_VERIFY_BEGIN
+SIGNATURE_VERIFY_END
+
+SIGNATURE_VERIFY_RETRY_WITH_JAVA_HOME_BEGIN
+Verifies
+Verified using v1 scheme (JAR signing): false
+Verified using v2 scheme (APK Signature Scheme v2): true
+Verified using v3 scheme (APK Signature Scheme v3): false
+Verified using v3.1 scheme (APK Signature Scheme v3.1): false
+Verified using v4 scheme (APK Signature Scheme v4): false
+Verified for SourceStamp: false
+Number of signers: 1
+Signer #1 certificate DN: C=US, O=Android, CN=Android Debug
+Signer #1 certificate SHA-256 digest: 81cb32ca842b661d9010756e04ab9a3e4431f2b368bf1fd7cf6668ad8c0ff2e2
+Signer #1 certificate SHA-1 digest: 68416c4ace8cd63bd4ff190cc8bbc261de2288a1
+Signer #1 certificate MD5 digest: f3cdcd54329c458c1ef0d6e1769953b6
+Signer #1 key algorithm: RSA
+Signer #1 key size (bits): 2048
+Signer #1 public key SHA-256 digest: de9017e9599c71f36867726f687dafd41538677a1c6349e8a03410520f1b4b68
+Signer #1 public key SHA-1 digest: d085234b717b296de65522c2c2b6320d969d9c45
+Signer #1 public key MD5 digest: c5a4b833f1708edcab2cdaf92156af57
+SIGNATURE_VERIFY_RETRY_WITH_JAVA_HOME_END
+
+NATIVE_LIBRARY_INSPECTION_BEGIN
+NATIVE_LIBRARY_SIZE_BYTES=134989032
+1a8915686a2cc27f025b9b25a81e69b67b3d149cfc4cf6e7bfabce31ee516199  /tmp/lorepia-import-android.0BFBPJ/libspikesimporthardening_lib.so
+/tmp/lorepia-import-android.0BFBPJ/libspikesimporthardening_lib.so: ELF 64-bit LSB shared object, ARM aarch64, version 1 (SYSV), dynamically linked, with debug_info, not stripped
+ELF Header:
+  Magic:   7f 45 4c 46 02 01 01 00 00 00 00 00 00 00 00 00
+  Class:                             ELF64
+  Data:                              2's complement, little endian
+  Version:                           1 (current)
+  OS/ABI:                            UNIX - System V
+  ABI Version:                       0
+  Type:                              DYN (Shared object file)
+  Machine:                           AArch64
+  Version:                           0x1
+  Entry point address:               0x0
+  Start of program headers:          64 (bytes into file)
+  Start of section headers:          134986792 (bytes into file)
+  Flags:                             0x0
+  Size of this header:               64 (bytes)
+  Size of program headers:           56 (bytes)
+  Number of program headers:         10
+  Size of section headers:           64 (bytes)
+  Number of section headers:         35
+  Section header string table index: 33
+NATIVE_LIBRARY_INSPECTION_END
