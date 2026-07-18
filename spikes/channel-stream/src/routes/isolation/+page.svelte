@@ -163,6 +163,9 @@
   const NATIVE_INVOKE_TIMEOUT_MS = 2_000;
   const FRAME_MESSAGE_MAX_ATTEMPTS_PER_WINDOW = 64;
   const FRAME_MESSAGE_ATTEMPT_WINDOW_MS = 1_000;
+  const IMPORTED_CODE_EXECUTION_ENABLED =
+    __LOREPIA_BUILD_PROFILE__.importedJavaScriptFixtureAllowed &&
+    __LOREPIA_BUILD_PROFILE__.importedLuaFixtureAllowed;
   const hostBrokerForwarder = createHostBrokerForwarder();
   const frameMessageAdmission = createFixedWindowAdmission({
     maxAttempts: FRAME_MESSAGE_MAX_ATTEMPTS_PER_WINDOW,
@@ -1029,6 +1032,16 @@
 
   onMount(() => {
     componentDisposed = false;
+    if (!IMPORTED_CODE_EXECUTION_ENABLED) {
+      hostBrokerReady = false;
+      frameReady = false;
+      frameDisabled = true;
+      statusMessage = `Store-Safe ${__LOREPIA_BUILD_PROFILE__.targetPlatform} build: imported JavaScript와 Lua 실행은 OFF입니다.`;
+      return () => {
+        componentDisposed = true;
+      };
+    }
+
     const listener = (event: MessageEvent<unknown>) => {
       void handleFrameMessage(event);
     };
@@ -1116,7 +1129,12 @@
 
   <section aria-labelledby="frame-heading">
     <h2 id="frame-heading">sandboxed plugin frame</h2>
-    {#if hostBrokerReady && sessionNonce.length > 0}
+    {#if !IMPORTED_CODE_EXECUTION_ENABLED}
+      <p data-testid="store-safe-imported-code-status">
+        Store-Safe mobile profile: imported JavaScript OFF, imported Lua OFF. 이 빌드에는 실행
+        fixture가 포함되지 않으며 이 경로는 iframe을 만들지 않습니다.
+      </p>
+    {:else if hostBrokerReady && sessionNonce.length > 0}
       <iframe
         bind:this={frame}
         title="악성 플러그인 격리 시험 프레임"

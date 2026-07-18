@@ -6,7 +6,8 @@
   "type": "module",
   "scripts": {
     "dev": "vite dev",
-    "build": "vite build",
+    "build": "vite build && node scripts/verify-built-profile.mjs",
+    "verify:build-profile": "node scripts/verify-built-profile.mjs",
     "preview": "vite preview",
     "test": "vitest run",
     "sync:plugin-frame": "node scripts/sync-plugin-frame.mjs",
