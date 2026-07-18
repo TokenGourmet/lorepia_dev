@@ -38,6 +38,17 @@ not replace or change any physical-device matrix cell above.
 | Locally packaged macOS release `.app` | Local packaged-app effect test | PASS (`11/11`, probe `1 -> 1`) | [`isolation.md`](isolation.md); direct invoke transport was not exposed, so this is not ACL-denial proof |
 | Android 16 / API 36 `sdk_gphone64_arm64`, WebView `133.0.6943.137` | Local emulator runtime | FAIL (probe `1 -> 2`) | [`isolation.md`](isolation.md); sandboxed iframe reached `privileged_probe`; screenshot hash retained but raw `/tmp` file is not in the repository |
 
+## Broker candidate observations (not physical-device evidence)
+
+These rows evaluate exact candidate commit
+`a42d33d4e843da353f042d435133d3ac5f988fa4`. They do not replace or change any
+physical-device or cross-platform capability cell above.
+
+| Platform/runtime | Evidence level | Result | Evidence and limitation |
+|---|---|---|---|
+| macOS 26.5.2 arm64, locally packaged release `.app` | Local packaged-app effect test | PASS (`18/18`) | [candidate record](evidence/a42d33d-local-isolation.md); direct iframe Tauri transport was absent, so this is not ACL-decision proof |
+| Android 16 / API 36 `sdk_gphone64_arm64`, WebView `133.0.6943.137` | Local emulator runtime | **FAIL** (`15/18`, `18/18` complete) | [candidate record](evidence/a42d33d-local-isolation.md); three direct native callbacks timed out and remain `INCONCLUSIVE`; final monitored sink delta had no extra effect |
+
 ## Available local environments (not pass evidence)
 
 These environments have been identified for upcoming runs. Inventory alone does not change a matrix cell.

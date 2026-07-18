@@ -119,6 +119,23 @@ negative-test suite. Record the historical `direct-tauri-invoke-blocked` result
 and the independently queried native probe count before and after the iframe
 attempt. Candidate builds use the newer retired-command audit described below.
 
+## Candidate broker observation
+
+Commit `a42d33d4e843da353f042d435133d3ac5f988fa4` was rebuilt and exercised as a
+locally packaged macOS release app and an Android 16/API 36 emulator APK. The
+full immutable summary, artifact hashes, exact failures, sink counters, and
+watchdog observations are in
+[`evidence/a42d33d-local-isolation.md`](evidence/a42d33d-local-isolation.md).
+
+| Runtime | Result | Key interpretation |
+|---|---|---|
+| macOS 26.5.2 arm64, locally packaged release `.app` | `18/18 PASS` | Stale token, exact command surface, broker policy, sink delta, and watchdog passed; direct iframe Tauri transport was absent, so this is not ACL-decision proof |
+| Android 16/API 36 `sdk_gphone64_arm64`, WebView `133.0.6943.137` | **FAIL**, `15/18 PASS`, `18/18` complete | Three direct native calls timed out and remain `INCONCLUSIVE`; the final sink audit found no extra monitored effect; emulator evidence does not change a physical-device cell |
+
+This candidate retires the raw sanitizer/probe wrappers demonstrated by the
+unsafe baseline, but it does not close M-1 or establish a production plugin
+runtime.
+
 ## Selected fallback and remaining blocker
 
 The selected replacement for raw iframe-to-Tauri invocation has these target
@@ -138,9 +155,11 @@ already proves every item:
    guessed, stale, and replayed tokens, while independently checking that no
    prohibited native side effect occurred.
 
-The current local runtime suite covers missing/wrong tokens, registration
-takeover followed by an attacker-token probe, and replayed request IDs. Token
-rotation/staleness and runtime rate-limit abuse remain unverified.
+The candidate local observations cover missing/wrong tokens, registration
+takeover attempts, replayed request IDs, and token rotation/staleness. Android
+direct-call response semantics remain inconclusive because the native callback
+timed out. Runtime rate-limit abuse and iframe self-navigation egress remain
+unverified.
 
 The broker's internal admission order is covered by source tests, including
 lifecycle calls and lock contention. Those tests begin after Tauri has decoded
