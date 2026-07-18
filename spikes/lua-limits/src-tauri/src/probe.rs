@@ -918,9 +918,10 @@ mod tests {
     }
 
     #[test]
-    fn cargo_feature_surface_is_lua54_vendored_only() {
+    fn cargo_feature_surface_and_ios_bundle_bridge_are_pinned() {
         const CARGO_TOML: &str = include_str!("../Cargo.toml");
         const CARGO_LOCK: &str = include_str!("../Cargo.lock");
+        const BUILD_RS: &str = include_str!("../build.rs");
         let mlua_line = CARGO_TOML
             .lines()
             .find(|line| line.starts_with("mlua = "))
@@ -933,5 +934,13 @@ mod tests {
             assert!(!mlua_line.contains(forbidden_feature));
         }
         assert!(CARGO_LOCK.contains("name = \"mlua\"\nversion = \"0.12.0\""));
+        assert!(CARGO_TOML.contains(
+            "[target.'cfg(target_os = \"ios\")'.dependencies]\nmlua-sys = { version = \"=0.11.0\", default-features = false, features = [\"lua54\", \"vendored\"] }"
+        ));
+        assert!(BUILD_RS.contains("bundle_vendored_lua_for_ios_staticlib"));
+        assert!(BUILD_RS.contains("CARGO_CFG_TARGET_OS"));
+        assert!(BUILD_RS.contains("OsStr::new(\"ios\")"));
+        assert!(BUILD_RS.contains("liblua5.4.a"));
+        assert!(BUILD_RS.contains("cargo:rustc-link-lib=static:+bundle=lorepia_lua54_ios_bundle"));
     }
 }

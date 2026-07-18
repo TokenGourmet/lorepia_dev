@@ -24,6 +24,15 @@ vendored source builders available; it is not selection of the `mlua/luajit`
 runtime feature. The selected VM feature is `mlua/lua54`, `mlua/luajit` is
 disabled, and the runtime contract separately requires `_VERSION == "Lua 5.4"`.
 
+Tauri's iOS shell links the Rust product as `libapp.a`. The upstream vendored
+Lua archive is marked `-bundle`, so it is not automatically folded into that
+static library and an unmodified iOS link leaves the `lua*` symbols unresolved.
+For iOS targets only, this spike declares the matching pinned `mlua-sys`
+dependency and its build script copies the already-built `liblua5.4.a` under a
+private name and links it with Rust's `+bundle` modifier. This keeps the final
+iOS app self-contained without enabling dynamic modules or changing the
+selected Lua 5.4 runtime.
+
 Exactly one no-argument Tauri command is exposed:
 `run_lua_limits_m1_probe`. The WebView cannot provide source, bytecode, a file
 or module path, globals, a limit, a fixture, or an expected result. Rust loads

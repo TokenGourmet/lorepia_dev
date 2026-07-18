@@ -1689,6 +1689,7 @@ name = "lorepia-lua-limits-spike"
 version = "0.1.0"
 dependencies = [
  "mlua",
+ "mlua-sys",
  "serde",
  "serde_json",
  "sha2",
