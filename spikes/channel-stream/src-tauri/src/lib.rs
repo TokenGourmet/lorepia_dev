@@ -43,6 +43,15 @@ const DEFAULT_ACK_TIMEOUT_MS: u64 = 1_000;
 const MAX_REQUESTS: usize = 128;
 const NO_TERMINAL_SEQ: u64 = u64::MAX;
 const MAX_PLUGIN_HTML_BYTES: usize = host_broker::MAX_SANITIZE_HTML_BYTES;
+// Tauri 2.11 sends JSON Channel payloads smaller than 8192 bytes directly by
+// evaluating them in the destination WebView. Larger payloads are placed in a
+// process-global, numerically indexed fetch queue whose fetch command bypasses
+// normal ACL resolution. Keep every LorePia Channel event on the direct path so
+// an untrusted same-process WebView cannot race that queue.
+const TAURI_CHANNEL_JSON_DIRECT_THRESHOLD_BYTES: usize = 8_192;
+const LOREPIA_DIRECT_JSON_BUDGET_BYTES: usize = 4_096;
+const MAX_CHANNEL_REQUEST_ID: &str = "m1-channel-ffffffffffffffff";
+const _: () = assert!(LOREPIA_DIRECT_JSON_BUDGET_BYTES < TAURI_CHANNEL_JSON_DIRECT_THRESHOLD_BYTES);
 
 static HOST_BROKER_PROBE_CALLS: AtomicU64 = AtomicU64::new(0);
 static HOST_BROKER_SANITIZE_CALLS: AtomicU64 = AtomicU64::new(0);
@@ -57,10 +66,23 @@ struct StreamFailure {
 impl StreamFailure {
     fn new(code: impl Into<String>, message: impl Into<String>) -> Self {
         Self {
-            code: code.into(),
-            message: message.into(),
+            code: truncate_utf8(code.into(), 64),
+            message: truncate_utf8(message.into(), 512),
         }
     }
+}
+
+fn truncate_utf8(mut value: String, max_bytes: usize) -> String {
+    if value.len() <= max_bytes {
+        return value;
+    }
+
+    let mut end = max_bytes;
+    while !value.is_char_boundary(end) {
+        end -= 1;
+    }
+    value.truncate(end);
+    value
 }
 
 #[derive(Debug, Clone, Serialize, PartialEq, Eq)]
@@ -84,19 +106,55 @@ enum StreamEvent {
     Completed {
         request_id: String,
         seq: u64,
-        text: String,
     },
     Cancelled {
         request_id: String,
         seq: u64,
-        partial_text: String,
     },
     Failed {
         request_id: String,
         seq: u64,
-        partial_text: String,
         error: StreamFailure,
     },
+}
+
+fn serialized_json_len(value: &impl Serialize) -> Option<usize> {
+    serde_json::to_vec(value).ok().map(|encoded| encoded.len())
+}
+
+fn serialized_channel_event_len(event: &StreamEvent) -> Option<usize> {
+    serialized_json_len(event)
+}
+
+fn json_value_uses_direct_path(value: &impl Serialize) -> bool {
+    serialized_json_len(value).is_some_and(|len| len <= LOREPIA_DIRECT_JSON_BUDGET_BYTES)
+}
+
+fn channel_event_uses_direct_path(event: &StreamEvent) -> bool {
+    json_value_uses_direct_path(event)
+}
+
+fn direct_delta_fits(text: &str) -> bool {
+    channel_event_uses_direct_path(&StreamEvent::Delta {
+        request_id: MAX_CHANNEL_REQUEST_ID.to_owned(),
+        seq: u64::MAX,
+        text: text.to_owned(),
+    })
+}
+
+fn send_direct_channel_event(
+    channel: &Channel<StreamEvent>,
+    event: StreamEvent,
+) -> Result<(), String> {
+    let Some(encoded_len) = serialized_channel_event_len(&event) else {
+        return Err("failed to serialize Channel event".to_owned());
+    };
+    if encoded_len > LOREPIA_DIRECT_JSON_BUDGET_BYTES {
+        return Err(format!(
+            "Channel event is {encoded_len} bytes; LorePia direct-execute budget is {LOREPIA_DIRECT_JSON_BUDGET_BYTES} bytes"
+        ));
+    }
+    channel.send(event).map_err(|error| error.to_string())
 }
 
 #[derive(Debug, Clone, Deserialize, Default)]
@@ -335,7 +393,6 @@ impl StreamMachine {
         Ok(StreamEvent::Completed {
             request_id: self.request_id.clone(),
             seq: self.last_seq,
-            text: self.text.clone(),
         })
     }
 
@@ -346,7 +403,6 @@ impl StreamMachine {
         Ok(StreamEvent::Cancelled {
             request_id: self.request_id.clone(),
             seq: self.last_seq,
-            partial_text: self.text.clone(),
         })
     }
 
@@ -363,7 +419,6 @@ impl StreamMachine {
         Ok(StreamEvent::Failed {
             request_id: self.request_id.clone(),
             seq: self.last_seq,
-            partial_text: self.text.clone(),
             error: failure,
         })
     }
@@ -396,7 +451,8 @@ impl StreamMachine {
             last_seq: self.last_seq,
             last_acked_seq: self.last_acked_seq,
             in_flight: self.in_flight(),
-            text: self.text.clone(),
+            text_bytes: self.text.len(),
+            text_sha256: format!("{:x}", Sha256::digest(self.text.as_bytes())),
             error: self.error.clone(),
             batch_window_ms: self.batch_window_ms,
             effective_batch_window_ms: self.effective_batch_window_ms,
@@ -577,7 +633,8 @@ struct StreamSnapshot {
     last_seq: u64,
     last_acked_seq: i64,
     in_flight: usize,
-    text: String,
+    text_bytes: usize,
+    text_sha256: String,
     error: Option<StreamFailure>,
     batch_window_ms: u64,
     effective_batch_window_ms: u64,
@@ -825,11 +882,22 @@ fn execute_host_broker_action(
         }
     };
 
-    Ok(HostBrokerRequestResponse {
+    let response = HostBrokerRequestResponse {
         request_id,
         module_id: module_id.to_owned(),
         result,
-    })
+    };
+    ensure_direct_broker_response(response)
+}
+
+fn ensure_direct_broker_response(
+    response: HostBrokerRequestResponse,
+) -> Result<HostBrokerRequestResponse, BrokerError> {
+    if json_value_uses_direct_path(&response) {
+        Ok(response)
+    } else {
+        Err(BrokerError::action_failed(&response.request_id))
+    }
 }
 
 #[tauri::command]
@@ -862,7 +930,7 @@ async fn start_mock_stream(
         let mut machine = request.machine.lock().await;
         machine.start()?
     };
-    if let Err(error) = on_event.send(started) {
+    if let Err(error) = send_direct_channel_event(&on_event, started) {
         registry.remove(&request_id);
         return Err(CommandError::internal(format!(
             "failed to deliver started event: {error}"
@@ -919,7 +987,13 @@ async fn get_stream_snapshot(
     registry: State<'_, StreamRegistry>,
 ) -> Result<StreamSnapshot, CommandError> {
     let request = registry.get(&request_id)?;
-    Ok(clone_snapshot_for_return(&request).await)
+    let snapshot = clone_snapshot_for_return(&request).await;
+    if !json_value_uses_direct_path(&snapshot) {
+        return Err(CommandError::internal(
+            "stream snapshot receipt exceeded the direct IPC response budget",
+        ));
+    }
+    Ok(snapshot)
 }
 
 async fn clone_snapshot_for_return(request: &StreamRequest) -> StreamSnapshot {
@@ -930,6 +1004,42 @@ async fn clone_snapshot_for_return(request: &StreamRequest) -> StreamSnapshot {
     // cannot invalidate the request while this snapshot is being assembled.
     request.record_terminal_snapshot_returned(&snapshot);
     snapshot
+}
+
+fn split_direct_delta_text(text: &str) -> Option<Vec<String>> {
+    if direct_delta_fits(text) {
+        return Some(vec![text.to_owned()]);
+    }
+
+    let mut boundaries = Vec::with_capacity(text.chars().count() + 1);
+    boundaries.push(0);
+    boundaries.extend(text.char_indices().skip(1).map(|(index, _)| index));
+    boundaries.push(text.len());
+
+    let mut parts = Vec::new();
+    let mut start_index = 0usize;
+    while start_index + 1 < boundaries.len() {
+        let mut low = start_index + 1;
+        let mut high = boundaries.len() - 1;
+        let mut best = start_index;
+
+        while low <= high {
+            let middle = low + (high - low) / 2;
+            if direct_delta_fits(&text[boundaries[start_index]..boundaries[middle]]) {
+                best = middle;
+                low = middle + 1;
+            } else {
+                high = middle - 1;
+            }
+        }
+
+        if best == start_index {
+            return None;
+        }
+        parts.push(text[boundaries[start_index]..boundaries[best]].to_owned());
+        start_index = best;
+    }
+    Some(parts)
 }
 
 async fn run_stream(
@@ -962,14 +1072,16 @@ async fn run_stream(
             let machine = request.machine.lock().await;
             machine.effective_batch_window_ms
         };
-        let mut batch_size = (effective_window_ms / config.chunk_interval_ms).max(1) as usize;
-        batch_size = batch_size.min(config.chunks.len() - source_index);
+        let mut desired_batch_size =
+            (effective_window_ms / config.chunk_interval_ms).max(1) as usize;
+        desired_batch_size = desired_batch_size.min(config.chunks.len() - source_index);
         if let Some(fail_after) = config.fail_after_chunks {
-            batch_size = batch_size.min(fail_after.saturating_sub(source_index).max(1));
+            desired_batch_size =
+                desired_batch_size.min(fail_after.saturating_sub(source_index).max(1));
         }
 
         let mut delta = String::new();
-        for chunk in &config.chunks[source_index..source_index + batch_size] {
+        for chunk in &config.chunks[source_index..source_index + desired_batch_size] {
             if !sleep_unless_cancelled(&request, config.chunk_interval_ms).await {
                 emit_cancelled(&request, &channel).await;
                 return;
@@ -977,20 +1089,35 @@ async fn run_stream(
             delta.push_str(chunk);
         }
 
-        if !wait_for_data_capacity(&request, config.ack_timeout_ms).await {
-            emit_cancelled(&request, &channel).await;
+        let Some(fragments) = split_direct_delta_text(&delta) else {
+            emit_failed(
+                &request,
+                &channel,
+                StreamFailure::new(
+                    "CHANNEL_EVENT_TOO_LARGE",
+                    "a Unicode scalar could not fit the direct Channel transport budget",
+                ),
+            )
+            .await;
             return;
-        }
+        };
 
-        match emit_delta(&request, &channel, delta).await {
-            DeltaDelivery::Sent => {}
-            DeltaDelivery::Cancelled => {
+        for fragment in fragments {
+            if !wait_for_data_capacity(&request, config.ack_timeout_ms).await {
                 emit_cancelled(&request, &channel).await;
                 return;
             }
-            DeltaDelivery::Failed => return,
+
+            match emit_delta(&request, &channel, fragment).await {
+                DeltaDelivery::Sent => {}
+                DeltaDelivery::Cancelled => {
+                    emit_cancelled(&request, &channel).await;
+                    return;
+                }
+                DeltaDelivery::Failed => return,
+            }
         }
-        source_index += batch_size;
+        source_index += desired_batch_size;
     }
 
     if config.fail_after_chunks == Some(source_index) {
@@ -1097,7 +1224,7 @@ async fn emit_delta(
         Err(_) => return DeltaDelivery::Failed,
     };
 
-    if let Err(error) = channel.send(event) {
+    if let Err(error) = send_direct_channel_event(channel, event) {
         machine.text.truncate(previous_len);
         machine.last_seq = previous_seq;
         machine.status = StreamStatus::Failed;
@@ -1153,7 +1280,7 @@ async fn deliver_terminal(
     };
     let terminal_seq = machine.last_seq;
 
-    if let Err(error) = channel.send(event) {
+    if let Err(error) = send_direct_channel_event(channel, event) {
         // Roll back the undelivered terminal transition before publishing the
         // local delivery failure. Both changes happen under the same lock, so a
         // concurrent snapshot sees only the final failed snapshot.
@@ -1188,6 +1315,14 @@ pub fn run() {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    fn assert_snapshot_text_receipt(snapshot: &StreamSnapshot, expected: &str) {
+        assert_eq!(snapshot.text_bytes, expected.len());
+        assert_eq!(
+            snapshot.text_sha256,
+            format!("{:x}", Sha256::digest(expected.as_bytes()))
+        );
+    }
 
     #[test]
     fn plugin_html_sanitizer_keeps_only_the_presentation_subset() {
@@ -1338,6 +1473,83 @@ mod tests {
         assert_eq!(serialized["result"]["callCount"], 1);
     }
 
+    #[test]
+    fn oversized_broker_results_fail_before_entering_tauri_response_queue() {
+        let error = ensure_direct_broker_response(HostBrokerRequestResponse {
+            request_id: "oversized-render".to_owned(),
+            module_id: "module.alpha".to_owned(),
+            result: HostBrokerResult::RenderSanitize {
+                html: "x".repeat(LOREPIA_DIRECT_JSON_BUDGET_BYTES),
+                input_bytes: LOREPIA_DIRECT_JSON_BUDGET_BYTES,
+                output_bytes: LOREPIA_DIRECT_JSON_BUDGET_BYTES,
+            },
+        })
+        .unwrap_err();
+
+        assert_eq!(error.code, host_broker::BrokerErrorCode::ActionFailed);
+        assert_eq!(error.request_id.as_deref(), Some("oversized-render"));
+    }
+
+    #[test]
+    fn bounded_app_command_response_shapes_stay_on_the_direct_path() {
+        fn assert_direct(value: &impl Serialize) {
+            let len = serialized_json_len(value).expect("response must serialize");
+            assert!(
+                len <= LOREPIA_DIRECT_JSON_BUDGET_BYTES,
+                "response was {len} bytes"
+            );
+        }
+
+        let request_id = MAX_CHANNEL_REQUEST_ID.to_owned();
+        let maximum_failure = StreamFailure::new("c".repeat(65), "m".repeat(513));
+        assert_eq!(maximum_failure.code.len(), 64);
+        assert_eq!(maximum_failure.message.len(), 512);
+
+        assert_direct(&StartStreamResponse {
+            request_id: request_id.clone(),
+        });
+        assert_direct(&AckStreamResponse {
+            request_id: request_id.clone(),
+            acknowledged_through: i64::MAX,
+            in_flight: 64,
+        });
+        assert_direct(&CancelStreamResponse {
+            request_id: request_id.clone(),
+            accepted: true,
+        });
+        assert_direct(&StreamSnapshot {
+            request_id: request_id.clone(),
+            status: StreamStatus::Failed,
+            last_seq: u64::MAX,
+            last_acked_seq: i64::MAX,
+            in_flight: 64,
+            text_bytes: 1_048_576,
+            text_sha256: "f".repeat(64),
+            error: Some(maximum_failure),
+            batch_window_ms: MAX_BATCH_WINDOW_MS,
+            effective_batch_window_ms: MAX_BATCH_WINDOW_MS,
+            max_in_flight: 64,
+        });
+        assert_direct(&RegisterHostBrokerSessionResponse {
+            outcome: RegistrationOutcome::Registered,
+            generation: u64::MAX,
+            module_id: "m".repeat(128),
+            network_policy: "deny",
+        });
+        assert_direct(&RotateHostBrokerSessionResponse {
+            outcome: RotationOutcome::Rotated,
+            generation: u64::MAX,
+            module_id: "m".repeat(128),
+            network_policy: "deny",
+        });
+        assert_direct(&HostBrokerRequestResponse {
+            request_id,
+            module_id: "m".repeat(128),
+            result: HostBrokerResult::StateRead { state: "ready" },
+        });
+        assert_direct(&host_broker_probe_count());
+    }
+
     fn config(batch_window_ms: u64, max_in_flight: usize) -> ValidatedConfig {
         ValidatedConfig {
             batch_window_ms,
@@ -1368,9 +1580,8 @@ mod tests {
         assert!(matches!(second, StreamEvent::Delta { seq: 2, .. }));
         machine.acknowledge(2).unwrap();
         let terminal = machine.complete().unwrap();
-        assert!(
-            matches!(terminal, StreamEvent::Completed { seq: 3, ref text, .. } if text == "ABC")
-        );
+        assert!(matches!(terminal, StreamEvent::Completed { seq: 3, .. }));
+        assert_snapshot_text_receipt(&machine.snapshot(), "ABC");
         assert_eq!(machine.status, StreamStatus::Completed);
         assert!(machine.complete().is_err());
         assert!(machine.cancel().is_err());
@@ -1411,10 +1622,8 @@ mod tests {
         assert!(machine.delta(" late".into()).is_err());
         assert!(machine.complete().is_err());
         let terminal = machine.cancel().unwrap();
-        assert!(
-            matches!(terminal, StreamEvent::Cancelled { seq: 2, ref partial_text, .. } if partial_text == "partial")
-        );
-        assert_eq!(machine.snapshot().text, "partial");
+        assert!(matches!(terminal, StreamEvent::Cancelled { seq: 2, .. }));
+        assert_snapshot_text_receipt(&machine.snapshot(), "partial");
         assert!(machine.delta(" later".into()).is_err());
         assert!(!machine.request_cancel());
     }
@@ -1427,12 +1636,10 @@ mod tests {
         machine.acknowledge(1).unwrap();
         let failure = StreamFailure::new("MOCK_FAILURE", "after 2 chunks");
         let terminal = machine.fail(failure.clone()).unwrap();
-        assert!(
-            matches!(terminal, StreamEvent::Failed { seq: 2, ref partial_text, error, .. } if partial_text == "AB" && error == failure)
-        );
+        assert!(matches!(terminal, StreamEvent::Failed { seq: 2, error, .. } if error == failure));
         let snapshot = machine.snapshot();
         assert_eq!(snapshot.status, StreamStatus::Failed);
-        assert_eq!(snapshot.text, "AB");
+        assert_snapshot_text_receipt(&snapshot, "AB");
         assert_eq!(snapshot.error, Some(failure));
         assert!(machine.complete().is_err());
     }
@@ -1514,13 +1721,11 @@ mod tests {
             serde_json::to_value(StreamEvent::Cancelled {
                 request_id: "r1".into(),
                 seq: 2,
-                partial_text: "A".into(),
             })
             .unwrap(),
             serde_json::to_value(StreamEvent::Failed {
                 request_id: "r1".into(),
                 seq: 2,
-                partial_text: "A".into(),
                 error: StreamFailure::new("MOCK_FAILURE", "expected"),
             })
             .unwrap(),
@@ -1532,8 +1737,11 @@ mod tests {
         assert_eq!(values[0]["maxInFlight"], 3);
         assert_eq!(values[1]["type"], "delta");
         assert_eq!(values[2]["type"], "cancelled");
-        assert_eq!(values[2]["partialText"], "A");
+        assert!(values[2].get("partialText").is_none());
+        assert!(values[2].get("text").is_none());
         assert_eq!(values[3]["type"], "failed");
+        assert!(values[3].get("partialText").is_none());
+        assert!(values[3].get("text").is_none());
         assert_eq!(values[3]["error"]["code"], "MOCK_FAILURE");
 
         for value in values {
@@ -1547,18 +1755,83 @@ mod tests {
         assert_eq!(snapshot["status"], "streaming");
         assert_eq!(snapshot["lastAckedSeq"], -1);
         assert_eq!(snapshot["effectiveBatchWindowMs"], 24);
+        assert_eq!(snapshot["textBytes"], 0);
+        assert_eq!(
+            snapshot["textSha256"],
+            "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        );
+        assert!(snapshot.get("text").is_none());
         assert!(snapshot.get("last_acked_seq").is_none());
     }
 
     #[test]
     fn total_chunk_byte_limit_is_enforced() {
         let invalid = StreamConfig {
-            chunks: Some(vec!["x".repeat(16_384); 65]),
+            chunks: Some(vec!["x".repeat(2_048); 513]),
             ..Default::default()
         };
         let error = ValidatedConfig::try_from(invalid).unwrap_err();
         assert_eq!(error.code, "INVALID_CONFIG");
         assert!(error.message.contains("total"));
+    }
+
+    #[test]
+    fn every_channel_event_is_forced_below_tauri_fetch_queue_threshold() {
+        let empty_delta = StreamEvent::Delta {
+            request_id: MAX_CHANNEL_REQUEST_ID.to_owned(),
+            seq: u64::MAX,
+            text: String::new(),
+        };
+        let overhead = serialized_channel_event_len(&empty_delta).unwrap();
+        let largest_ascii_text = "x".repeat(
+            LOREPIA_DIRECT_JSON_BUDGET_BYTES
+                .checked_sub(overhead)
+                .unwrap(),
+        );
+
+        assert!(direct_delta_fits(&largest_ascii_text));
+        assert!(!direct_delta_fits(&format!("{largest_ascii_text}x")));
+
+        let config = ValidatedConfig::try_from(StreamConfig {
+            chunks: Some(vec![format!("{largest_ascii_text}x")]),
+            ..Default::default()
+        })
+        .unwrap();
+        assert_eq!(config.chunks.len(), 1);
+
+        let terminal_events = [
+            StreamEvent::Completed {
+                request_id: MAX_CHANNEL_REQUEST_ID.to_owned(),
+                seq: u64::MAX,
+            },
+            StreamEvent::Cancelled {
+                request_id: MAX_CHANNEL_REQUEST_ID.to_owned(),
+                seq: u64::MAX,
+            },
+            StreamEvent::Failed {
+                request_id: MAX_CHANNEL_REQUEST_ID.to_owned(),
+                seq: u64::MAX,
+                error: StreamFailure::new("MOCK_FAILURE", "bounded fixture failure"),
+            },
+        ];
+        assert!(terminal_events.iter().all(channel_event_uses_direct_path));
+    }
+
+    #[test]
+    fn delta_fragmentation_preserves_ascii_unicode_and_json_escaping_exactly() {
+        let samples = [
+            "x".repeat(16_384),
+            "한글🙂".repeat(1_500),
+            "\0\n\r\t\u{0008}\u{000c}\"\\".repeat(1_000),
+        ];
+
+        for original in samples {
+            let parts = split_direct_delta_text(&original).unwrap();
+            assert!(parts.len() > 1);
+            assert!(parts.iter().all(|part| direct_delta_fits(part)));
+            assert_eq!(parts.concat().as_bytes(), original.as_bytes());
+            assert!(parts.iter().all(|part| part.is_char_boundary(part.len())));
+        }
     }
 
     #[tokio::test(flavor = "current_thread")]
@@ -1618,13 +1891,91 @@ mod tests {
 
         let snapshot = request.machine.lock().await.snapshot();
         assert_eq!(snapshot.status, StreamStatus::Completed);
-        assert_eq!(snapshot.text, "ABC");
+        assert_snapshot_text_receipt(&snapshot, "ABC");
         assert!((snapshot.batch_window_ms..=MAX_BATCH_WINDOW_MS)
             .contains(&snapshot.effective_batch_window_ms));
         assert_ne!(
             request.terminal_seq.load(Ordering::Acquire),
             NO_TERMINAL_SEQ
         );
+    }
+
+    #[tokio::test(flavor = "current_thread")]
+    async fn one_mib_stream_never_uses_the_tauri_channel_fetch_queue() {
+        use tauri::ipc::InvokeResponseBody;
+
+        let chunks = vec!["x".repeat(16_384); 64];
+        let expected = "x".repeat(1_048_576);
+        let config = ValidatedConfig::try_from(StreamConfig {
+            batch_window_ms: Some(16),
+            max_in_flight: Some(64),
+            chunk_interval_ms: Some(1),
+            chunks: Some(chunks),
+            ack_timeout_ms: Some(100),
+            ..Default::default()
+        })
+        .unwrap();
+        let mut machine = StreamMachine::new("request-one-mib".into(), &config);
+        let started = machine.start().unwrap();
+        machine.acknowledge(0).unwrap();
+        let request = Arc::new(StreamRequest::new(machine));
+        let received = Arc::new(Mutex::new(String::with_capacity(expected.len())));
+        let sequences = Arc::new(Mutex::new(Vec::<u64>::new()));
+        let callback_request = Arc::clone(&request);
+        let callback_received = Arc::clone(&received);
+        let callback_sequences = Arc::clone(&sequences);
+
+        let channel = Channel::new(move |body| {
+            let InvokeResponseBody::Json(json) = body else {
+                return Err(std::io::Error::other("unexpected raw channel body").into());
+            };
+            if json.len() > LOREPIA_DIRECT_JSON_BUDGET_BYTES {
+                return Err(std::io::Error::other("event exceeded direct budget").into());
+            }
+            let value: serde_json::Value = serde_json::from_str(&json)?;
+            let seq = value["seq"]
+                .as_u64()
+                .ok_or_else(|| std::io::Error::other("missing seq"))?;
+            callback_sequences.lock().unwrap().push(seq);
+            if value["type"] == "delta" {
+                callback_received
+                    .lock()
+                    .unwrap()
+                    .push_str(value["text"].as_str().unwrap());
+            }
+
+            let ack_request = Arc::clone(&callback_request);
+            tokio::spawn(async move {
+                let acknowledged_through = {
+                    let mut machine = ack_request.machine.lock().await;
+                    machine.acknowledge(seq).unwrap();
+                    machine.last_acked_seq
+                };
+                ack_request.record_acknowledged_through(acknowledged_through);
+                ack_request.notify.notify_one();
+            });
+            Ok(())
+        });
+
+        send_direct_channel_event(&channel, started).unwrap();
+        tokio::time::timeout(
+            Duration::from_secs(5),
+            run_stream(Arc::clone(&request), config, channel),
+        )
+        .await
+        .expect("one MiB stream should complete without queue fallback");
+        tokio::time::sleep(Duration::from_millis(10)).await;
+
+        assert_eq!(received.lock().unwrap().as_bytes(), expected.as_bytes());
+        {
+            let sequences = sequences.lock().unwrap();
+            assert!(sequences.windows(2).all(|pair| pair[1] == pair[0] + 1));
+            assert!(sequences.len() > 2);
+        }
+        let snapshot = request.machine.lock().await.snapshot();
+        assert_eq!(snapshot.status, StreamStatus::Completed);
+        assert_snapshot_text_receipt(&snapshot, &expected);
+        assert!(json_value_uses_direct_path(&snapshot));
     }
 
     #[tokio::test(flavor = "current_thread")]
@@ -1672,7 +2023,7 @@ mod tests {
         let snapshot = request.machine.lock().await.snapshot();
         assert_eq!(snapshot.status, StreamStatus::Failed);
         assert_eq!(snapshot.last_seq, 0);
-        assert_eq!(snapshot.text, "");
+        assert_snapshot_text_receipt(&snapshot, "");
         assert_eq!(
             snapshot.error.as_ref().map(|error| error.code.as_str()),
             Some("CHANNEL_DELIVERY_FAILED")
@@ -2081,7 +2432,7 @@ mod tests {
 
         let snapshot = request.machine.lock().await.snapshot();
         assert_eq!(snapshot.effective_batch_window_ms, 50);
-        assert_eq!(snapshot.text.len(), chunks.len());
+        assert_snapshot_text_receipt(&snapshot, &"x".repeat(chunks.len()));
         assert!(snapshot.in_flight <= snapshot.max_in_flight);
     }
 }

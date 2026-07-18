@@ -18,6 +18,7 @@
       }
     ],
     "security": {
+      "capabilities": ["default"],
       "csp": {
         "default-src": "'self' customprotocol: asset:",
         "base-uri": "'none'",
