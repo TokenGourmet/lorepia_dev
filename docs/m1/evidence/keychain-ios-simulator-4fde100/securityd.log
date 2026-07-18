@@ -1,0 +1,7 @@
+Timestamp                       (process)[PID]
+2026-07-19 05:24:41.361488+0900  localhost LorePia Keychain Spike[18759]: (Security) Created Activity ID: 0xbdd4b4, Description: SecItemCopyMatching_ios
+2026-07-19 05:24:41.361793+0900  localhost LorePia Keychain Spike[18759]: (Security) [com.apple.securityd:secitemratelimit] Not internal release, disabling SIRL
+2026-07-19 05:24:41.362804+0900  localhost LorePia Keychain Spike[18759]: (Security) [com.apple.securityd:thread-local-client-debug] SecSecurityClientGet new thread!
+2026-07-19 05:24:41.363211+0900  localhost LorePia Keychain Spike[18759]: (Security) [com.apple.securityd:keychain] System Keychain Always Supported set via feature flag to disabled
+2026-07-19 05:24:41.363262+0900  localhost LorePia Keychain Spike[18759]: (libxpc.dylib) [com.apple.xpc:connection] activating connection: mach=true listener=false peer=false name=com.apple.securityd
+2026-07-19 05:24:41.368269+0900  localhost securityd[17734]: [com.apple.securityd:SecError] LorePia Keychain[18759]/1#-1 LF=0 copy_matching Error Domain=NSOSStatusErrorDomain Code=-34018 "Client has neither application-identifier nor keychain-access-groups entitlements" UserInfo={numberOfErrorsDeep=0, NSDescription=Client has neither application-identifier nor keychain-access-groups entitlements}

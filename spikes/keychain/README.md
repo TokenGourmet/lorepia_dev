@@ -59,6 +59,13 @@ npm run tauri dev
 The single button runs the OS-store probe. A successful unit test or compile is
 not OS credential-service evidence; unit tests use a fake backend.
 
+On iOS, `tauri ios build --no-sign` is compile-only. Do not install that output
+to claim Keychain runtime evidence: the app has no effective
+`application-identifier` or `keychain-access-groups` entitlement and the first
+Protected Data call fails with OSStatus `-34018`. Before a simulator or device
+run, inspect the installed app with `codesign -d --entitlements :-` and require
+both entitlements from a valid development-team signing configuration.
+
 ## Evidence boundary
 
 A physical-platform result needs the exact commit, raw run log, OS/hardware,

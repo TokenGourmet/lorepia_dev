@@ -97,6 +97,15 @@ unsigned simulator compile proves only that the toolchain accepts the code; it
 does not prove entitlements, persistence, access while locked, or device
 Keychain behavior.
 
+An exact `4fde100` no-sign build was also launched on the named iOS 26.5
+simulator to test that boundary. Its first Keychain lookup failed with OSStatus
+`-34018` because the linker ad-hoc app had neither `application-identifier` nor
+`keychain-access-groups` entitlements. The result is preserved as `FAIL`, not
+reclassified as a blocked or successful runtime test
+([candidate record](evidence/keychain-ios-simulator-4fde100/)). A signed build
+with effective development-team entitlements is required before the lifecycle
+can be evaluated on iOS; physical-device evidence remains a separate gate.
+
 ## Evidence this spike does not claim
 
 - Unit tests use a fake store and prove lifecycle, cleanup, concurrency, and
@@ -118,9 +127,11 @@ Keychain behavior.
 The first Android emulator and macOS physical-host lifecycle observations are
 preserved as bounded candidate records ([Android](evidence/keychain-android-emulator-38ce4c2/),
 [macOS](evidence/keychain-macos-host-38ce4c2/)). They passed all seven lifecycle
-assertions and cleanup on their named environments. The Android and macOS
-physical-platform matrix cells remain `NOT RUN` because the broader non-leakage
-and distribution-profile evidence is not complete.
+assertions and cleanup on their named environments. The unsigned iOS simulator
+attempt is preserved separately as the entitlement failure above. The Android,
+macOS, and iOS physical-platform matrix cells remain `NOT RUN` because the
+required physical runtime, broader non-leakage, and distribution-profile
+evidence is not complete.
 
 ## Upstream references
 

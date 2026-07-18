@@ -56,14 +56,14 @@ physical-device or cross-platform capability cell above.
 
 ## Keychain candidate observations (not physical-device evidence)
 
-This row evaluates exact source commit
-`38ce4c2c73a897a146859d78229b024e43004ffd`. It does not replace or change the
-Android physical-device keychain cell above.
+Each row evaluates the exact source commit named by its candidate record. These
+observations do not replace or change any physical-device keychain cell above.
 
 | Platform/runtime | Evidence level | Result | Evidence and limitation |
 |---|---|---|---|
 | macOS 26.5.2 build 25F84, arm64 physical host | Local packaged-app OS-store lifecycle | PASS twice (`7/7`, cleanup proved) | [candidate record](evidence/keychain-macos-host-38ce4c2/); ad-hoc bundle and login Keychain only, with no product SQLite/export/crash-path sentinel scan |
 | Android 16 / API 36 `sdk_gphone64_arm64`, WebView `133.0.6943.137` | Local emulator OS-store lifecycle | PASS (`7/7`, cleanup proved) | [candidate record](evidence/keychain-android-emulator-38ce4c2/); installed APK hash matched the built APK; emulator only, with no product SQLite/export/crash-path sentinel scan |
+| iPhone 17 Pro simulator, iOS 26.5 build 23F77 | Local no-sign simulator OS-store attempt | **FAIL** before lifecycle (`-34018`) | [candidate record](evidence/keychain-ios-simulator-4fde100/); linker ad-hoc app had no effective Keychain entitlements, so this proves the no-sign runtime limitation only |
 
 ## Available local environments (not pass evidence)
 
