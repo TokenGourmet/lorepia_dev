@@ -1,17 +1,17 @@
-fn main() {
-    const COMMANDS: &[&str] = &[
-        "start_mock_stream",
-        "ack_stream",
-        "cancel_stream",
-        "get_stream_snapshot",
-        "sanitize_plugin_html",
-        "privileged_probe",
-        "privileged_probe_count",
-    ];
+include!("src/app_commands.rs");
 
+macro_rules! command_names {
+    ($($command:ident),+ $(,)?) => {
+        &[$(stringify!($command)),+]
+    };
+}
+
+const APP_COMMANDS: &[&str] = with_lorepia_app_commands!(command_names);
+
+fn main() {
     tauri_build::try_build(
         tauri_build::Attributes::new()
-            .app_manifest(tauri_build::AppManifest::new().commands(COMMANDS)),
+            .app_manifest(tauri_build::AppManifest::new().commands(APP_COMMANDS)),
     )
     .expect("failed to build LorePia Tauri command permissions");
 }

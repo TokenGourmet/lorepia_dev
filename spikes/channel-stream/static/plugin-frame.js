@@ -7,6 +7,7 @@
   const DETAIL_LIMIT = 256;
   const NONCE_PATTERN = /^[0-9a-f]{32,128}$/;
   const REQUEST_ID_PATTERN = /^[A-Za-z0-9][A-Za-z0-9_-]{0,63}$/;
+  const RUN_ID_PATTERN = /^[A-Za-z0-9][A-Za-z0-9_-]{0,63}$/;
   const RESPONSE_SUCCESS_KEYS = [
     "version",
     "type",
@@ -25,7 +26,7 @@
   ];
   const ERROR_KEYS = ["code", "message"];
   const WATCHDOG_PING_KEYS = ["type", "sessionId", "seq"];
-  const RUN_SUITE_KEYS = ["type", "sessionNonce"];
+  const RUN_SUITE_KEYS = ["type", "sessionNonce", "runId"];
   const SET_WATCHDOG_MODE_KEYS = ["type", "sessionNonce", "mode"];
   const DANGEROUS_HTML =
     '<p onclick="attack()">safe<script>attack()</' +
@@ -80,10 +81,11 @@
     parent.postMessage(message, "*");
   }
 
-  function postTestResult(testId, passed, detail) {
+  function postTestResult(runId, testId, passed, detail) {
     postToHost({
       type: "lorepia:plugin:test-result",
       sessionNonce,
+      runId,
       testId,
       passed,
       detail: boundedDetail(detail),
@@ -92,7 +94,7 @@
 
   function nextRequestId(label) {
     requestSequence += 1;
-    return `suite-${runSequence}-${requestSequence}-${label}`.slice(0, 64);
+    return `p-${runSequence}-${requestSequence}-${label}`.slice(0, 64);
   }
 
   function withTimeout(promise, timeoutMs, label) {
@@ -207,6 +209,36 @@
     }
   }
 
+  function testHostTokenStorageInaccessible() {
+    const key = "lorepia.m1.host-broker-token.v1";
+    const journalKey = "lorepia.m1.host-broker-rotation.v1";
+    const probeKey = "lorepia-isolation-session-storage-probe";
+    try {
+      const observed = window.sessionStorage.getItem(key);
+      const observedJournal = window.sessionStorage.getItem(journalKey);
+      if (observed !== null || observedJournal !== null) {
+        return {
+          passed: false,
+          detail: "host broker token material was visible in sessionStorage",
+        };
+      }
+      window.sessionStorage.setItem(probeKey, "opaque-frame");
+      const isolated = window.sessionStorage.getItem(probeKey) === "opaque-frame";
+      window.sessionStorage.removeItem(probeKey);
+      return {
+        passed: isolated,
+        detail: isolated
+          ? "frame sessionStorage is isolated and contains no host token"
+          : "frame sessionStorage behaved unexpectedly",
+      };
+    } catch (error) {
+      return {
+        passed: true,
+        detail: `host sessionStorage blocked (${boundedDetail(error)})`,
+      };
+    }
+  }
+
   function testWindowOpenBlocked() {
     try {
       const opened = window.open("about:blank", "_blank");
@@ -277,26 +309,159 @@
     };
   }
 
-  async function testDirectTauriInvokeBlocked() {
-    try {
-      const internals = globalThis.__TAURI_INTERNALS__;
-      if (internals === undefined || typeof internals.invoke !== "function") {
-        return { passed: true, detail: "Tauri invoke is not exposed in the frame" };
-      }
+  function tauriInvokeOrNull() {
+    const internals = globalThis.__TAURI_INTERNALS__;
+    return internals !== undefined && typeof internals.invoke === "function"
+      ? internals.invoke.bind(internals)
+      : null;
+  }
 
+  function nativeErrorCode(error) {
+    let candidate = error;
+    if (typeof candidate === "string") {
+      try {
+        candidate = JSON.parse(candidate);
+      } catch {
+        const match = candidate.match(/\b[A-Z][A-Z_]{2,63}\b/);
+        return match === null ? null : match[0];
+      }
+    }
+    return isPlainRecord(candidate) && typeof candidate.code === "string"
+      ? candidate.code
+      : null;
+  }
+
+  function isTimeoutError(error) {
+    return error instanceof Error && /timed out after \d+ms$/.test(error.message);
+  }
+
+  function directNativeRequestJson(label, method = "probe.increment") {
+    return JSON.stringify({
+      request_id: nextRequestId(label),
+      method,
+      payload: {},
+    });
+  }
+
+  async function testDirectBrokerMissingTokenDenied() {
+    const directInvoke = tauriInvokeOrNull();
+    if (directInvoke === null) {
+      return { passed: true, detail: "Tauri invoke transport is absent in this frame" };
+    }
+    try {
       await withTimeout(
-        internals.invoke("privileged_probe"),
+        directInvoke("host_broker_request", {
+          hostToken: null,
+          requestJson: directNativeRequestJson("missing-token"),
+        }),
         PROBE_TIMEOUT_MS,
-        "direct privileged invoke",
+        "host broker without token",
+      );
+      return { passed: false, detail: "host_broker_request accepted a missing token" };
+    } catch (error) {
+      const code = nativeErrorCode(error);
+      const timedOut = isTimeoutError(error);
+      return {
+        passed: code === "MISSING_HOST_TOKEN",
+        detail:
+          code === "MISSING_HOST_TOKEN"
+            ? `missing token returned ${code}`
+            : timedOut
+              ? "INCONCLUSIVE: missing-token native callback timed out"
+              : `missing token returned ${boundedDetail(error)}`,
+      };
+    }
+  }
+
+  async function testDirectBrokerWrongTokenDenied() {
+    const directInvoke = tauriInvokeOrNull();
+    if (directInvoke === null) {
+      return { passed: true, detail: "Tauri invoke transport is absent in this frame" };
+    }
+    try {
+      await withTimeout(
+        directInvoke("host_broker_request", {
+          hostToken: "0".repeat(64),
+          requestJson: directNativeRequestJson("wrong-token"),
+        }),
+        PROBE_TIMEOUT_MS,
+        "host broker with wrong token",
+      );
+      return { passed: false, detail: "host_broker_request accepted a wrong token" };
+    } catch (error) {
+      const code = nativeErrorCode(error);
+      const timedOut = isTimeoutError(error);
+      return {
+        passed: code === "INVALID_HOST_TOKEN",
+        detail:
+          code === "INVALID_HOST_TOKEN"
+            ? `wrong token returned ${code}`
+            : timedOut
+              ? "INCONCLUSIVE: wrong-token native callback timed out"
+              : `wrong token returned ${boundedDetail(error)}`,
+      };
+    }
+  }
+
+  async function testDirectRegistrationTakeoverDenied() {
+    const directInvoke = tauriInvokeOrNull();
+    if (directInvoke === null) {
+      return { passed: true, detail: "Tauri invoke transport is absent in this frame" };
+    }
+    const attackerToken = "0".repeat(64);
+    let registrationDetail;
+    try {
+      await withTimeout(
+        directInvoke("register_host_broker_session", {
+          hostToken: attackerToken,
+          policy: {
+            moduleId: "fixture.plugin",
+            manifestPermissions: ["probe.increment"],
+            approvedPermissions: ["probe.increment"],
+          },
+        }),
+        PROBE_TIMEOUT_MS,
+        "host broker registration takeover",
+      );
+      return { passed: false, detail: "broker registration accepted the attacker token" };
+    } catch (error) {
+      const code = nativeErrorCode(error);
+      const timedOut = isTimeoutError(error);
+      if (code !== "INVALID_HOST_TOKEN") {
+        return {
+          passed: false,
+          detail: timedOut
+            ? "INCONCLUSIVE: registration takeover native callback timed out"
+            : `registration takeover returned ${boundedDetail(error)}`,
+        };
+      }
+      registrationDetail = `registration returned ${code}`;
+    }
+
+    try {
+      await withTimeout(
+        directInvoke("host_broker_request", {
+          hostToken: attackerToken,
+          requestJson: directNativeRequestJson("takeover-attacker-probe"),
+        }),
+        PROBE_TIMEOUT_MS,
+        "attacker token after registration takeover",
       );
       return {
         passed: false,
-        detail: "Direct privileged_probe invocation succeeded",
+        detail: "attacker token became valid after registration takeover",
       };
     } catch (error) {
+      const code = nativeErrorCode(error);
+      const timedOut = isTimeoutError(error);
       return {
-        passed: true,
-        detail: `Direct privileged_probe invocation blocked (${boundedDetail(error)})`,
+        passed: code === "INVALID_HOST_TOKEN",
+        detail:
+          code === "INVALID_HOST_TOKEN"
+            ? `${registrationDetail}; attacker probe returned ${code}`
+            : timedOut
+              ? `INCONCLUSIVE: ${registrationDetail}; attacker probe native callback timed out`
+              : `attacker probe returned ${boundedDetail(error)}`,
       };
     }
   }
@@ -336,6 +501,23 @@
         html === null
           ? "render.sanitize did not return result.html"
           : `sanitized=${boundedDetail(html)}`,
+    };
+  }
+
+  async function testBrokerProbeIncrement() {
+    const response = await brokerRequest("probe.increment", {});
+    const result = response.ok && isPlainRecord(response.result) ? response.result : null;
+    const passed =
+      result !== null &&
+      result.sentinel === "LOREPIA_HOST_BROKER_PROBE_REACHED" &&
+      Number.isSafeInteger(result.callCount);
+    return {
+      passed,
+      detail: response.ok
+        ? passed
+          ? `authenticated probe count=${result.callCount}`
+          : "probe.increment returned an invalid broker result"
+        : `probe.increment failed with ${response.error.code}`,
     };
   }
 
@@ -397,18 +579,22 @@
   const TESTS = [
     ["parent-document-blocked", testParentDocumentBlocked],
     ["local-storage-blocked", testLocalStorageBlocked],
+    ["host-token-storage-inaccessible", testHostTokenStorageInaccessible],
     ["window-open-blocked", testWindowOpenBlocked],
     ["external-fetch-csp-blocked", testExternalFetchBlocked],
-    ["direct-tauri-invoke-blocked", testDirectTauriInvokeBlocked],
+    ["direct-broker-missing-token-denied", testDirectBrokerMissingTokenDenied],
+    ["direct-broker-wrong-token-denied", testDirectBrokerWrongTokenDenied],
+    ["direct-registration-takeover-denied", testDirectRegistrationTakeoverDenied],
     ["broker-state-read", testBrokerStateRead],
     ["broker-render-sanitize", testBrokerSanitize],
+    ["broker-probe-increment", testBrokerProbeIncrement],
     ["broker-network-denied", testBrokerNetworkDenied],
     ["broker-secret-permission-denied", testBrokerSecretDenied],
     ["broker-replay-rejected", testBrokerReplayRejected],
     ["broker-unknown-field-rejected", testUnknownEnvelopeRejected],
   ];
 
-  async function runSuite() {
+  async function runSuite(runId) {
     if (suiteRunning) return;
     suiteRunning = true;
     runSequence += 1;
@@ -417,9 +603,9 @@
       for (const [testId, test] of TESTS) {
         try {
           const result = await test();
-          postTestResult(testId, result.passed === true, result.detail);
+          postTestResult(runId, testId, result.passed === true, result.detail);
         } catch (error) {
-          postTestResult(testId, false, boundedDetail(error));
+          postTestResult(runId, testId, false, boundedDetail(error));
         }
       }
     } finally {
@@ -469,9 +655,11 @@
     if (
       hasExactKeys(value, RUN_SUITE_KEYS) &&
       value.type === "lorepia:plugin:run-suite" &&
-      value.sessionNonce === sessionNonce
+      value.sessionNonce === sessionNonce &&
+      typeof value.runId === "string" &&
+      RUN_ID_PATTERN.test(value.runId)
     ) {
-      void runSuite();
+      void runSuite(value.runId);
     }
   });
 

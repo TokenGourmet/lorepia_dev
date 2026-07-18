@@ -12,6 +12,8 @@ export const ISOLATION_LIMITS = Object.freeze({
   requestBytesMax: 72 * 1024,
   resultBytesMax: 64 * 1024,
   containerEntriesMax: 1_024,
+  totalEntriesMax: 4_096,
+  totalNodesMax: 4_097,
   nestingDepthMax: 16,
   errorMessageCharsMax: 256,
 });
@@ -141,6 +143,20 @@ function requestIdHint(value: unknown): string | null {
   }
 }
 
+export function safeIsolationRequestIdHint(value: unknown): string | null {
+  return requestIdHint(value);
+}
+
+export function safeIsolationMessageTypeHint(value: unknown): string | null {
+  try {
+    if (!isOrdinaryObject(value)) return null;
+    const messageType = ownDataValue(value, "type");
+    return typeof messageType === "string" ? messageType : null;
+  } catch {
+    return null;
+  }
+}
+
 function hasExactKeys(
   value: Record<string, unknown>,
   expected: readonly string[],
@@ -152,21 +168,35 @@ function hasExactKeys(
   );
 }
 
-function validateString(value: string): string | null {
-  if (byteLength(value) > ISOLATION_LIMITS.stringBytesMax) {
-    return "A string exceeds the protocol size limit.";
-  }
-  return null;
-}
-
 function inspectJsonValue(
   value: unknown,
   depth: number,
   seen: WeakSet<object>,
+  budget: {
+    entries: number;
+    nodes: number;
+    stringAndKeyBytes: number;
+    byteLimit: number;
+  },
 ): string | null {
+  budget.nodes += 1;
+  if (budget.nodes > ISOLATION_LIMITS.totalNodesMax) {
+    return "The JSON value exceeds the total node limit.";
+  }
+
   if (value === null || typeof value === "boolean") return null;
 
-  if (typeof value === "string") return validateString(value);
+  if (typeof value === "string") {
+    const bytes = byteLength(value);
+    if (bytes > ISOLATION_LIMITS.stringBytesMax) {
+      return "A string exceeds the protocol size limit.";
+    }
+    budget.stringAndKeyBytes += bytes;
+    if (budget.stringAndKeyBytes > budget.byteLimit) {
+      return "Strings and keys exceed the JSON byte limit.";
+    }
+    return null;
+  }
 
   if (typeof value === "number") {
     return Number.isFinite(value) ? null : "JSON numbers must be finite.";
@@ -191,6 +221,10 @@ function inspectJsonValue(
       if (value.length > ISOLATION_LIMITS.containerEntriesMax) {
         return "An array exceeds the entry limit.";
       }
+      budget.entries += value.length;
+      if (budget.entries > ISOLATION_LIMITS.totalEntriesMax) {
+        return "The JSON value exceeds the total entry limit.";
+      }
 
       const keys = Reflect.ownKeys(value);
       if (keys.length !== value.length + 1 || !keys.includes("length")) {
@@ -206,7 +240,12 @@ function inspectJsonValue(
         ) {
           return "Arrays must contain only enumerable data elements.";
         }
-        const problem = inspectJsonValue(descriptor.value, depth + 1, seen);
+        const problem = inspectJsonValue(
+          descriptor.value,
+          depth + 1,
+          seen,
+          budget,
+        );
         if (problem !== null) return problem;
       }
       return null;
@@ -220,14 +259,23 @@ function inspectJsonValue(
     if (keys.length > ISOLATION_LIMITS.containerEntriesMax) {
       return "An object exceeds the entry limit.";
     }
+    budget.entries += keys.length;
+    if (budget.entries > ISOLATION_LIMITS.totalEntriesMax) {
+      return "The JSON value exceeds the total entry limit.";
+    }
 
     for (const key of keys) {
       if (typeof key !== "string") return "Symbol keys are not allowed.";
       if (DANGEROUS_KEYS.has(key)) {
         return `The reserved key ${key} is not allowed.`;
       }
-      if (byteLength(key) > ISOLATION_LIMITS.objectKeyBytesMax) {
+      const keyBytes = byteLength(key);
+      if (keyBytes > ISOLATION_LIMITS.objectKeyBytesMax) {
         return "An object key exceeds the size limit.";
+      }
+      budget.stringAndKeyBytes += keyBytes;
+      if (budget.stringAndKeyBytes > budget.byteLimit) {
+        return "Strings and keys exceed the JSON byte limit.";
       }
 
       const descriptor = Object.getOwnPropertyDescriptor(value, key);
@@ -238,7 +286,12 @@ function inspectJsonValue(
       ) {
         return "Objects may contain only enumerable data properties.";
       }
-      const problem = inspectJsonValue(descriptor.value, depth + 1, seen);
+      const problem = inspectJsonValue(
+        descriptor.value,
+        depth + 1,
+        seen,
+        budget,
+      );
       if (problem !== null) return problem;
     }
     return null;
@@ -251,7 +304,12 @@ function validateJson(
   value: unknown,
   byteLimit: number,
 ): SafeJsonValidation {
-  const problem = inspectJsonValue(value, 0, new WeakSet<object>());
+  const problem = inspectJsonValue(value, 0, new WeakSet<object>(), {
+    entries: 0,
+    nodes: 0,
+    stringAndKeyBytes: 0,
+    byteLimit,
+  });
   if (problem !== null) return { ok: false, message: problem };
 
   try {

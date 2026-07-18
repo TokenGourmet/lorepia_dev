@@ -2,7 +2,7 @@
 
 M-1 exists to remove architecture risk before LorePia's production workspace and plugin API are frozen. A demo, a successful compile, or an undocumented manual check is not enough to close it.
 
-The current state is recorded in [`verification-matrix.md`](verification-matrix.md). Every claim must point to reproducible evidence from the exact commit being evaluated.
+The current state is recorded in [`verification-matrix.md`](verification-matrix.md). The preserved cross-platform unsafe isolation baseline and selected fallback are recorded in [`isolation.md`](isolation.md). Every claim must point to reproducible evidence from the exact commit being evaluated.
 
 ## Result vocabulary
 
@@ -88,9 +88,21 @@ Before freezing `specs/plugin-api.md`:
 
 The plugin API remains provisional until these gates and the relevant isolation tests are complete.
 
+The unsafe-baseline isolation result does not close this gate: Android emulator
+execution demonstrated a privileged native side effect, while the macOS result
+only proved transport absence on that runtime. See [`isolation.md`](isolation.md).
+
 ## Store-Safe hard rule
 
 Until written policy clearance exists, Store-Safe builds must not execute imported JavaScript **or imported Lua**. Imported packages may be inspected and quarantined as inert data, but executable payloads remain disabled. Declarative templates and data binding are the only imported behavior allowed in this profile.
+
+The selected host-only 256-bit-token Rust broker fallback addresses the
+privileged sanitizer/probe command path, but not a synchronous busy loop sharing
+the host event loop. The disposable combined spike still exposes four Channel
+transport commands to its one Tauri window; those commands must be brokered or
+moved to a separately scoped WebView before this can become a production plugin
+runtime.
+That unresolved blocker is preserved in [`isolation.md`](isolation.md).
 
 Enabling either language requires all of the following:
 

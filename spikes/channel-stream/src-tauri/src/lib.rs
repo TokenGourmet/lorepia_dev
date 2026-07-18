@@ -1,4 +1,28 @@
+mod host_broker;
+
+include!("app_commands.rs");
+
+macro_rules! generate_lorepia_handler {
+    ($($command:ident),+ $(,)?) => {
+        tauri::generate_handler![$($command),+]
+    };
+}
+
+macro_rules! lorepia_command_names {
+    ($($command:ident),+ $(,)?) => {
+        &[$(stringify!($command)),+]
+    };
+}
+
+const APP_COMMAND_NAMES: &[&str] = with_lorepia_app_commands!(lorepia_command_names);
+const COMMAND_SURFACE_VERSION: u32 = 2;
+
+use host_broker::{
+    AuthorizedAction, BrokerAction, BrokerError, HostBroker, RegistrationOutcome,
+    RegistrationPolicy, RotationOutcome, SystemMonotonicClock,
+};
 use serde::{Deserialize, Serialize};
+use sha2::{Digest, Sha256};
 use std::{
     collections::{HashMap, HashSet, VecDeque},
     sync::{
@@ -18,9 +42,10 @@ const DEFAULT_CHUNK_INTERVAL_MS: u64 = 8;
 const DEFAULT_ACK_TIMEOUT_MS: u64 = 1_000;
 const MAX_REQUESTS: usize = 128;
 const NO_TERMINAL_SEQ: u64 = u64::MAX;
-const MAX_PLUGIN_HTML_BYTES: usize = 65_536;
+const MAX_PLUGIN_HTML_BYTES: usize = host_broker::MAX_SANITIZE_HTML_BYTES;
 
-static PRIVILEGED_PROBE_CALLS: AtomicU64 = AtomicU64::new(0);
+static HOST_BROKER_PROBE_CALLS: AtomicU64 = AtomicU64::new(0);
+static HOST_BROKER_SANITIZE_CALLS: AtomicU64 = AtomicU64::new(0);
 
 #[derive(Debug, Clone, Serialize, PartialEq, Eq)]
 #[serde(rename_all = "camelCase")]
@@ -569,9 +594,59 @@ struct SanitizedHtmlResponse {
 
 #[derive(Debug, Clone, Serialize, PartialEq, Eq)]
 #[serde(rename_all = "camelCase")]
-struct PrivilegedProbeResponse {
-    sentinel: &'static str,
-    call_count: u64,
+struct RegisterHostBrokerSessionResponse {
+    outcome: RegistrationOutcome,
+    generation: u64,
+    module_id: String,
+    network_policy: &'static str,
+}
+
+#[derive(Debug, Clone, Serialize, PartialEq, Eq)]
+#[serde(rename_all = "camelCase")]
+struct RotateHostBrokerSessionResponse {
+    outcome: RotationOutcome,
+    generation: u64,
+    module_id: String,
+    network_policy: &'static str,
+}
+
+#[derive(Debug, Clone, Serialize, PartialEq, Eq)]
+#[serde(rename_all = "camelCase")]
+struct HostBrokerRequestResponse {
+    request_id: String,
+    module_id: String,
+    result: HostBrokerResult,
+}
+
+#[derive(Debug, Clone, Serialize, PartialEq, Eq)]
+#[serde(
+    tag = "type",
+    rename_all = "snake_case",
+    rename_all_fields = "camelCase"
+)]
+enum HostBrokerResult {
+    StateRead {
+        state: &'static str,
+    },
+    RenderSanitize {
+        html: String,
+        input_bytes: usize,
+        output_bytes: usize,
+    },
+    ProbeIncrement {
+        sentinel: &'static str,
+        call_count: u64,
+    },
+}
+
+#[derive(Debug, Clone, Serialize, PartialEq, Eq)]
+#[serde(rename_all = "camelCase")]
+struct HostBrokerProbeCountResponse {
+    probe_call_count: u64,
+    sanitize_call_count: u64,
+    command_surface_version: u32,
+    command_names: &'static [&'static str],
+    command_sha256: String,
 }
 
 #[derive(Debug, Clone, Serialize, PartialEq, Eq)]
@@ -674,22 +749,99 @@ fn sanitize_plugin_html_value(input: &str) -> Result<SanitizedHtmlResponse, Comm
 }
 
 #[tauri::command]
-fn sanitize_plugin_html(html: String) -> Result<SanitizedHtmlResponse, CommandError> {
-    sanitize_plugin_html_value(&html)
+fn register_host_broker_session(
+    host_token: Option<String>,
+    policy: RegistrationPolicy,
+    broker: State<'_, HostBroker<SystemMonotonicClock>>,
+) -> Result<RegisterHostBrokerSessionResponse, BrokerError> {
+    let receipt = broker.register(host_token.as_deref(), policy)?;
+    Ok(RegisterHostBrokerSessionResponse {
+        outcome: receipt.outcome,
+        generation: receipt.generation,
+        module_id: receipt.module_id,
+        network_policy: "deny",
+    })
 }
 
 #[tauri::command]
-fn privileged_probe() -> PrivilegedProbeResponse {
-    let call_count = PRIVILEGED_PROBE_CALLS.fetch_add(1, Ordering::SeqCst) + 1;
-    PrivilegedProbeResponse {
-        sentinel: "LOREPIA_PRIVILEGED_COMMAND_REACHED",
-        call_count,
+fn rotate_host_broker_session(
+    current_host_token: Option<String>,
+    next_host_token: Option<String>,
+    expected_generation: u64,
+    broker: State<'_, HostBroker<SystemMonotonicClock>>,
+) -> Result<RotateHostBrokerSessionResponse, BrokerError> {
+    let receipt = broker.rotate(
+        current_host_token.as_deref(),
+        next_host_token.as_deref(),
+        expected_generation,
+    )?;
+    Ok(RotateHostBrokerSessionResponse {
+        outcome: receipt.outcome,
+        generation: receipt.generation,
+        module_id: receipt.module_id,
+        network_policy: "deny",
+    })
+}
+
+#[tauri::command]
+fn host_broker_request(
+    host_token: Option<String>,
+    request_json: String,
+    broker: State<'_, HostBroker<SystemMonotonicClock>>,
+) -> Result<HostBrokerRequestResponse, BrokerError> {
+    broker.execute_json(
+        host_token.as_deref(),
+        &request_json,
+        execute_host_broker_action,
+    )
+}
+
+fn execute_host_broker_action(
+    authorized: AuthorizedAction<'_>,
+) -> Result<HostBrokerRequestResponse, BrokerError> {
+    let AuthorizedAction {
+        request_id,
+        module_id,
+        action,
+    } = authorized;
+    let result = match action {
+        BrokerAction::StateRead => HostBrokerResult::StateRead { state: "ready" },
+        BrokerAction::RenderSanitize { html } => {
+            let sanitized = sanitize_plugin_html_value(&html)
+                .map_err(|_| BrokerError::action_failed(&request_id))?;
+            HOST_BROKER_SANITIZE_CALLS.fetch_add(1, Ordering::SeqCst);
+            HostBrokerResult::RenderSanitize {
+                html: sanitized.html,
+                input_bytes: sanitized.input_bytes,
+                output_bytes: sanitized.output_bytes,
+            }
+        }
+        BrokerAction::ProbeIncrement => {
+            let call_count = HOST_BROKER_PROBE_CALLS.fetch_add(1, Ordering::SeqCst) + 1;
+            HostBrokerResult::ProbeIncrement {
+                sentinel: "LOREPIA_HOST_BROKER_PROBE_REACHED",
+                call_count,
+            }
+        }
+    };
+
+    Ok(HostBrokerRequestResponse {
+        request_id,
+        module_id: module_id.to_owned(),
+        result,
+    })
+}
+
+#[tauri::command]
+fn host_broker_probe_count() -> HostBrokerProbeCountResponse {
+    let command_manifest = format!("{}\n", APP_COMMAND_NAMES.join("\n"));
+    HostBrokerProbeCountResponse {
+        probe_call_count: HOST_BROKER_PROBE_CALLS.load(Ordering::SeqCst),
+        sanitize_call_count: HOST_BROKER_SANITIZE_CALLS.load(Ordering::SeqCst),
+        command_surface_version: COMMAND_SURFACE_VERSION,
+        command_names: APP_COMMAND_NAMES,
+        command_sha256: format!("{:x}", Sha256::digest(command_manifest.as_bytes())),
     }
-}
-
-#[tauri::command]
-fn privileged_probe_count() -> u64 {
-    PRIVILEGED_PROBE_CALLS.load(Ordering::SeqCst)
 }
 
 #[tauri::command]
@@ -1027,15 +1179,8 @@ async fn deliver_terminal(
 pub fn run() {
     tauri::Builder::default()
         .manage(StreamRegistry::default())
-        .invoke_handler(tauri::generate_handler![
-            start_mock_stream,
-            ack_stream,
-            cancel_stream,
-            get_stream_snapshot,
-            sanitize_plugin_html,
-            privileged_probe,
-            privileged_probe_count
-        ])
+        .manage(HostBroker::<SystemMonotonicClock>::production())
+        .invoke_handler(with_lorepia_app_commands!(generate_lorepia_handler))
         .run(tauri::generate_context!())
         .expect("error while running LorePia Channel spike");
 }
@@ -1120,6 +1265,77 @@ mod tests {
                 .code,
             "HTML_TOO_LARGE"
         );
+    }
+
+    #[test]
+    fn host_broker_executor_maps_authorized_actions_and_uses_dedicated_probe_counter() {
+        HOST_BROKER_PROBE_CALLS.store(0, Ordering::SeqCst);
+        HOST_BROKER_SANITIZE_CALLS.store(0, Ordering::SeqCst);
+
+        let state = execute_host_broker_action(AuthorizedAction {
+            request_id: "state-action".into(),
+            module_id: "module.alpha",
+            action: BrokerAction::StateRead,
+        })
+        .unwrap();
+        assert_eq!(state.request_id, "state-action");
+        assert_eq!(state.module_id, "module.alpha");
+        assert_eq!(state.result, HostBrokerResult::StateRead { state: "ready" });
+
+        let sanitized = execute_host_broker_action(AuthorizedAction {
+            request_id: "sanitize-action".into(),
+            module_id: "module.alpha",
+            action: BrokerAction::RenderSanitize {
+                html: "<p onclick='attack()'>safe<script>attack()</script></p>".into(),
+            },
+        })
+        .unwrap();
+        assert!(matches!(
+            sanitized.result,
+            HostBrokerResult::RenderSanitize { ref html, .. }
+                if html == "<p>safe</p>"
+        ));
+
+        let probe = execute_host_broker_action(AuthorizedAction {
+            request_id: "probe-action".into(),
+            module_id: "module.alpha",
+            action: BrokerAction::ProbeIncrement,
+        })
+        .unwrap();
+        assert!(matches!(
+            &probe.result,
+            HostBrokerResult::ProbeIncrement {
+                sentinel: "LOREPIA_HOST_BROKER_PROBE_REACHED",
+                call_count: 1
+            }
+        ));
+        let audit = host_broker_probe_count();
+        assert_eq!(audit.probe_call_count, 1);
+        assert_eq!(audit.sanitize_call_count, 1);
+        assert_eq!(audit.command_surface_version, 2);
+        assert_eq!(
+            audit.command_names,
+            [
+                "ack_stream",
+                "cancel_stream",
+                "get_stream_snapshot",
+                "host_broker_probe_count",
+                "host_broker_request",
+                "register_host_broker_session",
+                "rotate_host_broker_session",
+                "start_mock_stream",
+            ]
+        );
+        assert_eq!(
+            audit.command_sha256,
+            "989743be825534a0355232646cb09098c6d1bbdf45047d0ee017df21606c100a"
+        );
+
+        let serialized = serde_json::to_value(probe).unwrap();
+        assert_eq!(serialized["requestId"], "probe-action");
+        assert_eq!(serialized["moduleId"], "module.alpha");
+        assert_eq!(serialized["result"]["type"], "probe_increment");
+        assert_eq!(serialized["result"]["callCount"], 1);
     }
 
     fn config(batch_window_ms: u64, max_in_flight: usize) -> ValidatedConfig {

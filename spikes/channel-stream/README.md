@@ -13,6 +13,27 @@ This disposable Tauri 2 + SvelteKit application validates LorePia's native-to-we
 
 The mock proves the transport and lifecycle mechanics only. It does not claim real provider SSE, mobile physical-device behavior, persistence, or production performance.
 
+## Isolation baseline
+
+The `/isolation` route is a negative-test harness, not proof of a production-safe
+plugin runtime. Unsafe-baseline commit `2f8e130` passed the packaged macOS
+effect-level suite because direct Tauri transport was not exposed there, but it
+failed on an Android 16/API 36 emulator when the iframe invoked
+`privileged_probe` and changed native state. The preserved evidence, selected
+host-only 256-bit-token Rust broker fallback, and remaining same-event-loop busy
+loop blocker are documented in
+[`../../docs/m1/isolation.md`](../../docs/m1/isolation.md). Store-Safe mobile
+imports keep JavaScript and Lua disabled.
+
+This combined disposable spike still registers the four raw Channel transport
+commands for its main window. The broker is the only path to the fixture's
+sanitizer and probe sinks, not yet the only native command path. Production work
+must broker those remaining commands or move plugin execution to a separately
+scoped WebView. Tauri also decodes the outer IPC command arguments before the
+Rust broker's size and admission checks run, so those checks do not bound the
+first allocation of an oversized direct command. That pre-handler boundary is
+another reason this harness is not a production plugin runtime.
+
 ## Run checks
 
 From this directory:
