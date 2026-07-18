@@ -1649,7 +1649,18 @@ mod tests {
             if is_delta {
                 let ack_request = Arc::clone(&callback_request);
                 tokio::spawn(async move {
-                    tokio::time::sleep(Duration::from_millis(40)).await;
+                    if seq == 1 {
+                        loop {
+                            let pressure_applied = {
+                                let machine = ack_request.machine.lock().await;
+                                machine.effective_batch_window_ms == MAX_BATCH_WINDOW_MS
+                            };
+                            if pressure_applied {
+                                break;
+                            }
+                            tokio::task::yield_now().await;
+                        }
+                    }
                     let acknowledged_through = {
                         let mut machine = ack_request.machine.lock().await;
                         machine.acknowledge(seq).unwrap();
@@ -1663,7 +1674,12 @@ mod tests {
         });
 
         channel.send(started).unwrap();
-        run_stream(Arc::clone(&request), config, channel).await;
+        tokio::time::timeout(
+            Duration::from_secs(2),
+            run_stream(Arc::clone(&request), config, channel),
+        )
+        .await
+        .expect("pressure-driven stream should not stall");
 
         let events = captured.lock().unwrap().clone();
         let delta_lengths: Vec<usize> = events

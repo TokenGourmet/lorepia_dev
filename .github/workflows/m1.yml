@@ -109,6 +109,12 @@ jobs:
           cache: npm
           cache-dependency-path: spikes/channel-stream/package-lock.json
 
+      - name: Set up Java 21
+        uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: "21"
+
       - name: Set up Rust and Android target
         run: |
           rustup toolchain install 1.97.1 --profile minimal --no-self-update
