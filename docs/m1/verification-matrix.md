@@ -9,7 +9,7 @@ This is the evidence index for the current commit, not a roadmap checkbox list. 
 | Platform | SQLite / FTS5 | Lua limits | File import | Keychain | Channel stream | Audio |
 |---|---|---|---|---|---|---|
 | Windows physical machine | NOT RUN | NOT RUN | NOT RUN | NOT RUN | NOT RUN | NOT RUN |
-| macOS physical machine | NOT RUN | NOT RUN | NOT RUN | NOT RUN | NOT RUN | NOT RUN |
+| macOS physical machine | PASS ([host record](evidence/sqlite-macos-39dfef0/)) | NOT RUN | NOT RUN | NOT RUN | NOT RUN | NOT RUN |
 | Linux physical machine | NOT RUN | NOT RUN | NOT RUN | NOT RUN | NOT RUN | NOT RUN |
 | Android physical device | NOT RUN | NOT RUN | NOT RUN | NOT RUN | NOT RUN | NOT RUN |
 | iOS physical device | NOT RUN | NOT RUN | NOT RUN | NOT RUN | NOT RUN | NOT RUN |
@@ -37,6 +37,9 @@ These rows are deliberately separate from the runtime matrix.
 | iOS ARM64 / Channel | Hosted simulator compile | NOT RUN | Await first `iOS simulator compile (channel-stream, no device)` run |
 | iOS ARM64 / keychain | Hosted simulator compile | NOT RUN | Await first `iOS simulator compile (keychain, no device)` run |
 | iOS ARM64 / SQLite/FTS5 | Hosted simulator compile | NOT RUN | Await first `iOS simulator compile (sqlite-fts, no device)` run |
+| macOS arm64 / SQLite/FTS5 exact candidate | Local packaged debug `.app` build and physical-host runtime | PASS | [source `39dfef0` record](evidence/sqlite-macos-39dfef0/) |
+| Android ARM64 / SQLite/FTS5 exact candidate | Local cross-compile summary only | NOT RUN | Build exited 0, but no qualifying raw log/artifact or run identity was retained ([observation](evidence/sqlite-mobile-compile-39dfef0/)) |
+| iOS ARM64 / SQLite/FTS5 exact candidate | Local simulator-compile summary only | NOT RUN | Build exited 0, but no qualifying raw log/artifact or run identity was retained ([observation](evidence/sqlite-mobile-compile-39dfef0/)) |
 
 ## Isolation baseline observations (not physical-device evidence)
 
@@ -76,7 +79,7 @@ These environments have been identified for upcoming runs. Inventory alone does 
 
 | Environment | Identified version | Evidence limitation |
 |---|---|---|
-| macOS host | macOS 26.5.2, arm64 | No capability scenario/result attached yet |
+| macOS host | macOS 26.5.2, arm64 | Packaged SQLite/FTS5 host record attached; other capability cells remain separate |
 | Apple toolchain | Xcode 26.6 | Toolchain inventory only |
 | iOS simulator | iOS 26.5 | Simulator, not a physical iOS device |
 | Android emulator | Android 16 / API 36, `sdk_gphone64_arm64`, WebView 133.0.6943.137 | Emulator, not a physical Android device |
@@ -99,8 +102,10 @@ These environments have been identified for upcoming runs. Inventory alone does 
 | Gate | State | Required evidence / current decision |
 |---|---|---|
 | Risu observation notes v1 | NOT RUN | Observation record without copied source |
-| Fixture provenance | NOT RUN | Per-file origin, permission/license, hash |
-| Golden behavior tests | NOT RUN | Expected/actual result for every fixture |
+| Compatibility fixture provenance | NOT RUN | Risu/card/import fixture set and conversion-difference record are not complete |
+| SQLite FTS fixture provenance | PASS | One synthetic search fixture has self-authored origin, CC0-1.0 permission, byte size, and canonical hash pinned ([fixture record](../../spikes/sqlite-fts/fixtures/README.md)) |
+| Compatibility golden behavior and conversion | NOT RUN | Risu/card/import golden set and conversion differences are not complete |
+| SQLite FTS golden searches | PASS (`7/7`) | Exact expected/actual IDs are in the native transcript; a packaged-app pass screenshot is separate and raw IPC JSON was not retained ([host record](evidence/sqlite-macos-39dfef0/)) |
 | Android reference device fixed | NOT RUN | Model, SoC/RAM, OS/build, power mode |
 | Windows reference machine fixed | NOT RUN | Model, CPU/RAM, OS/build, power mode |
 | Raw samples and p95 report | NOT RUN | Dataset, warm-up, sample count, raw samples, calculation |

@@ -1,0 +1,143 @@
+Source commit: 39dfef0ec998f806093722dbb23c46d3239fe077
+Tester: OpenAI Codex task /root
+Host: macOS 26.5.2 build 25F84, arm64, Mac16,10
+Command:
+  cargo test --locked --manifest-path src-tauri/Cargo.toml probe::tests::full_file_backed_probe_passes_and_removes_all_files -- --exact --nocapture
+Diagnostic-only source change:
+  eprintln!("M1_EXACT_RECEIPT={receipt:#?}");
+Exit code: 0
+
+running 1 test
+M1_EXACT_RECEIPT=ProbeReceipt {
+    protocol_version: 1,
+    schema_version: 2,
+    applied_migrations: [
+        1,
+        2,
+    ],
+    migrations_idempotent: true,
+    future_schema_rejected: true,
+    persistence: PersistenceEvidence {
+        marker_reopened: true,
+        fixture_rows_reopened: true,
+    },
+    concurrency: ConcurrencyEvidence {
+        journal_mode: "wal",
+        busy_timeout_ms: 250,
+        reader_writer_concurrent: true,
+        snapshot_isolated: true,
+        busy_observed: true,
+        retry_succeeded: true,
+    },
+    search: SearchEvidence {
+        tokenizer: "trigram",
+        short_query_policy: "escaped-like-bounded",
+        short_query_limit: 64,
+        golden: [
+            GoldenResult {
+                query_id: "q-fts-euneunhan",
+                result_ids: [
+                    1,
+                ],
+            },
+            GoldenResult {
+                query_id: "q-fts-doseogwan",
+                result_ids: [
+                    1,
+                ],
+            },
+            GoldenResult {
+                query_id: "q-fts-jeonggeojang",
+                result_ids: [
+                    2,
+                ],
+            },
+            GoldenResult {
+                query_id: "q-like-byeol",
+                result_ids: [
+                    2,
+                ],
+            },
+            GoldenResult {
+                query_id: "q-like-bit",
+                result_ids: [
+                    1,
+                    2,
+                    4,
+                ],
+            },
+            GoldenResult {
+                query_id: "q-like-escaped-wildcards",
+                result_ids: [
+                    5,
+                ],
+            },
+            GoldenResult {
+                query_id: "q-fts-injection-literal",
+                result_ids: [],
+            },
+        ],
+        mutation_sync: true,
+        injection_safe: true,
+    },
+    sqlite_version: "3.53.2",
+    compile_options: [
+        "ATOMIC_INTRINSICS=1",
+        "COMPILER=clang-21.0.0",
+        "DEFAULT_AUTOVACUUM",
+        "DEFAULT_CACHE_SIZE=-2000",
+        "DEFAULT_FILE_FORMAT=4",
+        "DEFAULT_FOREIGN_KEYS",
+        "DEFAULT_JOURNAL_SIZE_LIMIT=-1",
+        "DEFAULT_MMAP_SIZE=0",
+        "DEFAULT_PAGE_SIZE=4096",
+        "DEFAULT_PCACHE_INITSZ=20",
+        "DEFAULT_RECURSIVE_TRIGGERS",
+        "DEFAULT_SECTOR_SIZE=4096",
+        "DEFAULT_SYNCHRONOUS=2",
+        "DEFAULT_WAL_AUTOCHECKPOINT=1000",
+        "DEFAULT_WAL_SYNCHRONOUS=2",
+        "DEFAULT_WORKER_THREADS=0",
+        "DIRECT_OVERFLOW_READ",
+        "ENABLE_API_ARMOR",
+        "ENABLE_COLUMN_METADATA",
+        "ENABLE_DBSTAT_VTAB",
+        "ENABLE_FTS3",
+        "ENABLE_FTS3_PARENTHESIS",
+        "ENABLE_FTS5",
+        "ENABLE_LOAD_EXTENSION",
+        "ENABLE_MEMORY_MANAGEMENT",
+        "ENABLE_RTREE",
+        "ENABLE_STAT4",
+        "HAVE_ISNAN",
+        "MALLOC_SOFT_LIMIT=1024",
+        "MAX_ATTACHED=10",
+        "MAX_COLUMN=2000",
+        "MAX_COMPOUND_SELECT=500",
+        "MAX_DEFAULT_PAGE_SIZE=8192",
+        "MAX_EXPR_DEPTH=1000",
+        "MAX_FUNCTION_ARG=1000",
+        "MAX_LENGTH=1000000000",
+        "MAX_LIKE_PATTERN_LENGTH=50000",
+        "MAX_MMAP_SIZE=0x7fff0000",
+        "MAX_PAGE_COUNT=0xfffffffe",
+        "MAX_PAGE_SIZE=65536",
+        "MAX_SQL_LENGTH=1000000000",
+        "MAX_TRIGGER_DEPTH=1000",
+        "MAX_VARIABLE_NUMBER=32766",
+        "MAX_VDBE_OP=250000000",
+        "MAX_WORKER_THREADS=8",
+        "MUTEX_PTHREADS",
+        "SOUNDEX",
+        "SYSTEM_MALLOC",
+        "TEMP_STORE=1",
+        "THREADSAFE=1",
+        "USE_URI",
+    ],
+    fts5_enabled: true,
+    fixture_sha256: "b5e8b2f2fdcf40d33dbb5eca555c982700e3cc1559dfe3adc878d85e2380b674",
+    cleanup_pending: false,
+}
+test probe::tests::full_file_backed_probe_passes_and_removes_all_files ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 10 filtered out
