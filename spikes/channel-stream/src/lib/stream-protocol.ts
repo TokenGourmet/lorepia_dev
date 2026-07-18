@@ -73,7 +73,8 @@ export type StreamSnapshot = {
   lastSeq: number;
   lastAckedSeq: number;
   inFlight: number;
-  text: string;
+  textBytes: number;
+  textSha256: string;
   error: StreamFailure | null;
   batchWindowMs: number;
   effectiveBatchWindowMs: number;

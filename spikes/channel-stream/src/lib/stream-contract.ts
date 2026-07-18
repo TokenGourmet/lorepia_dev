@@ -13,8 +13,13 @@ export type ExpectedTerminalSnapshot = {
   requestId: string;
   status: Extract<StreamSnapshotStatus, "completed" | "cancelled" | "failed">;
   lastSeq: number;
-  text: string;
+  acceptedText: string;
   error: { code: string; message: string } | null;
+};
+
+export type TextReceipt = {
+  textBytes: number;
+  textSha256: string;
 };
 
 export type StreamContractState = {
@@ -67,6 +72,27 @@ function isNonnegativeSafeInteger(value: unknown): value is number {
 function hasOnlyKeys(value: Record<string, unknown>, allowedKeys: string[]): boolean {
   const allowed = new Set(allowedKeys);
   return Object.keys(value).every((key) => allowed.has(key));
+}
+
+function getWebCryptoDigest(): Pick<SubtleCrypto, "digest"> {
+  const subtle = globalThis.crypto?.subtle;
+  if (subtle === undefined) {
+    throw new Error("Web Crypto SHA-256을 사용할 수 없습니다.");
+  }
+  return subtle;
+}
+
+export async function createTextReceipt(
+  text: string,
+  digestProvider: Pick<SubtleCrypto, "digest"> = getWebCryptoDigest(),
+): Promise<TextReceipt> {
+  const encoded = new TextEncoder().encode(text);
+  const digest = await digestProvider.digest("SHA-256", encoded);
+  const textSha256 = Array.from(new Uint8Array(digest), (byte) =>
+    byte.toString(16).padStart(2, "0"),
+  ).join("");
+
+  return { textBytes: encoded.byteLength, textSha256 };
 }
 
 function describeEventType(value: unknown): string {
@@ -164,7 +190,7 @@ export function expectedSnapshotFrom(
       requestId: event.requestId,
       status: "completed",
       lastSeq: event.seq,
-      text: state.text,
+      acceptedText: state.text,
       error: null,
     };
   }
@@ -174,7 +200,7 @@ export function expectedSnapshotFrom(
       requestId: event.requestId,
       status: "cancelled",
       lastSeq: event.seq,
-      text: state.text,
+      acceptedText: state.text,
       error: null,
     };
   }
@@ -183,7 +209,7 @@ export function expectedSnapshotFrom(
     requestId: event.requestId,
     status: "failed",
     lastSeq: event.seq,
-    text: state.text,
+    acceptedText: state.text,
     error: event.error,
   };
 }
@@ -284,6 +310,20 @@ export function validateStreamEvent(
 function hasValidSnapshotPayload(value: unknown): value is StreamSnapshot {
   if (!isRecord(value)) return false;
 
+  const hasValidKeys = hasOnlyKeys(value, [
+    "requestId",
+    "status",
+    "lastSeq",
+    "lastAckedSeq",
+    "inFlight",
+    "textBytes",
+    "textSha256",
+    "error",
+    "batchWindowMs",
+    "effectiveBatchWindowMs",
+    "maxInFlight",
+  ]);
+
   const statusIsValid =
     value.status === "queued" ||
     value.status === "streaming" ||
@@ -325,13 +365,16 @@ function hasValidSnapshotPayload(value: unknown): value is StreamSnapshot {
     inFlight <= maxInFlight;
 
   return (
+    hasValidKeys &&
     typeof value.requestId === "string" &&
     value.requestId.length > 0 &&
     statusIsValid &&
     isNonnegativeSafeInteger(value.lastSeq) &&
     isNonnegativeSafeInteger(value.lastAckedSeq) &&
     inFlightIsValid &&
-    typeof value.text === "string" &&
+    isNonnegativeSafeInteger(value.textBytes) &&
+    typeof value.textSha256 === "string" &&
+    /^[0-9a-f]{64}$/.test(value.textSha256) &&
     errorIsValid &&
     batchWindowIsValid &&
     effectiveBatchWindowIsValid &&
@@ -339,9 +382,10 @@ function hasValidSnapshotPayload(value: unknown): value is StreamSnapshot {
   );
 }
 
-export function snapshotMismatches(
+function snapshotMismatches(
   snapshot: StreamSnapshot,
   expected: ExpectedTerminalSnapshot,
+  expectedReceipt: TextReceipt,
 ): string[] {
   const mismatches: string[] = [];
 
@@ -350,7 +394,10 @@ export function snapshotMismatches(
   if (snapshot.lastSeq !== expected.lastSeq) mismatches.push("lastSeq");
   if (snapshot.lastAckedSeq !== expected.lastSeq) mismatches.push("lastAckedSeq");
   if (snapshot.inFlight !== 0) mismatches.push("inFlight");
-  if (snapshot.text !== expected.text) mismatches.push("text");
+  if (snapshot.textBytes !== expectedReceipt.textBytes) mismatches.push("textBytes");
+  if (snapshot.textSha256 !== expectedReceipt.textSha256) {
+    mismatches.push("textSha256");
+  }
 
   const errorMatches =
     (snapshot.error === null && expected.error === null) ||
@@ -363,10 +410,11 @@ export function snapshotMismatches(
   return mismatches;
 }
 
-export function validateTerminalSnapshot(
+export async function validateTerminalSnapshot(
   value: unknown,
   expected: ExpectedTerminalSnapshot,
-): SnapshotValidation {
+  digestProvider?: Pick<SubtleCrypto, "digest">,
+): Promise<SnapshotValidation> {
   if (!hasValidSnapshotPayload(value)) {
     return {
       accepted: false,
@@ -375,7 +423,11 @@ export function validateTerminalSnapshot(
     };
   }
 
-  const mismatches = snapshotMismatches(value, expected);
+  const expectedReceipt = await createTextReceipt(
+    expected.acceptedText,
+    digestProvider ?? getWebCryptoDigest(),
+  );
+  const mismatches = snapshotMismatches(value, expected, expectedReceipt);
   if (mismatches.length > 0) {
     return {
       accepted: false,

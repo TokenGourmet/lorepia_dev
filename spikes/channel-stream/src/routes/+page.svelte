@@ -182,7 +182,14 @@
         return;
       }
 
-      const validation = validateTerminalSnapshot(rawSnapshot, expected);
+      const validation = await validateTerminalSnapshot(rawSnapshot, expected);
+      if (activeRun !== run) return;
+
+      if (run.expectedTerminal !== expected) {
+        reportProtocolError("기대하던 종료 이벤트가 영수증 검증 중 변경되었습니다.");
+        return;
+      }
+
       if (!validation.accepted) {
         reportProtocolError(validation.error);
         return;
@@ -194,7 +201,6 @@
       lastSeq = result.lastSeq;
       lastAckedSeq = result.lastAckedSeq;
       backendInFlight = result.inFlight;
-      partialText = result.text;
       batchWindowMs = result.batchWindowMs;
       maxInFlight = result.maxInFlight;
       effectiveBatchWindowMs = result.effectiveBatchWindowMs;
@@ -478,9 +484,11 @@
         <dd>{snapshot.batchWindowMs} ms</dd>
         <dt>최종 배칭 윈도우</dt>
         <dd>{snapshot.effectiveBatchWindowMs} ms</dd>
+        <dt>텍스트 UTF-8 바이트</dt>
+        <dd>{snapshot.textBytes}</dd>
+        <dt>텍스트 SHA-256</dt>
+        <dd><code>{snapshot.textSha256}</code></dd>
       </dl>
-      <h3>저장된 텍스트</h3>
-      <pre aria-label="백엔드 최종 스냅샷 텍스트">{snapshot.text}</pre>
     {:else}
       <p>종료 이벤트를 받으면 ACK 완료 후 자동으로 조회합니다.</p>
     {/if}
