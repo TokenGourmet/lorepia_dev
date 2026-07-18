@@ -32,18 +32,27 @@ jobs:
           - name: Linux
             runner: ubuntu-22.04
             spike: keychain
+          - name: Linux
+            runner: ubuntu-22.04
+            spike: sqlite-fts
           - name: macOS
             runner: macos-26
             spike: channel-stream
           - name: macOS
             runner: macos-26
             spike: keychain
+          - name: macOS
+            runner: macos-26
+            spike: sqlite-fts
           - name: Windows
             runner: windows-2022
             spike: channel-stream
           - name: Windows
             runner: windows-2022
             spike: keychain
+          - name: Windows
+            runner: windows-2022
+            spike: sqlite-fts
     defaults:
       run:
         working-directory: spikes/${{ matrix.spike }}
@@ -109,7 +118,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        spike: [channel-stream, keychain]
+        spike: [channel-stream, keychain, sqlite-fts]
     defaults:
       run:
         shell: bash
@@ -173,7 +182,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        spike: [channel-stream, keychain]
+        spike: [channel-stream, keychain, sqlite-fts]
     defaults:
       run:
         shell: bash

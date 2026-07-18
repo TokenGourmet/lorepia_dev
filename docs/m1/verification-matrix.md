@@ -24,14 +24,19 @@ These rows are deliberately separate from the runtime matrix.
 |---|---|---|---|
 | Windows / Channel | Hosted native compile/test | NOT RUN | Await first `Desktop compile/test (Windows / channel-stream)` run |
 | Windows / keychain | Hosted native compile/test | NOT RUN | Await first `Desktop compile/test (Windows / keychain)` run |
+| Windows / SQLite/FTS5 | Hosted native compile/test | NOT RUN | Await first `Desktop compile/test (Windows / sqlite-fts)` run |
 | macOS / Channel | Hosted native compile/test | NOT RUN | Await first `Desktop compile/test (macOS / channel-stream)` run |
 | macOS / keychain | Hosted native compile/test | NOT RUN | Await first `Desktop compile/test (macOS / keychain)` run |
+| macOS / SQLite/FTS5 | Hosted native compile/test | NOT RUN | Await first `Desktop compile/test (macOS / sqlite-fts)` run |
 | Linux / Channel | Hosted native compile/test | NOT RUN | Await first `Desktop compile/test (Linux / channel-stream)` run |
 | Linux / keychain | Hosted native compile/test | NOT RUN | Await first `Desktop compile/test (Linux / keychain)` run |
+| Linux / SQLite/FTS5 | Hosted native compile/test | NOT RUN | Await first `Desktop compile/test (Linux / sqlite-fts)` run |
 | Android ARM64 / Channel | Hosted cross-compile to debug APK | NOT RUN | Await first `Android compile (channel-stream, no device)` run |
 | Android ARM64 / keychain | Hosted cross-compile to debug APK | NOT RUN | Await first `Android compile (keychain, no device)` run |
+| Android ARM64 / SQLite/FTS5 | Hosted cross-compile to debug APK | NOT RUN | Await first `Android compile (sqlite-fts, no device)` run |
 | iOS ARM64 / Channel | Hosted simulator compile | NOT RUN | Await first `iOS simulator compile (channel-stream, no device)` run |
 | iOS ARM64 / keychain | Hosted simulator compile | NOT RUN | Await first `iOS simulator compile (keychain, no device)` run |
+| iOS ARM64 / SQLite/FTS5 | Hosted simulator compile | NOT RUN | Await first `iOS simulator compile (sqlite-fts, no device)` run |
 
 ## Isolation baseline observations (not physical-device evidence)
 

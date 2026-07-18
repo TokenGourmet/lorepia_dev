@@ -2,7 +2,7 @@
 
 M-1 exists to remove architecture risk before LorePia's production workspace and plugin API are frozen. A demo, a successful compile, or an undocumented manual check is not enough to close it.
 
-The current state is recorded in [`verification-matrix.md`](verification-matrix.md). The preserved cross-platform unsafe isolation baseline and selected fallback are recorded in [`isolation.md`](isolation.md). The audited Tauri Channel queue behavior and bounded-transport decision are recorded in [`channel-ipc-boundary.md`](channel-ipc-boundary.md). The independent five-OS credential-store boundary is recorded in [`keychain.md`](keychain.md). Every claim must point to reproducible evidence from the exact commit being evaluated.
+The current state is recorded in [`verification-matrix.md`](verification-matrix.md). The preserved cross-platform unsafe isolation baseline and selected fallback are recorded in [`isolation.md`](isolation.md). The audited Tauri Channel queue behavior and bounded-transport decision are recorded in [`channel-ipc-boundary.md`](channel-ipc-boundary.md). The independent five-OS credential-store boundary is recorded in [`keychain.md`](keychain.md). The disposable SQLite/FTS5 probe contract is recorded in [`sqlite-fts.md`](sqlite-fts.md). Every claim must point to reproducible evidence from the exact commit being evaluated.
 
 ## Result vocabulary
 
@@ -137,13 +137,16 @@ M-1 may close only when all statements below are true:
 
 `.github/workflows/m1.yml` performs:
 
-- Windows/macOS/Linux: the Channel and keychain spikes independently run
+- Windows/macOS/Linux: the Channel, keychain, and SQLite/FTS5 spikes independently run
   `npm ci`, frontend contract tests, Svelte/TypeScript check, frontend build,
   Rust format, Rust tests, Clippy with warnings denied, and Rust check.
-- Android: both spikes compile a debug ARM64 APK on a hosted runner. The
+- Android: all three spikes compile a debug ARM64 APK on a hosted runner. The
   keychain job also verifies its committed NDK-context hook and backup
   exclusions before compilation.
-- iOS: both spikes compile a debug ARM64 simulator target on a hosted macOS
+- iOS: all three spikes compile a debug ARM64 simulator target on a hosted macOS
   runner.
 
-Hosted CI does not claim audio output, keychain UI/service behavior, WebView isolation, document-picker behavior, or physical-device smoke. Those remain matrix work with real-device evidence.
+Hosted CI does not claim audio output, keychain UI/service behavior, SQLite
+file-locking/search runtime behavior, WebView isolation, document-picker
+behavior, or physical-device smoke. Those remain matrix work with real-device
+evidence.
