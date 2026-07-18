@@ -1,0 +1,43 @@
+[package]
+name = "lorepia-keychain-spike"
+version = "0.1.0"
+description = "LorePia M-1 five-OS native keychain probe"
+authors = ["LorePia contributors"]
+edition = "2021"
+license = "Apache-2.0"
+
+[lib]
+name = "spikeskeychain_lib"
+crate-type = ["staticlib", "cdylib", "rlib"]
+
+[build-dependencies]
+tauri-build = { version = "=2.6.3", features = [] }
+
+[dependencies]
+getrandom = "=0.3.3"
+keyring-core = "=1.0.0"
+serde = { version = "1.0.228", features = ["derive"] }
+sha2 = "=0.10.9"
+subtle = "=2.6.1"
+tauri = { version = "=2.11.5", features = [] }
+zeroize = "=1.9.0"
+
+[target.'cfg(target_os = "macos")'.dependencies]
+apple-native-keyring-store = { version = "=1.0.1", default-features = false, features = ["keychain"] }
+
+[target.'cfg(target_os = "ios")'.dependencies]
+apple-native-keyring-store = { version = "=1.0.1", default-features = false, features = ["protected"] }
+
+[target.'cfg(target_os = "windows")'.dependencies]
+windows-native-keyring-store = { version = "=1.1.0", default-features = false }
+
+[target.'cfg(target_os = "linux")'.dependencies]
+zbus-secret-service-keyring-store = { version = "=1.0.0", default-features = false, features = ["crypto-rust"] }
+
+[target.'cfg(target_os = "android")'.dependencies]
+android-native-keyring-store = { version = "=1.0.0", default-features = false }
+jni = "=0.21.1"
+ndk-context = "=0.1.1"
+
+[dev-dependencies]
+serde_json = "1.0.145"

@@ -1,0 +1,59 @@
+{
+  "$schema": "https://schema.tauri.app/config/2",
+  "productName": "LorePia Keychain Spike",
+  "version": "0.1.0",
+  "identifier": "dev.lorepia.spike.keychain",
+  "build": {
+    "beforeDevCommand": "npm run dev",
+    "devUrl": "http://localhost:1421",
+    "beforeBuildCommand": "npm run build",
+    "frontendDist": "../build"
+  },
+  "app": {
+    "windows": [
+      {
+        "label": "main",
+        "title": "LorePia M-1 Keychain Probe",
+        "width": 720,
+        "height": 520
+      }
+    ],
+    "security": {
+      "capabilities": ["default"],
+      "csp": {
+        "default-src": "'self' customprotocol: asset:",
+        "base-uri": "'none'",
+        "connect-src": "ipc: http://ipc.localhost",
+        "form-action": "'none'",
+        "frame-src": "'none'",
+        "img-src": "'self' asset: http://asset.localhost data:",
+        "object-src": "'none'",
+        "style-src": "'self' 'unsafe-inline'",
+        "script-src": "'self'"
+      },
+      "devCsp": {
+        "default-src": "'self' http://localhost:1421",
+        "base-uri": "'none'",
+        "connect-src": "ipc: http://ipc.localhost http://localhost:1421 ws://localhost:1421",
+        "form-action": "'none'",
+        "frame-src": "'none'",
+        "img-src": "'self' data:",
+        "object-src": "'none'",
+        "style-src": "'self' 'unsafe-inline'",
+        "script-src": "'self'"
+      },
+      "freezePrototype": true
+    }
+  },
+  "bundle": {
+    "active": true,
+    "targets": "all",
+    "icon": [
+      "icons/32x32.png",
+      "icons/128x128.png",
+      "icons/128x128@2x.png",
+      "icons/icon.icns",
+      "icons/icon.ico"
+    ]
+  }
+}

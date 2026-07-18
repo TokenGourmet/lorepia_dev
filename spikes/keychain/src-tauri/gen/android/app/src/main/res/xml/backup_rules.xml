@@ -1,0 +1,5 @@
+<?xml version="1.0" encoding="utf-8"?>
+<full-backup-content>
+    <!-- The encrypted preferences key is device-bound in Android Keystore. -->
+    <exclude domain="sharedpref" path="lorepia-keyring-v1.xml" />
+</full-backup-content>
