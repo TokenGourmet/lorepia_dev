@@ -45,10 +45,10 @@ into this product and does not change the bootstrap policy.
 
 ## UI ownership boundary
 
-The current page is functional plain HTML. It has no CSS, design tokens,
-animation, transition, iframe, audio element, or component library. Product
-visual design and animation remain owner-authored. Therefore the v2 plan's M0
-design-token condition is intentionally still open.
+The first owner-authored UI slice now includes shared design tokens, app-shell
+screens, chat composition, keyboard inset handling, and bounded touch gestures.
+It does not add an iframe, audio element, dynamic-code surface, or browser
+network path. This is a product slice, not an M0-completion claim.
 
 The existing LorePia icon is reused unchanged only because Tauri requires a
 compile-time application icon. No new branding or visual asset was designed in
@@ -155,7 +155,8 @@ Windows/Linux runtime pass.
   shell; hosted native compilation is recorded separately.
 - The v2 benchmark regression gate has no honest workload or baseline yet; no
   arbitrary threshold is invented here.
-- Design tokens and responsive visual design are deferred to the owner.
+- The first design-token and responsive screen slice exists; accessibility,
+  physical-device polish, and broader product flows remain open.
 - M-1 exit review and plugin API freeze remain blocked by the M-1 evidence
   matrix. Imported JavaScript and Lua remain disabled by product policy; M-1
   completion alone cannot enable them without an independently terminable

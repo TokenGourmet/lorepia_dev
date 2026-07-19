@@ -6,9 +6,9 @@ the M-1 vertical spikes used to prove or reject risky architecture choices in
 [`LorePia_기술계획서_v2.md`](LorePia_기술계획서_v2.md).
 
 The product scaffold is not an M0 completion claim. It establishes one typed
-`lorepia-core -> Tauri -> Svelte` startup path while M-1 exit evidence, the
-plugin API freeze, physical mobile smoke, benchmark baselines, and owner-authored
-visual design remain open. See [`docs/m0/README.md`](docs/m0/README.md).
+`lorepia-core -> Tauri -> Svelte` startup path and an owner-authored first UI
+slice while M-1 exit evidence, the plugin API freeze, physical mobile smoke,
+and benchmark baselines remain open. See [`docs/m0/README.md`](docs/m0/README.md).
 
 The current spikes exercise mock SSE-to-Tauri-Channel streaming, an independent
 five-OS credential-store lifecycle, a file-backed SQLite/FTS5 lifecycle, a
@@ -16,15 +16,16 @@ bounded archive/PNG import-hardening lifecycle, and a constrained Lua 5.4
 runtime. A sixth spike exercises a fixed local PCM WAV through the trusted
 main WebView's `HTMLAudioElement` path. A seventh tests an independently
 terminable QuickJS-WASM Worker boundary without sending source through Tauri
-IPC. They are intentionally functional and minimal. Product UI, visual design,
-and animation are outside the implementation scope here and remain
-owner-authored work.
+IPC. They are intentionally functional and minimal and remain separate from the
+product UI and its owner-authored design system.
 
 ## Current scope
 
 - Maintain a real root Rust workspace and a Tauri 2 + Svelte 5 product shell.
-- Keep the first product command surface limited to an exact startup snapshot.
-- Keep product UI functional and unstyled until owner-authored design work.
+- Keep every product command capability explicit, bounded, and limited to the
+  trusted main WebView.
+- Keep product UI on the owner-authored tokens and screen components without
+  weakening executable-content or native-command boundaries.
 - Prove the Tauri 2 + Rust + Svelte toolchain on Windows, macOS, Linux, Android, and iOS.
 - Verify Channel sequencing, batching, cancellation, backpressure, and partial-result behavior.
 - Verify that OS credential services can complete a native-only
