@@ -10,6 +10,7 @@ exclude = [
   "spikes/import-hardening/src-tauri",
   "spikes/keychain/src-tauri",
   "spikes/lua-limits/src-tauri",
+  "spikes/script-runner/src-tauri",
   "spikes/sqlite-fts/src-tauri",
 ]
 

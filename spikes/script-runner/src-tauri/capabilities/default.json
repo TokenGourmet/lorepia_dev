@@ -1,0 +1,7 @@
+{
+  "$schema": "../gen/schemas/desktop-schema.json",
+  "identifier": "default",
+  "description": "Static capability for the trusted Script Runner M-1 host WebView",
+  "webviews": ["main"],
+  "permissions": []
+}

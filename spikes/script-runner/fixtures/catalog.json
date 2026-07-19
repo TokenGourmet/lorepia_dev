@@ -1,0 +1,50 @@
+{
+  "protocolVersion": "m1-script-runner-fixtures-v1",
+  "policyVersion": "m1-script-runner-v1",
+  "origin": "self-authored for LorePia M-1 security validation",
+  "license": "Apache-2.0",
+  "fixtures": [
+    {
+      "fixtureId": "allowed",
+      "file": "allowed.js",
+      "sourceBytes": 84,
+      "sourceSha256": "39400a23cd3673742191a0b0fc2ac2ae85f5ebbba61b4c36d0dde84d3ba21533"
+    },
+    {
+      "fixtureId": "infinite-loop",
+      "file": "infinite-loop.js",
+      "sourceBytes": 34,
+      "sourceSha256": "1b6d83e4758779a5d3b79cd919c92492f6cf3f96c33ee06d05aecf8b4583b477"
+    },
+    {
+      "fixtureId": "recursive-pressure",
+      "file": "recursive-pressure.js",
+      "sourceBytes": 87,
+      "sourceSha256": "a86fb5b29555dd746ee600bcd3af90558eb0dcd8bbd31595ec203915903c12ea"
+    },
+    {
+      "fixtureId": "allocator-pressure",
+      "file": "allocator-pressure.js",
+      "sourceBytes": 102,
+      "sourceSha256": "c2d6a2a18d3c84ccf99e3bfb6c82b650bb460f17af3bdbc0edccb622eac89a9f"
+    },
+    {
+      "fixtureId": "forbidden-globals",
+      "file": "forbidden-globals.js",
+      "sourceBytes": 692,
+      "sourceSha256": "be845676c62d41183070801ef5d5fbf4763682f7c93726d9bd2277060b34f4a9"
+    },
+    {
+      "fixtureId": "oversized-output",
+      "file": "oversized-output.js",
+      "sourceBytes": 33,
+      "sourceSha256": "66cdc0251c3ccff590ea6667a76496f961a46e35c847d75413ffeac5568012d6"
+    },
+    {
+      "fixtureId": "script-error",
+      "file": "script-error.js",
+      "sourceBytes": 80,
+      "sourceSha256": "c29913ed5f74106858ae3efd925252aec51bfe7d1c0f6724210bd3b0c3fbc7f8"
+    }
+  ]
+}
