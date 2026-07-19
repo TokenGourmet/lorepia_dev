@@ -166,6 +166,12 @@ jobs:
           distribution: temurin
           java-version: "21"
 
+      - name: Set up Android SDK command-line tools
+        uses: android-actions/setup-android@v4
+        with:
+          cmdline-tools-version: "14742923"
+          packages: ""
+
       - name: Set up pinned Rust and Android target
         run: |
           rustup toolchain install 1.97.1 --profile minimal --no-self-update
