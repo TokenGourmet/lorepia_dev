@@ -14,9 +14,11 @@ The current spikes exercise mock SSE-to-Tauri-Channel streaming, an independent
 five-OS credential-store lifecycle, a file-backed SQLite/FTS5 lifecycle, a
 bounded archive/PNG import-hardening lifecycle, and a constrained Lua 5.4
 runtime. A sixth spike exercises a fixed local PCM WAV through the trusted
-main WebView's `HTMLAudioElement` path. They are intentionally functional and
-minimal. Product UI, visual design, and animation are outside the
-implementation scope here and remain owner-authored work.
+main WebView's `HTMLAudioElement` path. A seventh tests an independently
+terminable QuickJS-WASM Worker boundary without sending source through Tauri
+IPC. They are intentionally functional and minimal. Product UI, visual design,
+and animation are outside the implementation scope here and remain
+owner-authored work.
 
 ## Current scope
 
@@ -37,6 +39,9 @@ implementation scope here and remain owner-authored work.
   memory, and standard-library policy without enabling imported Lua.
 - Verify fixed-fixture load, play, pause, seek, resume, stop, release, and the
   foreground-only lifecycle policy through the trusted WebView audio path.
+- Verify that a fresh QuickJS-WASM Worker can enforce bounded script execution,
+  survive hostile fixtures, and be terminated externally without a Tauri
+  command, Channel, or source-transport path.
 - Record runtime evidence without treating compilation, a simulator, and a physical device as equivalent.
 - Keep imported JavaScript and Lua disabled in every current product profile;
   reopening requires a new reviewed contract, technical boundary evidence, and
@@ -65,6 +70,7 @@ No 5-OS runtime support claim is valid until the [M-1 verification matrix](docs/
 ├── spikes/import-hardening/    # Disposable archive/PNG defense spike
 ├── spikes/lua-limits/          # Disposable Lua 5.4 limit-enforcement spike
 ├── spikes/audio-playback/      # Disposable trusted-WebView audio spike
+├── spikes/script-runner/       # Disposable terminable JavaScript runner spike
 ├── .github/workflows/product.yml # Product 5OS compile gates
 ├── .github/workflows/m1.yml    # Spike desktop and mobile compile verification
 └── LorePia_기술계획서_v2.md    # Current technical plan
@@ -133,6 +139,14 @@ and emitted fixed WAV. Its controls and receipt exercise a trusted
 `HTMLAudioElement`; they do not define product media UI or establish a runtime
 pass without physical output, lifecycle, and resource-release evidence. See
 [`docs/m1/audio-playback.md`](docs/m1/audio-playback.md).
+
+The script-runner spike uses the same locked sequence from
+`spikes/script-runner`. Its fixed 15-case probe runs each case in a fresh
+QuickJS-WASM Worker and proves both engine interruption and host-side Worker
+termination. It has an empty Tauri command/capability surface and does not send
+source through Tauri IPC. This candidate does not enable imported JavaScript in
+the product; architecture, current runtime observations, and remaining gates
+are in [`docs/m1/script-runner.md`](docs/m1/script-runner.md).
 
 `rust-toolchain.toml`, `Cargo.lock`, and `package-lock.json` are application inputs and must be committed. CI uses the pinned Rust toolchain and lockfiles and must not silently refresh dependencies.
 

@@ -68,6 +68,24 @@ own product contract, policy clearance, five-platform limit evidence, and a
 negative test proving that imports or stale settings cannot enable it by
 default.
 
+## Candidate follow-up (decision unchanged)
+
+The disposable [`script-runner` spike](../m1/script-runner.md) now runs each
+fixed case in a fresh QuickJS-WASM module Worker. Exact implementation commit
+`58bab9d697533b697b098b1a6130665d1ad7cd04` passed its 15-case suite in a
+packaged macOS Tauri WKWebView, an Android ARM64 emulator, and an iOS simulator.
+It demonstrated engine
+interruption, host-side `Worker.terminate()`, fixed maximum WASM memory, absent
+guest host globals, bounded receipts, raw-error redaction, and recovery.
+
+That result does not change this ADR. The spike accepts only a bundled,
+self-authored corpus and has no product source-to-runner contract. Windows,
+Linux, physical Android, signed physical iOS, store policy, lifecycle, and
+arbitrary-source admission evidence remain incomplete. The product therefore
+keeps its Worker/WASM surface absent and imported executable content
+`DISABLED_BY_SECURITY_POLICY` until a separate reviewed product decision meets
+every reopening requirement above.
+
 ## Consequences
 
 - Card/archive import work may inspect, report, preserve, or quarantine script

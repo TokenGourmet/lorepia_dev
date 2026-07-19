@@ -33,30 +33,35 @@ These rows are deliberately separate from the runtime matrix.
 | Windows / import hardening | Hosted native compile/test | PASS | [`d56388e` job](https://github.com/TokenGourmet/lorepia_dev/actions/runs/29671504249/job/88151282400); no system picker/runtime import |
 | Windows / Lua limits | Hosted native compile/test | PASS | [`d56388e` job](https://github.com/TokenGourmet/lorepia_dev/actions/runs/29671504249/job/88151282423); fixed diagnostic corpus only |
 | Windows / Audio playback | Hosted native compile/test and emitted-fixture identity check | PASS | [`d56388e` job](https://github.com/TokenGourmet/lorepia_dev/actions/runs/29671504249/job/88151282406); no audio device or lifecycle exercised |
+| Windows / Script runner | Hosted native compile/test and emitted Worker/WASM boundary check | PASS | [`2ab7672` job](https://github.com/TokenGourmet/lorepia_dev/actions/runs/29674968473/job/88160626055); LF-pinned fixtures passed, no packaged WebView2 runtime |
 | macOS / Channel | Hosted native compile/test | PASS | [`d56388e` job](https://github.com/TokenGourmet/lorepia_dev/actions/runs/29671504249/job/88151282403); hosted checks only |
 | macOS / keychain | Hosted native compile/test | PASS | [`d56388e` job](https://github.com/TokenGourmet/lorepia_dev/actions/runs/29671504249/job/88151282401); no Keychain runtime |
 | macOS / SQLite/FTS5 | Hosted native compile/test | PASS | [`d56388e` job](https://github.com/TokenGourmet/lorepia_dev/actions/runs/29671504249/job/88151282425); separate physical-host record remains below |
 | macOS / import hardening | Hosted native compile/test | PASS | [`d56388e` job](https://github.com/TokenGourmet/lorepia_dev/actions/runs/29671504249/job/88151282433); no system picker/runtime import |
 | macOS / Lua limits | Hosted native compile/test | PASS | [`d56388e` job](https://github.com/TokenGourmet/lorepia_dev/actions/runs/29671504249/job/88151282428); fixed diagnostic corpus only |
 | macOS / Audio playback | Hosted native compile/test and emitted-fixture identity check | PASS | [`d56388e` job](https://github.com/TokenGourmet/lorepia_dev/actions/runs/29671504249/job/88151282417); no audio device or lifecycle exercised |
+| macOS / Script runner | Hosted native compile/test and emitted Worker/WASM boundary check | PASS | [`2ab7672` job](https://github.com/TokenGourmet/lorepia_dev/actions/runs/29674968473/job/88160626132); separate packaged-host runtime record remains below |
 | Linux / Channel | Hosted native compile/test | PASS | [`d56388e` job](https://github.com/TokenGourmet/lorepia_dev/actions/runs/29671504249/job/88151282389); no packaged WebView runtime |
 | Linux / keychain | Hosted native compile/test | PASS | [`d56388e` job](https://github.com/TokenGourmet/lorepia_dev/actions/runs/29671504249/job/88151282424); no Secret Service runtime |
 | Linux / SQLite/FTS5 | Hosted native compile/test | PASS | [`d56388e` job](https://github.com/TokenGourmet/lorepia_dev/actions/runs/29671504249/job/88151282338); no file-locking/search runtime |
 | Linux / import hardening | Hosted native compile/test | PASS | [`d56388e` job](https://github.com/TokenGourmet/lorepia_dev/actions/runs/29671504249/job/88151282415); no system picker/runtime import |
 | Linux / Lua limits | Hosted native compile/test | PASS | [`d56388e` job](https://github.com/TokenGourmet/lorepia_dev/actions/runs/29671504249/job/88151282351); fixed diagnostic corpus only |
 | Linux / Audio playback | Hosted native compile/test and emitted-fixture identity check | PASS | [`d56388e` job](https://github.com/TokenGourmet/lorepia_dev/actions/runs/29671504249/job/88151282361); no audio device or lifecycle exercised |
+| Linux / Script runner | Hosted native compile/test and emitted Worker/WASM boundary check | PASS | [`2ab7672` job](https://github.com/TokenGourmet/lorepia_dev/actions/runs/29674968473/job/88160626121); no packaged WebKitGTK runtime |
 | Android ARM64 / Channel | Hosted cross-compile to debug APK | PASS (compile only) | [`d56388e` job](https://github.com/TokenGourmet/lorepia_dev/actions/runs/29671504249/job/88151282337); APK existence/hash checked, no install/runtime |
 | Android ARM64 / keychain | Hosted cross-compile to debug APK | PASS (compile only) | [`d56388e` job](https://github.com/TokenGourmet/lorepia_dev/actions/runs/29671504249/job/88151282318); APK existence/hash checked, no Keystore runtime |
 | Android ARM64 / SQLite/FTS5 | Hosted cross-compile to debug APK | PASS (compile only) | [`d56388e` job](https://github.com/TokenGourmet/lorepia_dev/actions/runs/29671504249/job/88151282326); APK existence/hash checked, no database runtime |
 | Android ARM64 / import hardening | Hosted cross-compile to debug APK | PASS (compile only) | [`d56388e` job](https://github.com/TokenGourmet/lorepia_dev/actions/runs/29671504249/job/88151282328); APK existence/hash checked, no picker/import runtime |
 | Android ARM64 / Lua limits | Hosted cross-compile to debug APK | PASS (compile only) | [`d56388e` job](https://github.com/TokenGourmet/lorepia_dev/actions/runs/29671504249/job/88151282324); APK existence/hash checked, no Lua runtime |
 | Android ARM64 / Audio playback | Hosted cross-compile to debug APK and emitted-fixture identity check | PASS (compile only) | [`d56388e` job](https://github.com/TokenGourmet/lorepia_dev/actions/runs/29671504249/job/88151282344); install, output, lifecycle, and release remain `NOT RUN` |
+| Android ARM64 / Script runner | Hosted cross-compile to debug APK and emitted Worker/WASM boundary check | PASS (compile only) | [`2ab7672` job](https://github.com/TokenGourmet/lorepia_dev/actions/runs/29674968473/job/88160626025); no install or WebView runtime in CI |
 | iOS ARM64 / Channel | Hosted simulator compile | PASS (compile only) | [`d56388e` job](https://github.com/TokenGourmet/lorepia_dev/actions/runs/29671504249/job/88151282305); `.app`/Info.plist checked, no launch |
 | iOS ARM64 / keychain | Hosted simulator compile | PASS (compile only) | [`d56388e` job](https://github.com/TokenGourmet/lorepia_dev/actions/runs/29671504249/job/88151282316); `.app`/Info.plist checked, no signed Keychain runtime |
 | iOS ARM64 / SQLite/FTS5 | Hosted simulator compile | PASS (compile only) | [`d56388e` job](https://github.com/TokenGourmet/lorepia_dev/actions/runs/29671504249/job/88151282327); `.app`/Info.plist checked, no database runtime |
 | iOS ARM64 / import hardening | Hosted simulator compile | PASS (compile only) | [`d56388e` job](https://github.com/TokenGourmet/lorepia_dev/actions/runs/29671504249/job/88151282342); `.app`/Info.plist checked, no picker/import runtime |
 | iOS ARM64 / Lua limits | Hosted simulator compile | PASS (compile only) | [`d56388e` job](https://github.com/TokenGourmet/lorepia_dev/actions/runs/29671504249/job/88151282304); `.app`/Info.plist and vendored symbols checked, no Lua runtime |
 | iOS ARM64 / Audio playback | Hosted simulator compile and emitted-fixture identity check | PASS (compile only) | [`d56388e` job](https://github.com/TokenGourmet/lorepia_dev/actions/runs/29671504249/job/88151282311); launch, output, lifecycle, and release remain `NOT RUN` |
+| iOS ARM64 / Script runner | Hosted simulator compile and emitted Worker/WASM boundary check | PASS (compile only) | [`2ab7672` job](https://github.com/TokenGourmet/lorepia_dev/actions/runs/29674968473/job/88160626033); `.app` verified, no launch or signed-device runtime in CI |
 | macOS arm64 / SQLite/FTS5 exact candidate | Local packaged debug `.app` build and physical-host runtime | PASS | [source `39dfef0` record](evidence/sqlite-macos-39dfef0/) |
 | macOS arm64 / import-hardening exact candidate | Local packaged debug `.app` build and physical-host synthetic-core runtime | PASS twice (`26/26` each) | [source `46af753` record](evidence/import-hardening-macos-46af753/); no picker or external file was used, so File import and Archive/import hardening cells remain `NOT RUN` |
 | Android ARM64 / import-hardening exact candidate | Local cross-compile to debug APK, no device | PASS (compile only) | [source `46af753` record](evidence/import-hardening-mobile-compile-46af753/); APK metadata and debug signature were inspected, but install/runtime/import remain `NOT RUN` |
@@ -109,6 +114,22 @@ physical-device or cross-platform capability cell above.
 | macOS 26.5.2 arm64, locally packaged release `.app` | Local packaged-app effect test | PASS (`18/18`) | [candidate record](evidence/a42d33d-local-isolation.md); direct iframe Tauri transport was absent, so this is not ACL-decision proof |
 | Android 16 / API 36 `sdk_gphone64_arm64`, WebView `133.0.6943.137` | Local emulator runtime | **FAIL** (`15/18`, `18/18` complete) | [candidate record](evidence/a42d33d-local-isolation.md); three direct native callbacks timed out and remain `INCONCLUSIVE`; final monitored sink delta had no extra effect |
 
+## Script-runner candidate observations (exact-commit local evidence)
+
+These rows cover the independently terminable QuickJS-WASM Worker replacement,
+not the unsafe iframe or broker candidate above. They evaluate exact
+implementation commit `58bab9d697533b697b098b1a6130665d1ad7cd04` based on
+`f150d38`; committed inputs and local packaged artifact hashes are pinned in the
+candidate record. Complete raw receipts and physical-device evidence remain
+absent, so the observations do not replace a physical-device cell or close the
+product JavaScript gate.
+
+| Platform/runtime | Evidence level | Result | Evidence and limitation |
+|---|---|---|---|
+| macOS 26.5.2 build 25F84 arm64, packaged Tauri WKWebView on the physical host | Exact-commit local packaged-app observation | **PASS (`15/15`)** | [candidate record](evidence/script-runner-58bab9d/); all fixed cases, exact `WEDGE_STARTED`, external Worker termination, heartbeat, and recovery passed; executable hash pinned, full raw transcript not committed |
+| Android 16 / API 36 `sdk_gphone64_arm64`, WebView `133.0.6943.137`, installed debug APK | Exact-commit local emulator observation | **PASS (`15/15`)** | [candidate record](evidence/script-runner-58bab9d/); all fixed cases and recovery passed, and the installed APK matched the built hash; not a physical device |
+| iPhone 17 simulator / iOS 26.5, installed no-sign ARM64 simulator app | Exact-commit local simulator observation | **PASS (`15/15`)** after preserved **FAIL (`14/15`)** | [candidate record](evidence/script-runner-58bab9d/); after the warmup fix, exact `WEDGE_STARTED`, external termination, and recovery passed, and the installed executable matched the built hash; not signed physical-device evidence |
+
 ## Keychain candidate observations (not physical-device evidence)
 
 Each row evaluates the exact source commit named by its candidate record. These
@@ -138,7 +159,7 @@ These environments have been identified for upcoming runs. Inventory alone does 
 | Archive/import hardening | NOT RUN | NOT RUN | NOT RUN | NOT RUN | NOT RUN | None |
 | Regex budget | NOT RUN | NOT RUN | NOT RUN | NOT RUN | NOT RUN | None |
 | Lua budget and stdlib removal | NOT RUN | PASS ([host record](evidence/lua-macos-9975d80/)) | NOT RUN | NOT RUN | NOT RUN | Fixed pure-Lua corpus proved instruction/allocator interruption, forbidden-global absence, and host recovery; this is VM non-exposure, not binary object removal, and imported Lua remains disabled |
-| JavaScript watchdog | NOT RUN | NOT RUN | NOT RUN | NOT RUN | NOT RUN | Cooperative same-event-loop watchdog cannot handle a busy loop; imported JS execution remains blocked ([baseline](isolation.md)) |
+| JavaScript watchdog | NOT RUN | NOT RUN | NOT RUN | NOT RUN | NOT RUN | The same-event-loop iframe remains rejected. Exact candidate `58bab9d` locally passed `15/15` in the macOS Tauri WKWebView, Android emulator, and iOS simulator, including external termination and recovery; the preserved pre-warmup iOS result was `14/15`. Emulator/simulator observations do not promote these formal physical-device cells and imported JS remains disabled ([candidate](script-runner.md), [exact-commit evidence](evidence/script-runner-58bab9d/)) |
 | iframe IPC and broker denial | NOT RUN | NOT RUN | NOT RUN | NOT RUN | NOT RUN | Unsafe Android emulator baseline preserved; broker candidate retires demonstrated privileged wrappers. Same-process Tauri plugin WebView rejected after shared Channel queue audit; current eight-command spike uses a version-pinned 4096-byte transport mitigation, while imported execution stays off ([isolation](isolation.md), [Channel decision](channel-ipc-boundary.md)) |
 | Final HTML sanitizer | NOT RUN | NOT RUN | NOT RUN | NOT RUN | NOT RUN | None |
 | Plugin network default-deny | NOT RUN | NOT RUN | NOT RUN | NOT RUN | NOT RUN | None |
@@ -158,8 +179,8 @@ These environments have been identified for upcoming runs. Inventory alone does 
 | Windows reference machine fixed | NOT RUN | Model, CPU/RAM, OS/build, power mode |
 | Raw samples and p95 report | NOT RUN | Dataset, warm-up, sample count, raw samples, calculation |
 | Plugin API freeze | BLOCKED | Blocked by observations, fixtures, golden tests, and isolation evidence |
-| Android Store-Safe decision | JS/LUA OFF | Unsafe emulator isolation baseline plus absent real-device defenses; imported JS and Lua remain disabled ([record](isolation.md)) |
-| iOS Store-Safe decision | JS/LUA OFF | Written policy clearance and real-device defenses do not yet exist; same-event-loop JS blocker remains open ([record](isolation.md)) |
+| Android Store-Safe decision | JS/LUA OFF | Unsafe iframe baseline remains preserved. Exact runner candidate `58bab9d` passed on an emulator but has not been extracted into the product; real-device defenses and policy review remain absent ([isolation](isolation.md), [runner candidate](script-runner.md)) |
+| iOS Store-Safe decision | JS/LUA OFF | The terminable runner passed only in a no-sign simulator after warmup repair. Written policy clearance, product extraction, signing, and real-device defenses do not exist ([runner candidate](script-runner.md)) |
 | M-1 exit review | BLOCKED | Exit contract in `docs/m1/README.md` is not yet satisfied |
 
 ## Evidence record template

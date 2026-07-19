@@ -12,6 +12,13 @@
 > 가설을 폐기한다. 현재 제품은 가져온 JavaScript와 Lua를 실행하지 않는다.
 > 재개 조건은 [`ADR 0001`](docs/decisions/0001-imported-code-execution.md)이
 > 정의하며, 아래 로드맵의 실행형 플러그인 항목보다 우선한다.
+>
+> **후속 후보 실증:** 일회용 `spikes/script-runner`의 fresh
+> QuickJS-WASM Worker 경계는 정확한 구현 커밋 `58bab9d`에서 macOS Tauri WKWebView,
+> Android ARM64 에뮬레이터, iOS 시뮬레이터의 고정 15-case를 통과했다.
+> 이는 iframe busy-loop의 대체 후보를 선택한 결과이지 제품 활성화 결정이
+> 아니다. Windows/Linux 런타임, 물리 모바일, 임의 소스의 제품 admission
+> 계약, 스토어 정책 검토 전에는 위 비활성 결정을 유지한다.
 
 ---
 
@@ -34,6 +41,7 @@
 | 앱 셸 | **Tauri 2** | 모바일 IPC/권한/Channel 동작 | 데스크톱 Tauri + 모바일 별도 셸(코어 재사용) |
 | 프론트엔드 | **Svelte 5 + TS + Vite** | 가상 스크롤 1만 msg 60fps | Solid |
 | 로컬 DB | **SQLite** (rusqlite) + FTS5 | 5 OS 파일 잠금/동시성/한글 FTS 토크나이저 | — |
+| 가져온 JavaScript | **후보: fresh QuickJS-WASM module Worker** (스파이크 전용, 제품 비활성) | 엔진 중단 + 외부 Worker 종료, 고정 WASM 최대 메모리, raw IPC 부재, 5 OS/실기기 | 선언형 규칙으로 축소 |
 | 스크립팅 | **후보: Lua 5.4** (mlua, vendored, 제품 비활성) | iOS 빌드(인터프리터), 명령 카운트 중단, 별도 제품 계약 | 선언형 규칙 엔진으로 축소 |
 | 마크다운 | **comrak** | 증분 렌더 성능 | pulldown-cmark |
 | 정규식 | **이중 엔진**: 기본 `regex`(선형 보장) + 호환 모드 `fancy-regex`(한도 하) | 백트래킹 폭탄 negative test | 호환 모드 기능 축소 |
@@ -92,6 +100,9 @@ WebView 소유권이 없는 프로세스 전역 Channel fetch 큐, 같은 이벤
 
 정확한 재개 조건과 제품 회귀 불변조건은
 [`ADR 0001`](docs/decisions/0001-imported-code-execution.md)을 따른다.
+현재 QuickJS-WASM Worker 후보의 범위·한도·로컬 런타임 결과는
+[`docs/m1/script-runner.md`](docs/m1/script-runner.md)에 기록하며, 고정 fixture
+통과를 임의 카드 스크립트 API의 승인으로 해석하지 않는다.
 
 ### 2.3 채팅 파이프라인
 ```

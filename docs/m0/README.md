@@ -33,6 +33,9 @@ broker code remains disposable research and is not copied into this product.
 An independently terminable runtime and pre-decode bounded transport are
 necessary reopening conditions, but satisfying one condition does not
 automatically change the policy; a new reviewed contract is required.
+The disposable [QuickJS-WASM Worker candidate](../m1/script-runner.md) now
+demonstrates termination on three local WebView runtimes, but it is not copied
+into this product and does not change the bootstrap policy.
 
 ## UI ownership boundary
 

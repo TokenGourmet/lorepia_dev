@@ -5,6 +5,9 @@ M-1 exists to remove architecture risk before LorePia's production workspace and
 The current state is recorded in [`verification-matrix.md`](verification-matrix.md). The preserved cross-platform unsafe isolation baseline and selected fallback are recorded in [`isolation.md`](isolation.md). The audited Tauri Channel queue behavior and bounded-transport decision are recorded in [`channel-ipc-boundary.md`](channel-ipc-boundary.md). The independent five-OS credential-store boundary is recorded in [`keychain.md`](keychain.md). The disposable SQLite/FTS5 probe contract is recorded in [`sqlite-fts.md`](sqlite-fts.md), the disposable archive/PNG defense contract in [`import-hardening.md`](import-hardening.md), and the diagnostic Lua 5.4 limit contract in [`lua-limits.md`](lua-limits.md). Every claim must point to reproducible evidence from the exact commit being evaluated.
 The trusted-WebView audio candidate and its stricter physical-runtime gate are
 recorded in [`audio-playback.md`](audio-playback.md).
+The independently terminable QuickJS-WASM Worker candidate, its empty native
+command surface, and its product non-enablement gate are recorded in
+[`script-runner.md`](script-runner.md).
 
 ## Result vocabulary
 
@@ -61,6 +64,24 @@ Each capability must be executed on Windows, macOS, Linux, a physical Android de
    - Prove app background/foreground behavior and resource release on mobile.
    - A headless compile or API mock cannot pass this runtime gate.
 
+## Cross-cutting script-runner candidate
+
+The script-runner spike is a replacement candidate for the failed
+same-event-loop iframe execution boundary. It is not a seventh capability cell
+and does not change the 30-cell M-1 exit calculation. Each fixed probe case runs
+in a fresh static module Worker with a fresh QuickJS-WASM instance; a 50 ms
+engine interrupt is backed by a 500 ms host-side `Worker.terminate()` watchdog.
+The spike has no Tauri command, Channel, frontend Tauri API dependency, or
+source/input transport through native IPC.
+
+Local Tauri runtime observations currently pass all 15 fixed cases on the
+macOS WKWebView, an Android ARM64 emulator WebView, and an iOS 26.5 simulator
+WKWebView. The mobile results are not physical-device evidence, and none of
+these observations enables imported scripts in the product. Product
+extraction, product-contract review, Windows/Linux runtime evidence, physical
+mobile evidence, and store-policy review remain open; see
+[`script-runner.md`](script-runner.md).
+
 ## Negative-test gate
 
 All cases below require an executable regression test or recorded OS/WebView scenario. The host must remain within the declared resource bound, deny the prohibited effect, and produce a user-diagnosable error.
@@ -70,7 +91,7 @@ All cases below require an executable regression test or recorded OS/WebView sce
 | Archive/import | Zip bomb, `../` and absolute-path traversal, symlink escape, oversized entry/count, malformed PNG chunk; no out-of-staging write and bounded CPU/memory/disk |
 | Regex | Catastrophic-backtracking compatibility pattern and oversized input; terminate at the 10 ms policy bound and report the rejected pattern |
 | Lua | Infinite loop, recursion/allocator pressure, and forbidden-library access; terminate at the configured cap while the host remains responsive |
-| JavaScript | Busy loop/unresponsive iframe; watchdog disables or reloads the module while the host remains usable on the tested WebView |
+| JavaScript | Infinite loop, recursion/allocator pressure, forbidden-global access, oversized output, raw error, and a deliberately wedged Worker; engine or host termination succeeds, subsequent execution recovers, and the host remains usable on the tested WebView |
 | IPC/broker | Direct Tauri invoke, forged `postMessage`, undeclared permission, rate-limit bypass, and default network access; every request is denied without privileged side effects |
 | Network | Undeclared origin, redirect, DNS-rebinding target, and direct browser request; default deny remains effective and approved access only traverses the broker |
 | Rendering | Sanitizer-bypass fixtures through every HTML-producing hook; final output contains no executable script, handler, unsafe URL, or app-DOM escape |
@@ -116,6 +137,15 @@ byte budget, but imported execution remains off until an independently
 terminable boundary with a bounded transport exists. See
 [`channel-ipc-boundary.md`](channel-ipc-boundary.md).
 
+The disposable script-runner now demonstrates such a boundary on the local
+macOS WKWebView, an Android emulator, and an iOS simulator: source never enters
+Tauri IPC, fixed Worker messages stay within 4096 bytes, and the host can
+externally terminate a wedged Worker. This retires the same-event-loop iframe
+as the candidate, but it does not itself authorize imported execution. The
+product still has no reviewed source-to-runner contract, and Windows, Linux,
+physical Android, and signed physical iOS runtime evidence remain incomplete.
+See [`script-runner.md`](script-runner.md).
+
 M-1 completion does not enable either language. JavaScript must first meet the
 independent termination, pre-decode admission, queue ownership, negative-test,
 and five-profile requirements in
@@ -153,15 +183,15 @@ the plugin API, or authorize M-1-dependent scripting/plugin work.
 `.github/workflows/m1.yml` performs:
 
 - Windows/macOS/Linux: the Channel, keychain, SQLite/FTS5, import-hardening,
-  Lua-limit, and audio-playback spikes independently run
+  Lua-limit, audio-playback, and script-runner spikes independently run
   `npm ci`, frontend contract tests, Svelte/TypeScript check, frontend build,
   Rust format, Rust tests, Clippy with warnings denied, and Rust check.
-- Android: all six spikes compile a debug ARM64 APK on a hosted runner and
+- Android: all seven spikes compile a debug ARM64 APK on a hosted runner and
   verify that an APK exists. The
   keychain job also verifies its committed NDK-context hook and backup
   exclusions before compilation. The audio job verifies that the fixed WAV in
   the emitted frontend assets has the pinned identity.
-- iOS: all six spikes compile a debug ARM64 simulator target on a hosted macOS
+- iOS: all seven spikes compile a debug ARM64 simulator target on a hosted macOS
   runner and verify that the generated `.app` and `Info.plist` exist. The audio
   job performs the same emitted-fixture verification.
 
@@ -169,7 +199,8 @@ The desktop audio jobs also verify the emitted WAV identity after the frontend
 build. These source, test, asset, and compile checks do not launch an audio
 device or exercise WebView lifecycle delivery.
 
-Hosted CI does not claim audio output or resource release, keychain UI/service behavior, SQLite
-file-locking/search runtime behavior, Lua runtime-limit behavior, WebView
-isolation, platform document-picker behavior, or physical-device smoke. Those
-remain matrix work with real-device evidence.
+Hosted CI does not claim audio output or resource release, keychain UI/service
+behavior, SQLite file-locking/search runtime behavior, Lua runtime-limit
+behavior, script-runner WebView termination behavior, WebView isolation,
+platform document-picker behavior, or physical-device smoke. Those remain
+matrix work with runtime and real-device evidence.
