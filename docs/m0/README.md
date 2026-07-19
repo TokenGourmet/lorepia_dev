@@ -90,6 +90,9 @@ Android APK compile, or iOS simulator compile is compile evidence only.
 
 ## Local evidence on 2026-07-19
 
+The reproducible receipt is in
+[`evidence/2026-07-19-local.md`](evidence/2026-07-19-local.md).
+
 On the development Mac, the following passed with the committed source and
 lockfiles:
 
