@@ -1958,8 +1958,11 @@ mod tests {
         });
 
         send_direct_channel_event(&channel, started).unwrap();
+        // This is a transport-integrity regression, not a performance gate.
+        // Hosted Windows debug runners compile and execute several spike jobs
+        // concurrently, so keep a bounded but scheduling-tolerant deadline.
         tokio::time::timeout(
-            Duration::from_secs(5),
+            Duration::from_secs(30),
             run_stream(Arc::clone(&request), config, channel),
         )
         .await
