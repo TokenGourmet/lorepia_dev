@@ -7,9 +7,10 @@ start of M0, not an M0 completion claim.
 
 ```text
 Svelte 5 static product screen
-  -> get_product_bootstrap
   -> trusted main-WebView Tauri capability
-  -> lorepia-core
+     -> get_product_bootstrap -> lorepia-core
+     -> write-only credential commands -> five-OS OS credential store
+     -> provider stream commands -> native HTTPS/SSE/NDJSON runtime
 ```
 
 The internal bootstrap response is intentionally exact and small:
@@ -25,10 +26,19 @@ It records a JavaScript payload's byte length and SHA-256 identity as immutable
 `INERT_QUARANTINED` data. It accepts no source, hook, runtime, or activation
 field, and imported or stale settings cannot change the fixed disabled policy.
 
-The application exposes no filesystem, shell, dialog, HTTP, plugin, audio,
-import, database, provider, keychain, Lua, or Channel command. The production
-CSP blocks frames, media, objects, workers, forms, and remote network
-connections. The main WebView can invoke only `get_product_bootstrap`.
+The application still exposes no filesystem, shell, dialog, plugin, audio,
+import, database, Lua, or imported-code command. The production CSP blocks
+remote browser networking. The trusted main WebView now has a narrow native
+credential and provider-stream command surface; provider traffic leaves through
+the Rust HTTP client, not browser `fetch`. See the
+[native provider runtime contract](provider-runtime.md).
+
+The product-owned [LLM provider catalog](llm-provider-catalog.md) records six
+providers and a UI-independent request compiler. Five API-key providers now
+connect through the native vault and bounded stream runtime. Vertex request
+compilation exists, but invocation remains fail-closed until the native Google
+OAuth flow is implemented. The existing settings UI is not wired to these
+commands in this slice.
 
 This bootstrap contract is an internal startup seam. It does not freeze the
 blocked public plugin API or any M-1 spike contract.

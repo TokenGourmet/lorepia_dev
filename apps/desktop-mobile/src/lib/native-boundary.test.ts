@@ -27,11 +27,20 @@ const capabilityFiles = readdirSync(
 ).sort();
 
 describe("native product boundary", () => {
-  it("grants one bootstrap permission to the trusted main WebView", () => {
+  it("grants only the product commands to the trusted main WebView", () => {
     expect(tauriConfig.app.security.capabilities).toEqual(["default"]);
     expect(capabilityFiles).toEqual(["default.json"]);
     expect(capability.webviews).toEqual(["main"]);
-    expect(capability.permissions).toEqual(["allow-get-product-bootstrap"]);
+    expect(capability.permissions).toEqual([
+      "allow-get-product-bootstrap",
+      "allow-get-provider-credential-status",
+      "allow-save-provider-api-key",
+      "allow-delete-provider-credential",
+      "allow-start-provider-stream",
+      "allow-ack-provider-stream",
+      "allow-cancel-provider-stream",
+      "allow-get-provider-stream-snapshot",
+    ]);
   });
 
   it("starts with network and executable WebView surfaces closed", () => {

@@ -2,7 +2,11 @@
 resolver = "2"
 members = [
   "apps/desktop-mobile/src-tauri",
+  "crates/lorepia-credential-vault",
   "crates/lorepia-core",
+  "crates/lorepia-provider-runtime",
+  "crates/lorepia-providers",
+  "crates/lorepia-tool-runtime",
 ]
 exclude = [
   "spikes/audio-playback/src-tauri",

@@ -1,0 +1,32 @@
+[package]
+name = "lorepia-credential-vault"
+version = "0.1.0"
+description = "Five-OS native credential vault for LorePia provider authentication"
+edition = "2024"
+license = "Apache-2.0"
+authors = ["LorePia contributors"]
+repository = "https://github.com/TokenGourmet/lorepia_dev"
+
+[dependencies]
+keyring-core = "=1.0.0"
+lorepia-providers = { path = "../lorepia-providers" }
+serde = { version = "=1.0.229", features = ["derive"] }
+zeroize = "=1.9.0"
+
+[target.'cfg(target_os = "macos")'.dependencies]
+apple-native-keyring-store = { version = "=1.0.1", default-features = false, features = ["keychain"] }
+
+[target.'cfg(target_os = "ios")'.dependencies]
+apple-native-keyring-store = { version = "=1.0.1", default-features = false, features = ["protected"] }
+
+[target.'cfg(target_os = "windows")'.dependencies]
+windows-native-keyring-store = { version = "=1.1.0", default-features = false }
+
+[target.'cfg(target_os = "linux")'.dependencies]
+zbus-secret-service-keyring-store = { version = "=1.0.0", default-features = false, features = ["crypto-rust"] }
+
+[target.'cfg(target_os = "android")'.dependencies]
+android-native-keyring-store = { version = "=1.0.0", default-features = false }
+
+[dev-dependencies]
+serde_json = "=1.0.150"

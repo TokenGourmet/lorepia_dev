@@ -16,5 +16,20 @@ crate-type = ["staticlib", "cdylib", "rlib"]
 tauri-build.workspace = true
 
 [dependencies]
+lorepia-credential-vault = { path = "../../../crates/lorepia-credential-vault" }
 lorepia-core = { path = "../../../crates/lorepia-core" }
+lorepia-provider-runtime = { path = "../../../crates/lorepia-provider-runtime" }
+lorepia-providers = { path = "../../../crates/lorepia-providers" }
+serde.workspace = true
+serde_json.workspace = true
+subtle = "=2.6.1"
 tauri.workspace = true
+tokio = { version = "=1.53.0", features = ["sync", "time"] }
+tokio-util = { version = "=0.7.18", features = ["rt"] }
+url = "=2.5.8"
+uuid = { version = "=1.24.0", features = ["v4"] }
+zeroize = "=1.9.0"
+
+[target.'cfg(target_os = "android")'.dependencies]
+jni = "=0.21.1"
+ndk-context = "=0.1.1"
