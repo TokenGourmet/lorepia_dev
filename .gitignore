@@ -40,3 +40,4 @@ pnpm-debug.log*
 
 # Tauri mobile wrappers under src-tauri/gen are source, not generated build
 # output. Keep them tracked; only nested build directories are ignored above.
+**/src-tauri/gen/schemas/

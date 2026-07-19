@@ -1,6 +1,14 @@
 # LorePia
 
-LorePia is a local-first, cross-platform AI character chat client in the M-1 risk-removal phase. The current repository contains disposable vertical spikes used to prove or reject the architecture in [`LorePia_기술계획서_v2.md`](LorePia_기술계획서_v2.md); it is not yet the product application.
+LorePia is a local-first, cross-platform AI character chat client. The
+repository now contains the first non-disposable M0 product scaffold alongside
+the M-1 vertical spikes used to prove or reject risky architecture choices in
+[`LorePia_기술계획서_v2.md`](LorePia_기술계획서_v2.md).
+
+The product scaffold is not an M0 completion claim. It establishes one typed
+`lorepia-core -> Tauri -> Svelte` startup path while M-1 exit evidence, the
+plugin API freeze, physical mobile smoke, benchmark baselines, and owner-authored
+visual design remain open. See [`docs/m0/README.md`](docs/m0/README.md).
 
 The current spikes exercise mock SSE-to-Tauri-Channel streaming, an independent
 five-OS credential-store lifecycle, a file-backed SQLite/FTS5 lifecycle, a
@@ -12,6 +20,9 @@ implementation scope here and remain owner-authored work.
 
 ## Current scope
 
+- Maintain a real root Rust workspace and a Tauri 2 + Svelte 5 product shell.
+- Keep the first product command surface limited to an exact startup snapshot.
+- Keep product UI functional and unstyled until owner-authored design work.
 - Prove the Tauri 2 + Rust + Svelte toolchain on Windows, macOS, Linux, Android, and iOS.
 - Verify Channel sequencing, batching, cancellation, backpressure, and partial-result behavior.
 - Verify that OS credential services can complete a native-only
@@ -35,6 +46,10 @@ No 5-OS runtime support claim is valid until the [M-1 verification matrix](docs/
 
 ```text
 .
+├── Cargo.toml                  # Product Rust workspace
+├── crates/lorepia-core/        # Platform-independent product core
+├── apps/desktop-mobile/        # Tauri 2 + Svelte 5 product shell
+├── docs/m0/                    # Product scaffold scope and open gates
 ├── docs/m1/                    # M-1 gates, procedures, and evidence matrix
 ├── spikes/channel-stream/      # Disposable Channel vertical spike
 ├── spikes/keychain/            # Disposable five-OS credential-store spike
@@ -42,9 +57,26 @@ No 5-OS runtime support claim is valid until the [M-1 verification matrix](docs/
 ├── spikes/import-hardening/    # Disposable archive/PNG defense spike
 ├── spikes/lua-limits/          # Disposable Lua 5.4 limit-enforcement spike
 ├── spikes/audio-playback/      # Disposable trusted-WebView audio spike
-├── .github/workflows/m1.yml    # Desktop and mobile compile verification
+├── .github/workflows/product.yml # Product 5OS compile gates
+├── .github/workflows/m1.yml    # Spike desktop and mobile compile verification
 └── LorePia_기술계획서_v2.md    # Current technical plan
 ```
+
+## Run the product scaffold
+
+Install the current [Tauri prerequisites](https://v2.tauri.app/start/prerequisites/),
+then run:
+
+```sh
+cd apps/desktop-mobile
+npm ci
+npm test
+npm run check
+npm run tauri dev
+```
+
+The current screen only proves the typed native-core startup path. It is not a
+chat UI or a visual-design proposal.
 
 ## Run and check a spike
 

@@ -1,0 +1,7 @@
+{
+  "$schema": "../gen/schemas/desktop-schema.json",
+  "identifier": "default",
+  "description": "Exact LorePia product bootstrap capability for the trusted main WebView",
+  "webviews": ["main"],
+  "permissions": ["allow-get-product-bootstrap"]
+}

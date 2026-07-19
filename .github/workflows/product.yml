@@ -1,0 +1,260 @@
+name: Product scaffold verification
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: product-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  CARGO_TERM_COLOR: always
+  RUST_BACKTRACE: "1"
+
+jobs:
+  quality:
+    name: Product contracts and quality
+    runs-on: ubuntu-22.04
+    timeout-minutes: 45
+    defaults:
+      run:
+        working-directory: apps/desktop-mobile
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v6
+
+      - name: Install Linux Tauri dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install --yes \
+            build-essential \
+            libayatana-appindicator3-dev \
+            librsvg2-dev \
+            libssl-dev \
+            libwebkit2gtk-4.1-dev \
+            libxdo-dev
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v6
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: apps/desktop-mobile/package-lock.json
+
+      - name: Set up pinned Rust toolchain
+        run: |
+          rustup toolchain install 1.97.1 --profile minimal --component rustfmt --component clippy --no-self-update
+          rustc --version --verbose
+
+      - name: Install locked JavaScript dependencies
+        run: npm ci
+
+      - name: Run frontend contract tests
+        run: npm test
+
+      - name: Audit JavaScript dependencies at moderate severity
+        run: npm audit --audit-level=moderate
+
+      - name: Check Svelte and TypeScript
+        run: npm run check
+
+      - name: Build static frontend
+        run: npm run build
+
+      - name: Check Rust formatting
+        run: cargo fmt --all -- --check
+
+      - name: Run Rust workspace tests
+        run: cargo test --locked --workspace --all-targets
+
+      - name: Lint Rust workspace
+        run: cargo clippy --locked --workspace --all-targets -- -D warnings
+
+      - name: Check Rust workspace
+        run: cargo check --locked --workspace --all-targets
+
+      - name: Verify lockfiles and generated permissions stayed stable
+        run: git diff --exit-code -- ../../Cargo.lock package-lock.json src-tauri/permissions
+
+  desktop-compile:
+    name: Desktop compile (${{ matrix.name }})
+    runs-on: ${{ matrix.runner }}
+    timeout-minutes: 45
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - name: Linux
+            runner: ubuntu-22.04
+          - name: macOS
+            runner: macos-26
+          - name: Windows
+            runner: windows-2022
+    defaults:
+      run:
+        working-directory: apps/desktop-mobile
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v6
+
+      - name: Install Linux Tauri dependencies
+        if: runner.os == 'Linux'
+        run: |
+          sudo apt-get update
+          sudo apt-get install --yes \
+            build-essential \
+            libayatana-appindicator3-dev \
+            librsvg2-dev \
+            libssl-dev \
+            libwebkit2gtk-4.1-dev \
+            libxdo-dev
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v6
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: apps/desktop-mobile/package-lock.json
+
+      - name: Set up pinned Rust toolchain
+        shell: bash
+        run: |
+          rustup toolchain install 1.97.1 --profile minimal --no-self-update
+          rustc --version --verbose
+
+      - name: Install locked JavaScript dependencies
+        run: npm ci
+
+      - name: Compile debug desktop executable without bundling
+        run: npm run tauri build -- --debug --no-bundle --ci
+
+      - name: Verify product inputs stayed stable
+        shell: bash
+        run: git diff --exit-code -- ../../Cargo.lock package-lock.json src-tauri/permissions src-tauri/gen
+
+  android-compile:
+    name: Android ARM64 compile (no device)
+    runs-on: ubuntu-22.04
+    timeout-minutes: 75
+    defaults:
+      run:
+        shell: bash
+        working-directory: apps/desktop-mobile
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v6
+
+      - name: Validate committed Gradle Wrapper JARs
+        uses: gradle/actions/wrapper-validation@v6
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v6
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: apps/desktop-mobile/package-lock.json
+
+      - name: Set up Java 21
+        uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: "21"
+
+      - name: Set up pinned Rust and Android target
+        run: |
+          rustup toolchain install 1.97.1 --profile minimal --no-self-update
+          rustup target add --toolchain 1.97.1 aarch64-linux-android
+          rustc --version --verbose
+
+      - name: Install pinned Android NDK
+        run: |
+          yes | sdkmanager --licenses > /dev/null || true
+          sdkmanager "ndk;28.2.13676358"
+          echo "NDK_HOME=$ANDROID_HOME/ndk/28.2.13676358" >> "$GITHUB_ENV"
+
+      - name: Install locked JavaScript dependencies
+        run: npm ci
+
+      - name: Require committed Android wrapper source
+        run: |
+          test -f src-tauri/gen/android/app/build.gradle.kts
+          test -f src-tauri/gen/android/gradle/wrapper/gradle-wrapper.jar
+          test -f src-tauri/gen/android/app/src/main/java/dev/lorepia/client/MainActivity.kt
+
+      - name: Compile debug ARM64 APK
+        run: npm run tauri android build -- --debug --target aarch64 --apk --ci
+
+      - name: Verify APK exists
+        run: test -n "$(find src-tauri/gen/android/app/build/outputs -type f -name '*.apk' -print -quit)"
+
+      - name: Verify product inputs and wrapper stayed stable
+        run: git diff --exit-code -- ../../Cargo.lock package-lock.json src-tauri/permissions src-tauri/gen/android
+
+      - name: Record compile-only scope
+        run: |
+          {
+            echo "### Android evidence scope"
+            echo ""
+            echo "The committed wrapper produced an ARM64 debug APK. No emulator or physical device was launched."
+          } >> "$GITHUB_STEP_SUMMARY"
+
+  ios-simulator-compile:
+    name: iOS ARM64 simulator compile (no device)
+    runs-on: macos-26
+    timeout-minutes: 75
+    defaults:
+      run:
+        shell: bash
+        working-directory: apps/desktop-mobile
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v6
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v6
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: apps/desktop-mobile/package-lock.json
+
+      - name: Set up pinned Rust and iOS simulator target
+        run: |
+          rustup toolchain install 1.97.1 --profile minimal --no-self-update
+          rustup target add --toolchain 1.97.1 aarch64-apple-ios-sim
+          rustc --version --verbose
+
+      - name: Verify Xcode and CocoaPods
+        run: |
+          xcodebuild -version
+          pod --version
+
+      - name: Install locked JavaScript dependencies
+        run: npm ci
+
+      - name: Require committed Apple wrapper source
+        run: |
+          test -f src-tauri/gen/apple/project.yml
+          test -f src-tauri/gen/apple/lorepia-app.xcodeproj/project.pbxproj
+
+      - name: Compile debug ARM64 simulator app
+        run: npm run tauri ios build -- --debug --target aarch64-sim --ci --no-sign
+
+      - name: Verify simulator app exists
+        run: test -n "$(find src-tauri/gen/apple/build/arm64-sim -maxdepth 1 -type d -name '*.app' -print -quit)"
+
+      - name: Verify product inputs and wrapper stayed stable
+        run: git diff --exit-code -- ../../Cargo.lock package-lock.json src-tauri/permissions src-tauri/gen/apple
+
+      - name: Record compile-only scope
+        run: |
+          {
+            echo "### iOS evidence scope"
+            echo ""
+            echo "The committed wrapper produced an ARM64 simulator app. No simulator or physical device was launched."
+          } >> "$GITHUB_STEP_SUMMARY"

@@ -1,0 +1,20 @@
+[package]
+name = "lorepia-app"
+description = "LorePia Tauri product shell"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+authors.workspace = true
+repository.workspace = true
+build = "build.rs"
+
+[lib]
+name = "lorepia_app_lib"
+crate-type = ["staticlib", "cdylib", "rlib"]
+
+[build-dependencies]
+tauri-build.workspace = true
+
+[dependencies]
+lorepia-core = { path = "../../../crates/lorepia-core" }
+tauri.workspace = true
