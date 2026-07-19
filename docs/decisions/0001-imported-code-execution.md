@@ -86,6 +86,13 @@ keeps its Worker/WASM surface absent and imported executable content
 `DISABLED_BY_SECURITY_POLICY` until a separate reviewed product decision meets
 every reopening requirement above.
 
+The product may meanwhile record imported executable payloads through the
+metadata-only [quarantine contract](../m0/imported-executable-quarantine.md).
+That contract preserves only language, byte length, and content identity and
+always returns `INERT_QUARANTINED`; it is not executor extraction, arbitrary
+source admission, or a reviewed hook contract, so it does not satisfy any
+runtime reopening requirement by itself.
+
 ## Consequences
 
 - Card/archive import work may inspect, report, preserve, or quarantine script

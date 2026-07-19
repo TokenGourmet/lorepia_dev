@@ -111,6 +111,25 @@ All recovery cases create a new Worker and engine. A result is `PASS` only when
 all 15 case identifiers return the exact stable outcome code; the watchdog case
 must also report at least one host heartbeat tick.
 
+## Host-message contract hardening after the runtime candidate
+
+The current source adds unit regressions around the controller boundary beyond
+the fixed runtime corpus. The controller now requires the exact top-level
+`RESULT` key set and treats a message deserialization failure as
+`CONTRACT_FAILURE`, terminating that invocation. Tests also cover malformed,
+forged, extra-key, oversized, cross-invocation, duplicate, and replayed
+`READY`, `RESULT`, and `WEDGE_STARTED` messages; cancellation before readiness;
+boot timeout; runtime error; and fresh-instance recovery after each failure
+class.
+
+These are host-controller unit results, not new WebView runtime evidence. The
+packaged macOS, Android-emulator, and iOS-simulator observations below remain
+tied to exact commit `58bab9d`. The hardened source must be committed, packaged,
+and rerun before those environments can be claimed for the new implementation.
+It also does not prove Tauri Channel queue ownership: this candidate does not
+use that queue, and any future streaming transport still needs its own
+destination and invocation binding.
+
 ## Current runtime observations
 
 | Platform/runtime | Result | What it establishes | Limitation |
@@ -127,6 +146,13 @@ promote the Android physical-device or iOS physical-device cells in
 [`verification-matrix.md`](verification-matrix.md).
 
 ## Product extraction gate
+
+The product now has a
+[metadata-only quarantine contract](../m0/imported-executable-quarantine.md)
+that can identify inert JavaScript content without accepting source or naming
+hooks. This is non-executable importer preparation only. The runner remains in
+this disposable spike, and the actual product extraction gate below is still
+open.
 
 Imported JavaScript remains disabled until a product change separately proves
 all of the following:

@@ -19,6 +19,12 @@ The internal bootstrap response is intentionally exact and small:
 - device-local data policy, except user-selected LLM requests
 - imported executable content `DISABLED_BY_SECURITY_POLICY`
 
+The product also has a metadata-only
+[`imported executable quarantine contract`](imported-executable-quarantine.md).
+It records a JavaScript payload's byte length and SHA-256 identity as immutable
+`INERT_QUARANTINED` data. It accepts no source, hook, runtime, or activation
+field, and imported or stale settings cannot change the fixed disabled policy.
+
 The application exposes no filesystem, shell, dialog, HTTP, plugin, audio,
 import, database, provider, keychain, Lua, or Channel command. The production
 CSP blocks frames, media, objects, workers, forms, and remote network

@@ -123,8 +123,11 @@ function parseWorkerResult(
   ) {
     return null;
   }
-  const envelope = value as Partial<WorkerResult>;
-  if (envelope.type !== "RESULT") {
+  const envelope = value as Partial<WorkerResult> & Record<string, unknown>;
+  if (
+    Object.keys(envelope).sort().join(",") !== "receipt,type" ||
+    envelope.type !== "RESULT"
+  ) {
     return null;
   }
   const receipt = envelope.receipt as Record<string, unknown> | undefined;
@@ -287,6 +290,18 @@ export class ScriptRunnerController {
             caseId,
             invocationId,
             "WORKER_FAILURE",
+            started,
+            hostHeartbeatTicks,
+          ),
+        );
+      });
+
+      worker.addEventListener("messageerror", () => {
+        finish(
+          hostReceipt(
+            caseId,
+            invocationId,
+            "CONTRACT_FAILURE",
             started,
             hostHeartbeatTicks,
           ),

@@ -1,12 +1,13 @@
 import { invoke } from "@tauri-apps/api/core";
 
+import { IMPORTED_EXECUTABLE_POLICY } from "./imported-executable-quarantine";
+
 export const PRODUCT_BOOTSTRAP_COMMAND = "get_product_bootstrap" as const;
 export const PRODUCT_BOOTSTRAP_ERROR_MESSAGE =
   "제품 코어 상태를 불러오지 못했습니다.";
 
 const DATA_POLICY = "DEVICE_LOCAL_EXCEPT_USER_SELECTED_LLM_REQUESTS" as const;
-const IMPORTED_EXECUTABLE_CONTENT =
-  "DISABLED_BY_SECURITY_POLICY" as const;
+const IMPORTED_EXECUTABLE_CONTENT = IMPORTED_EXECUTABLE_POLICY;
 const CARGO_SEMVER =
   /^(0|[1-9]\d*)\.(0|[1-9]\d*)\.(0|[1-9]\d*)(?:-[0-9A-Za-z-]+(?:\.[0-9A-Za-z-]+)*)?(?:\+[0-9A-Za-z-]+(?:\.[0-9A-Za-z-]+)*)?$/;
 const CONTRACT_KEYS = [
