@@ -61,6 +61,10 @@ this slice.
 - Wrapper regeneration is a reviewed change tied to a Tauri CLI update.
 - Android CI validates committed wrapper JARs and the Gradle distribution URL
   is paired with its official SHA-256 checksum.
+- `npm run build` scans the emitted frontend for the v2 disabled-policy marker,
+  known iframe/dynamic-code/Worker/WebAssembly surfaces, executable
+  Lua/WASM extensions, stale policy values, and unreviewed artifact types.
+  This is a regression tripwire, not a general-purpose code sandbox.
 
 The provisional application identifier is `dev.lorepia.client`. It must be
 confirmed against the actual Apple and Android publisher accounts before a
@@ -124,12 +128,22 @@ That immutable receipt describes bootstrap v1 and 15 frontend tests. It is not
 silently rewritten to claim the current v2 security-policy contract; current
 source and hosted-CI evidence receives its own exact-commit record.
 
+## Current hardening evidence
+
+Implementation subject `d56388e` has a separate reproducible
+[`local and hosted receipt`](evidence/2026-07-19-hardening-d56388e.md).
+Its [Product run](https://github.com/TokenGourmet/lorepia_dev/actions/runs/29671504268)
+passed all six quality/desktop/mobile-compile jobs, and its
+[M-1 run](https://github.com/TokenGourmet/lorepia_dev/actions/runs/29671504249)
+passed all 30 spike jobs. This closes the hosted compile/check failures for that
+exact subject only. It does not establish a physical-device or packaged
+Windows/Linux runtime pass.
+
 ## Open M0 gates
 
-- Hosted CI must remain green for the exact current commit. A prior green run
-  does not qualify a later hardening change, and compile jobs remain distinct
-  from runtime evidence.
 - No physical Android or iOS smoke evidence exists from this product shell.
+- No packaged Windows or Linux runtime smoke evidence exists from this product
+  shell; hosted native compilation is recorded separately.
 - The v2 benchmark regression gate has no honest workload or baseline yet; no
   arbitrary threshold is invented here.
 - Design tokens and responsive visual design are deferred to the owner.

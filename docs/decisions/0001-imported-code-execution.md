@@ -37,7 +37,12 @@ The M0 product enforces this decision with:
   `get_product_bootstrap`;
 - no import, plugin, Lua, Channel, filesystem, shell, HTTP, or dialog command;
 - CSP `frame-src`, `worker-src`, and `object-src` set to `'none'`; and
-- frontend regression checks that reject executable frame/rendering surfaces.
+- source and build-output regression checks that reject known executable
+  frame/runtime markers and unreviewed artifact types.
+
+Those checks are tripwires, not a sandbox or proof that arbitrary code is
+safe. The boundary depends on the imported-code executor being absent, the
+single exact native command/capability, and the closed CSP together.
 
 M-1 completion alone cannot enable imported execution. Enabling any language
 requires a new product contract and an explicit review. The review may split

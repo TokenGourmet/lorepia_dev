@@ -234,7 +234,11 @@ lorepia/
 
 ## 11. 바로 다음 액션
 
-1. M-1 Windows CI의 줄바꿈/Clippy 실패를 닫고 5 OS compile evidence를 행별로 기록한다.
-2. 서명된 iOS Keychain 및 Android/iOS 실기기 runtime evidence를 확보한다.
+`d56388e`에서 Product 6/6과 M-1 30/30 hosted compile/test가 통과했다.
+이는 5 OS 런타임 통과가 아니라 데스크톱 hosted checks + Android APK/iOS
+simulator compile 증거다.
+
+1. 서명된 iOS Keychain 및 Android/iOS 실기기 runtime evidence를 확보한다.
+2. Windows/Linux packaged runtime smoke와 각 capability 실제 동작 증거를 확보한다.
 3. M0에서는 imported execution과 무관한 제품 골격만 진행하고, 플러그인 API는 고정하지 않는다.
 4. 별도 프로세스 또는 동등한 독립 종료 경계 후보가 생기면 ADR 0001의 재개 조건으로 새 스파이크를 연다.
