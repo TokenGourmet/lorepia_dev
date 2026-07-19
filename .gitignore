@@ -41,3 +41,8 @@ pnpm-debug.log*
 # Tauri mobile wrappers under src-tauri/gen are source, not generated build
 # output. Keep them tracked; only nested build directories are ignored above.
 **/src-tauri/gen/schemas/
+
+# Local installable previews; keep text and checksum receipts trackable.
+/artifacts/*.apk
+/artifacts/*.aab
+/artifacts/*.ipa
