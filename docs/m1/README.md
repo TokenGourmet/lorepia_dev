@@ -3,6 +3,8 @@
 M-1 exists to remove architecture risk before LorePia's production workspace and plugin API are frozen. A demo, a successful compile, or an undocumented manual check is not enough to close it.
 
 The current state is recorded in [`verification-matrix.md`](verification-matrix.md). The preserved cross-platform unsafe isolation baseline and selected fallback are recorded in [`isolation.md`](isolation.md). The audited Tauri Channel queue behavior and bounded-transport decision are recorded in [`channel-ipc-boundary.md`](channel-ipc-boundary.md). The independent five-OS credential-store boundary is recorded in [`keychain.md`](keychain.md). The disposable SQLite/FTS5 probe contract is recorded in [`sqlite-fts.md`](sqlite-fts.md), the disposable archive/PNG defense contract in [`import-hardening.md`](import-hardening.md), and the diagnostic Lua 5.4 limit contract in [`lua-limits.md`](lua-limits.md). Every claim must point to reproducible evidence from the exact commit being evaluated.
+The trusted-WebView audio candidate and its stricter physical-runtime gate are
+recorded in [`audio-playback.md`](audio-playback.md).
 
 ## Result vocabulary
 
@@ -55,7 +57,7 @@ Each capability must be executed on Windows, macOS, Linux, a physical Android de
    - Cancellation must stop upstream work, emit one terminal outcome, and prevent later data chunks.
    - Interrupted streams must retain the exact last sequence and partial payload required for recovery.
 6. **Audio**
-   - Load, play, pause/resume, seek, stop, and release the approved local fixture.
+   - Load, play, pause, seek, resume, stop, and release the approved local fixture.
    - Prove app background/foreground behavior and resource release on mobile.
    - A headless compile or API mock cannot pass this runtime gate.
 
@@ -138,16 +140,21 @@ M-1 may close only when all statements below are true:
 `.github/workflows/m1.yml` performs:
 
 - Windows/macOS/Linux: the Channel, keychain, SQLite/FTS5, import-hardening,
-  and Lua-limit spikes independently run
+  Lua-limit, and audio-playback spikes independently run
   `npm ci`, frontend contract tests, Svelte/TypeScript check, frontend build,
   Rust format, Rust tests, Clippy with warnings denied, and Rust check.
-- Android: all five spikes compile a debug ARM64 APK on a hosted runner. The
+- Android: all six spikes compile a debug ARM64 APK on a hosted runner. The
   keychain job also verifies its committed NDK-context hook and backup
-  exclusions before compilation.
-- iOS: all five spikes compile a debug ARM64 simulator target on a hosted macOS
-  runner.
+  exclusions before compilation. The audio job verifies that the fixed WAV in
+  the emitted frontend assets has the pinned identity.
+- iOS: all six spikes compile a debug ARM64 simulator target on a hosted macOS
+  runner. The audio job performs the same emitted-fixture verification.
 
-Hosted CI does not claim audio output, keychain UI/service behavior, SQLite
+The desktop audio jobs also verify the emitted WAV identity after the frontend
+build. These source, test, asset, and compile checks do not launch an audio
+device or exercise WebView lifecycle delivery.
+
+Hosted CI does not claim audio output or resource release, keychain UI/service behavior, SQLite
 file-locking/search runtime behavior, Lua runtime-limit behavior, WebView
 isolation, platform document-picker behavior, or physical-device smoke. Those
 remain matrix work with real-device evidence.

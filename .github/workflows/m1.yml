@@ -41,6 +41,9 @@ jobs:
           - name: Linux
             runner: ubuntu-22.04
             spike: lua-limits
+          - name: Linux
+            runner: ubuntu-22.04
+            spike: audio-playback
           - name: macOS
             runner: macos-26
             spike: channel-stream
@@ -56,6 +59,9 @@ jobs:
           - name: macOS
             runner: macos-26
             spike: lua-limits
+          - name: macOS
+            runner: macos-26
+            spike: audio-playback
           - name: Windows
             runner: windows-2022
             spike: channel-stream
@@ -71,6 +77,9 @@ jobs:
           - name: Windows
             runner: windows-2022
             spike: lua-limits
+          - name: Windows
+            runner: windows-2022
+            spike: audio-playback
     defaults:
       run:
         working-directory: spikes/${{ matrix.spike }}
@@ -105,6 +114,10 @@ jobs:
       - name: Install locked JavaScript dependencies
         run: npm ci
 
+      - name: Verify source audio fixture identity
+        if: matrix.spike == 'audio-playback'
+        run: npm run verify:fixture
+
       - name: Run frontend contract tests
         run: npm test
 
@@ -116,6 +129,10 @@ jobs:
 
       - name: Build frontend
         run: npm run build
+
+      - name: Verify emitted audio fixture identity
+        if: matrix.spike == 'audio-playback'
+        run: npm run verify:built-fixture
 
       - name: Check Rust formatting
         run: cargo fmt --manifest-path src-tauri/Cargo.toml --all -- --check
@@ -136,7 +153,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        spike: [channel-stream, keychain, sqlite-fts, import-hardening, lua-limits]
+        spike: [channel-stream, keychain, sqlite-fts, import-hardening, lua-limits, audio-playback]
     defaults:
       run:
         shell: bash
@@ -172,6 +189,10 @@ jobs:
       - name: Install locked JavaScript dependencies
         run: npm ci
 
+      - name: Verify source audio fixture identity
+        if: matrix.spike == 'audio-playback'
+        run: npm run verify:fixture
+
       - name: Initialize disposable Android wrapper when absent
         run: |
           if [[ ! -d src-tauri/gen/android ]]; then
@@ -184,6 +205,10 @@ jobs:
 
       - name: Compile debug ARM64 APK
         run: npm run tauri android build -- --debug --target aarch64 --apk --ci
+
+      - name: Verify emitted audio fixture identity
+        if: matrix.spike == 'audio-playback'
+        run: npm run verify:built-fixture
 
       - name: Record compile-only scope
         run: |
@@ -200,7 +225,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        spike: [channel-stream, keychain, sqlite-fts, import-hardening, lua-limits]
+        spike: [channel-stream, keychain, sqlite-fts, import-hardening, lua-limits, audio-playback]
     defaults:
       run:
         shell: bash
@@ -230,6 +255,10 @@ jobs:
       - name: Install locked JavaScript dependencies
         run: npm ci
 
+      - name: Verify source audio fixture identity
+        if: matrix.spike == 'audio-playback'
+        run: npm run verify:fixture
+
       - name: Initialize disposable iOS wrapper when absent
         run: |
           if [[ ! -d src-tauri/gen/apple ]]; then
@@ -238,6 +267,10 @@ jobs:
 
       - name: Compile debug ARM64 simulator app
         run: npm run tauri ios build -- --debug --target aarch64-sim --ci --no-sign
+
+      - name: Verify emitted audio fixture identity
+        if: matrix.spike == 'audio-playback'
+        run: npm run verify:built-fixture
 
       - name: Verify vendored Lua is embedded in the iOS product
         if: matrix.spike == 'lua-limits'

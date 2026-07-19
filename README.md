@@ -5,9 +5,10 @@ LorePia is a local-first, cross-platform AI character chat client in the M-1 ris
 The current spikes exercise mock SSE-to-Tauri-Channel streaming, an independent
 five-OS credential-store lifecycle, a file-backed SQLite/FTS5 lifecycle, a
 bounded archive/PNG import-hardening lifecycle, and a constrained Lua 5.4
-runtime. They are intentionally functional and minimal. Product UI, visual
-design, and animation are outside the implementation scope here and remain
-owner-authored work.
+runtime. A sixth spike exercises a fixed local PCM WAV through the trusted
+main WebView's `HTMLAudioElement` path. They are intentionally functional and
+minimal. Product UI, visual design, and animation are outside the
+implementation scope here and remain owner-authored work.
 
 ## Current scope
 
@@ -23,6 +24,8 @@ owner-authored work.
   importer or product limits.
 - Verify that a fixed diagnostic Lua corpus is bounded by instruction, deadline,
   memory, and standard-library policy without enabling imported Lua.
+- Verify fixed-fixture load, play, pause, seek, resume, stop, release, and the
+  foreground-only lifecycle policy through the trusted WebView audio path.
 - Record runtime evidence without treating compilation, a simulator, and a physical device as equivalent.
 - Keep imported JavaScript and Lua disabled in the Store-Safe profile until written policy clearance and the required isolation evidence exist.
 
@@ -38,6 +41,7 @@ No 5-OS runtime support claim is valid until the [M-1 verification matrix](docs/
 ├── spikes/sqlite-fts/          # Disposable SQLite/FTS5 vertical spike
 ├── spikes/import-hardening/    # Disposable archive/PNG defense spike
 ├── spikes/lua-limits/          # Disposable Lua 5.4 limit-enforcement spike
+├── spikes/audio-playback/      # Disposable trusted-WebView audio spike
 ├── .github/workflows/m1.yml    # Desktop and mobile compile verification
 └── LorePia_기술계획서_v2.md    # Current technical plan
 ```
@@ -82,6 +86,13 @@ The Lua limit spike uses the same sequence from `spikes/lua-limits`. Its one
 no-argument diagnostic probe runs only a fixed self-authored corpus; it neither
 accepts imported Lua nor defines the product scripting API. See
 [`docs/m1/lua-limits.md`](docs/m1/lua-limits.md).
+
+The audio spike uses the same sequence from `spikes/audio-playback`, with
+`npm run verify:fixture` and `npm run verify:built-fixture` pinning the source
+and emitted fixed WAV. Its controls and receipt exercise a trusted
+`HTMLAudioElement`; they do not define product media UI or establish a runtime
+pass without physical output, lifecycle, and resource-release evidence. See
+[`docs/m1/audio-playback.md`](docs/m1/audio-playback.md).
 
 `rust-toolchain.toml`, `Cargo.lock`, and `package-lock.json` are application inputs and must be committed. CI uses the pinned Rust toolchain and lockfiles and must not silently refresh dependencies.
 
