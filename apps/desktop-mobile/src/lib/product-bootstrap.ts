@@ -5,7 +5,8 @@ export const PRODUCT_BOOTSTRAP_ERROR_MESSAGE =
   "제품 코어 상태를 불러오지 못했습니다.";
 
 const DATA_POLICY = "DEVICE_LOCAL_EXCEPT_USER_SELECTED_LLM_REQUESTS" as const;
-const IMPORTED_EXECUTABLE_CONTENT = "DISABLED_PENDING_M1_EVIDENCE" as const;
+const IMPORTED_EXECUTABLE_CONTENT =
+  "DISABLED_BY_SECURITY_POLICY" as const;
 const CARGO_SEMVER =
   /^(0|[1-9]\d*)\.(0|[1-9]\d*)\.(0|[1-9]\d*)(?:-[0-9A-Za-z-]+(?:\.[0-9A-Za-z-]+)*)?(?:\+[0-9A-Za-z-]+(?:\.[0-9A-Za-z-]+)*)?$/;
 const CONTRACT_KEYS = [
@@ -17,7 +18,7 @@ const CONTRACT_KEYS = [
 ] as const;
 
 export interface ProductBootstrap {
-  contractVersion: 1;
+  contractVersion: 2;
   productName: "LorePia";
   coreVersion: string;
   dataPolicy: typeof DATA_POLICY;
@@ -44,7 +45,7 @@ export function parseProductBootstrap(value: unknown): ProductBootstrap {
   }
 
   if (
-    value.contractVersion !== 1 ||
+    value.contractVersion !== 2 ||
     value.productName !== "LorePia" ||
     typeof value.coreVersion !== "string" ||
     !CARGO_SEMVER.test(value.coreVersion) ||

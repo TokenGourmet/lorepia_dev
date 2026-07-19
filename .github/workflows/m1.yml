@@ -206,6 +206,12 @@ jobs:
       - name: Compile debug ARM64 APK
         run: npm run tauri android build -- --debug --target aarch64 --apk --ci
 
+      - name: Verify APK exists
+        run: |
+          apk_path="$(find src-tauri/gen/android/app/build/outputs -type f -name '*.apk' -print -quit)"
+          test -n "$apk_path"
+          sha256sum "$apk_path"
+
       - name: Verify emitted audio fixture identity
         if: matrix.spike == 'audio-playback'
         run: npm run verify:built-fixture
@@ -267,6 +273,12 @@ jobs:
 
       - name: Compile debug ARM64 simulator app
         run: npm run tauri ios build -- --debug --target aarch64-sim --ci --no-sign
+
+      - name: Verify simulator app exists
+        run: |
+          app_dir="$(find src-tauri/gen/apple/build/arm64-sim -maxdepth 1 -type d -name '*.app' -print -quit)"
+          test -n "$app_dir"
+          test -f "$app_dir/Info.plist"
 
       - name: Verify emitted audio fixture identity
         if: matrix.spike == 'audio-playback'

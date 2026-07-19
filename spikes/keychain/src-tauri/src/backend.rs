@@ -29,10 +29,9 @@ impl KeyringStore {
         #[cfg(target_os = "windows")]
         {
             let modifiers = HashMap::from([("persistence", "Local")]);
-            return self
-                .store
+            self.store
                 .build(PROBE_SERVICE, account, Some(&modifiers))
-                .map_err(classify_keyring_error);
+                .map_err(classify_keyring_error)
         }
         #[cfg(not(target_os = "windows"))]
         self.store

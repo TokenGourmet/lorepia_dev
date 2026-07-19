@@ -38,7 +38,14 @@ implementation scope here and remain owner-authored work.
 - Verify fixed-fixture load, play, pause, seek, resume, stop, release, and the
   foreground-only lifecycle policy through the trusted WebView audio path.
 - Record runtime evidence without treating compilation, a simulator, and a physical device as equivalent.
-- Keep imported JavaScript and Lua disabled in the Store-Safe profile until written policy clearance and the required isolation evidence exist.
+- Keep imported JavaScript and Lua disabled in every current product profile;
+  reopening requires a new reviewed contract, technical boundary evidence, and
+  any applicable store-policy clearance.
+
+The current product decision is stricter than an evidence-pending toggle:
+imported executable content remains disabled until a new reviewed contract
+satisfies the independently terminable runtime and bounded-transport gates in
+[`ADR 0001`](docs/decisions/0001-imported-code-execution.md).
 
 No 5-OS runtime support claim is valid until the [M-1 verification matrix](docs/m1/verification-matrix.md) contains the required evidence.
 
@@ -51,6 +58,7 @@ No 5-OS runtime support claim is valid until the [M-1 verification matrix](docs/
 ├── apps/desktop-mobile/        # Tauri 2 + Svelte 5 product shell
 ├── docs/m0/                    # Product scaffold scope and open gates
 ├── docs/m1/                    # M-1 gates, procedures, and evidence matrix
+├── docs/decisions/             # Product architecture decisions
 ├── spikes/channel-stream/      # Disposable Channel vertical spike
 ├── spikes/keychain/            # Disposable five-OS credential-store spike
 ├── spikes/sqlite-fts/          # Disposable SQLite/FTS5 vertical spike

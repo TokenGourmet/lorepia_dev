@@ -2,7 +2,7 @@
 
 use serde::Serialize;
 
-pub const PRODUCT_BOOTSTRAP_CONTRACT_VERSION: u16 = 1;
+pub const PRODUCT_BOOTSTRAP_CONTRACT_VERSION: u16 = 2;
 
 /// The platform-independent product state owned by the native application.
 ///
@@ -24,7 +24,7 @@ impl LorePiaCore {
             product_name: "LorePia",
             core_version: env!("CARGO_PKG_VERSION"),
             data_policy: DataPolicy::DeviceLocalExceptUserSelectedLlmRequests,
-            imported_executable_content: ImportedExecutableContent::DisabledPendingM1Evidence,
+            imported_executable_content: ImportedExecutableContent::DisabledBySecurityPolicy,
         }
     }
 }
@@ -38,7 +38,7 @@ enum DataPolicy {
 #[derive(Clone, Copy, Debug, Eq, PartialEq, Serialize)]
 #[serde(rename_all = "SCREAMING_SNAKE_CASE")]
 enum ImportedExecutableContent {
-    DisabledPendingM1Evidence,
+    DisabledBySecurityPolicy,
 }
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq, Serialize)]
@@ -68,7 +68,7 @@ mod tests {
                 "productName": "LorePia",
                 "coreVersion": env!("CARGO_PKG_VERSION"),
                 "dataPolicy": "DEVICE_LOCAL_EXCEPT_USER_SELECTED_LLM_REQUESTS",
-                "importedExecutableContent": "DISABLED_PENDING_M1_EVIDENCE"
+                "importedExecutableContent": "DISABLED_BY_SECURITY_POLICY"
             })
         );
     }

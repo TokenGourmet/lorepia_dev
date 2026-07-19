@@ -11,7 +11,9 @@
   "packageManager": "npm@10.9.8",
   "scripts": {
     "dev": "vite dev",
-    "build": "vite build",
+    "build": "npm run build:web && npm run verify:built-boundary",
+    "build:web": "vite build",
+    "verify:built-boundary": "node scripts/verify-built-executable-boundary.mjs",
     "preview": "vite preview",
     "test": "vitest run",
     "check": "svelte-kit sync && svelte-check --tsconfig ./tsconfig.json",

@@ -1,4 +1,4 @@
-import { readFileSync } from "node:fs";
+import { readFileSync, readdirSync } from "node:fs";
 import { describe, expect, it } from "vitest";
 
 import capability from "../../src-tauri/capabilities/default.json";
@@ -22,20 +22,38 @@ const appleProject = readFileSync(
   new URL("../../src-tauri/gen/apple/project.yml", import.meta.url),
   "utf8",
 );
+const capabilityFiles = readdirSync(
+  new URL("../../src-tauri/capabilities", import.meta.url),
+)
+  .filter((name) => name.endsWith(".json"))
+  .sort();
 
 describe("native product boundary", () => {
   it("grants one bootstrap permission to the trusted main WebView", () => {
+    expect(tauriConfig.app.security.capabilities).toEqual(["default"]);
+    expect(capabilityFiles).toEqual(["default.json"]);
     expect(capability.webviews).toEqual(["main"]);
     expect(capability.permissions).toEqual(["allow-get-product-bootstrap"]);
   });
 
   it("starts with network and executable WebView surfaces closed", () => {
-    const csp = tauriConfig.app.security.csp;
-    expect(csp["connect-src"]).toBe("'self'");
-    expect(csp["frame-src"]).toBe("'none'");
-    expect(csp["media-src"]).toBe("'none'");
-    expect(csp["object-src"]).toBe("'none'");
-    expect(csp["worker-src"]).toBe("'none'");
+    for (const csp of [
+      tauriConfig.app.security.csp,
+      tauriConfig.app.security.devCsp,
+    ]) {
+      expect(csp["frame-src"]).toBe("'none'");
+      expect(csp["media-src"]).toBe("'none'");
+      expect(csp["object-src"]).toBe("'none'");
+      expect(csp["worker-src"]).toBe("'none'");
+    }
+    expect(tauriConfig.app.security.csp["connect-src"]).toBe("'self'");
+    expect(tauriConfig.app.security.devCsp["connect-src"]).toBe(
+      "'self' http://localhost:1423 ws://localhost:1424",
+    );
+    expect(tauriConfig.app.security.csp["script-src"]).toBe("'self'");
+    expect(tauriConfig.app.security.devCsp["script-src"]).toBe(
+      "'self' http://localhost:1423",
+    );
   });
 
   it("keeps desktop and committed mobile wrapper identifiers aligned", () => {

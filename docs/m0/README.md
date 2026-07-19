@@ -14,10 +14,10 @@ Svelte 5 static product screen
 
 The internal bootstrap response is intentionally exact and small:
 
-- contract version `1`
+- contract version `2`
 - product name and core version
 - device-local data policy, except user-selected LLM requests
-- imported executable content disabled pending M-1 evidence
+- imported executable content `DISABLED_BY_SECURITY_POLICY`
 
 The application exposes no filesystem, shell, dialog, HTTP, plugin, audio,
 import, database, provider, keychain, Lua, or Channel command. The production
@@ -26,6 +26,13 @@ connections. The main WebView can invoke only `get_product_bootstrap`.
 
 This bootstrap contract is an internal startup seam. It does not freeze the
 blocked public plugin API or any M-1 spike contract.
+
+The product-level decision and reopening requirements are recorded in
+[`ADR 0001`](../decisions/0001-imported-code-execution.md). The M-1 iframe and
+broker code remains disposable research and is not copied into this product.
+An independently terminable runtime and pre-decode bounded transport are
+necessary reopening conditions, but satisfying one condition does not
+automatically change the policy; a new reviewed contract is required.
 
 ## UI ownership boundary
 
@@ -88,13 +95,13 @@ npm run tauri build -- --debug --no-bundle --ci
 Run `npm run tauri dev` for the local macOS product shell. A desktop compile,
 Android APK compile, or iOS simulator compile is compile evidence only.
 
-## Local evidence on 2026-07-19
+## Baseline local evidence on 2026-07-19
 
-The reproducible receipt is in
+The historical reproducible receipt for feature commit `3434dbe` is in
 [`evidence/2026-07-19-local.md`](evidence/2026-07-19-local.md).
 
-On the development Mac, the following passed with the committed source and
-lockfiles:
+On that exact feature commit, the following passed with its committed source
+and lockfiles:
 
 - 15 frontend contract/boundary tests
 - Svelte and TypeScript checking with zero errors and warnings
@@ -113,16 +120,23 @@ The iOS bundle was compiled but not launched. Android was not compiled locally
 because the Mac has no Android SDK. Those facts do not establish physical
 mobile or five-OS runtime support.
 
+That immutable receipt describes bootstrap v1 and 15 frontend tests. It is not
+silently rewritten to claim the current v2 security-policy contract; current
+source and hosted-CI evidence receives its own exact-commit record.
+
 ## Open M0 gates
 
-- GitHub CI has not established green Linux, macOS, Windows, Android, and iOS
-  results until the workflow runs on the branch or PR.
+- Hosted CI must remain green for the exact current commit. A prior green run
+  does not qualify a later hardening change, and compile jobs remain distinct
+  from runtime evidence.
 - No physical Android or iOS smoke evidence exists from this product shell.
 - The v2 benchmark regression gate has no honest workload or baseline yet; no
   arbitrary threshold is invented here.
 - Design tokens and responsive visual design are deferred to the owner.
 - M-1 exit review and plugin API freeze remain blocked by the M-1 evidence
-  matrix. Imported JavaScript and Lua therefore remain disabled.
+  matrix. Imported JavaScript and Lua remain disabled by product policy; M-1
+  completion alone cannot enable them without an independently terminable
+  runtime, bounded transport, and a new reviewed bootstrap contract.
 
 Do not label this slice “M0 complete,” “5OS runtime passed,” or “plugin API
 frozen.”

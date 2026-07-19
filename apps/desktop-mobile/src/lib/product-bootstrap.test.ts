@@ -9,11 +9,11 @@ import {
 } from "./product-bootstrap";
 
 const VALID_BOOTSTRAP = {
-  contractVersion: 1,
+  contractVersion: 2,
   productName: "LorePia",
   coreVersion: "0.1.0",
   dataPolicy: "DEVICE_LOCAL_EXCEPT_USER_SELECTED_LLM_REQUESTS",
-  importedExecutableContent: "DISABLED_PENDING_M1_EVIDENCE",
+  importedExecutableContent: "DISABLED_BY_SECURITY_POLICY",
 } as const;
 
 describe("product bootstrap contract", () => {
@@ -33,7 +33,7 @@ describe("product bootstrap contract", () => {
   it.each([
     null,
     [],
-    { ...VALID_BOOTSTRAP, contractVersion: 2 },
+    { ...VALID_BOOTSTRAP, contractVersion: 1 },
     { ...VALID_BOOTSTRAP, coreVersion: "development" },
     { ...VALID_BOOTSTRAP, extra: true },
     {

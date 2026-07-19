@@ -116,12 +116,19 @@ byte budget, but imported execution remains off until an independently
 terminable boundary with a bounded transport exists. See
 [`channel-ipc-boundary.md`](channel-ipc-boundary.md).
 
-Enabling either language requires all of the following:
+M-1 completion does not enable either language. JavaScript must first meet the
+independent termination, pre-decode admission, queue ownership, negative-test,
+and five-profile requirements in
+[`ADR 0001`](../decisions/0001-imported-code-execution.md). Lua requires a
+separate reviewed native-runtime contract and its own five-platform limit and
+non-enablement evidence. Both languages additionally require all of the
+following:
 
 1. A dated policy review naming the store, guideline version, reviewer, decision, and submission constraints.
 2. Passing real-device isolation, broker, resource-limit, sanitizer, and network-denial evidence on the affected mobile platform.
 3. A profile-specific negative test proving that an unapproved build cannot re-enable execution through a manifest, import, migration, or stale setting.
-4. An explicit review decision recorded in the matrix; absence of a decision means disabled.
+4. A new versioned product contract and explicit review decision recorded in
+   the matrix; absence of either means disabled.
 
 ## M-1 exit decision
 
@@ -133,7 +140,13 @@ M-1 may close only when all statements below are true:
 - Compatibility observations, fixture provenance, and golden tests are complete enough to make the plugin API decision.
 - Performance reference hardware and raw p95 evidence are recorded.
 - The Store-Safe JS/Lua decision is explicit per mobile platform and the disabled-by-default regression test passes.
-- The review records one decision: proceed to M0, revise the architecture, or stop the affected platform/profile.
+- The review records one decision: proceed past the guarded M0 scaffold into
+  M-1-dependent milestones, revise the architecture, or stop the affected
+  platform/profile.
+
+The non-executable M0 scaffold may advance in parallel because it contains no
+imported-code source-to-sink path. That does not close M-1, complete M0, freeze
+the plugin API, or authorize M-1-dependent scripting/plugin work.
 
 ## CI scope
 
@@ -143,12 +156,14 @@ M-1 may close only when all statements below are true:
   Lua-limit, and audio-playback spikes independently run
   `npm ci`, frontend contract tests, Svelte/TypeScript check, frontend build,
   Rust format, Rust tests, Clippy with warnings denied, and Rust check.
-- Android: all six spikes compile a debug ARM64 APK on a hosted runner. The
+- Android: all six spikes compile a debug ARM64 APK on a hosted runner and
+  verify that an APK exists. The
   keychain job also verifies its committed NDK-context hook and backup
   exclusions before compilation. The audio job verifies that the fixed WAV in
   the emitted frontend assets has the pinned identity.
 - iOS: all six spikes compile a debug ARM64 simulator target on a hosted macOS
-  runner. The audio job performs the same emitted-fixture verification.
+  runner and verify that the generated `.app` and `Info.plist` exist. The audio
+  job performs the same emitted-fixture verification.
 
 The desktop audio jobs also verify the emitted WAV identity after the frontend
 build. These source, test, asset, and compile checks do not launch an audio
