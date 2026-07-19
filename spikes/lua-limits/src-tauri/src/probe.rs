@@ -922,7 +922,9 @@ mod tests {
         const CARGO_TOML: &str = include_str!("../Cargo.toml");
         const CARGO_LOCK: &str = include_str!("../Cargo.lock");
         const BUILD_RS: &str = include_str!("../build.rs");
-        let mlua_line = CARGO_TOML
+        let cargo_toml = CARGO_TOML.replace("\r\n", "\n");
+        let cargo_lock = CARGO_LOCK.replace("\r\n", "\n");
+        let mlua_line = cargo_toml
             .lines()
             .find(|line| line.starts_with("mlua = "))
             .expect("mlua dependency must exist");
@@ -933,8 +935,8 @@ mod tests {
         for forbidden_feature in ["luajit", "module", "async", "send"] {
             assert!(!mlua_line.contains(forbidden_feature));
         }
-        assert!(CARGO_LOCK.contains("name = \"mlua\"\nversion = \"0.12.0\""));
-        assert!(CARGO_TOML.contains(
+        assert!(cargo_lock.contains("name = \"mlua\"\nversion = \"0.12.0\""));
+        assert!(cargo_toml.contains(
             "[target.'cfg(target_os = \"ios\")'.dependencies]\nmlua-sys = { version = \"=0.11.0\", default-features = false, features = [\"lua54\", \"vendored\"] }"
         ));
         assert!(BUILD_RS.contains("bundle_vendored_lua_for_ios_staticlib"));
