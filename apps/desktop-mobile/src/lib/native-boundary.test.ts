@@ -24,9 +24,7 @@ const appleProject = readFileSync(
 );
 const capabilityFiles = readdirSync(
   new URL("../../src-tauri/capabilities", import.meta.url),
-)
-  .filter((name) => name.endsWith(".json"))
-  .sort();
+).sort();
 
 describe("native product boundary", () => {
   it("grants one bootstrap permission to the trusted main WebView", () => {
