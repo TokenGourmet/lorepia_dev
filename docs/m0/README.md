@@ -11,6 +11,7 @@ Svelte 5 static product screen
      -> get_product_bootstrap -> lorepia-core
      -> write-only credential commands -> five-OS OS credential store
      -> provider stream commands -> native HTTPS/SSE/NDJSON runtime
+     -> typed storage commands -> app-local SQLite v1
 ```
 
 The internal bootstrap response is intentionally exact and small:
@@ -26,22 +27,25 @@ It records a JavaScript payload's byte length and SHA-256 identity as immutable
 `INERT_QUARANTINED` data. It accepts no source, hook, runtime, or activation
 field, and imported or stale settings cannot change the fixed disabled policy.
 
-The application still exposes no filesystem, shell, dialog, plugin, audio,
-import, database, Lua, or imported-code command. The production CSP blocks
-remote browser networking. The trusted main WebView now has a narrow native
-credential and provider-stream command surface; provider traffic leaves through
-the Rust HTTP client, not browser `fetch`. See the
-[native provider runtime contract](provider-runtime.md).
+The application still exposes no general filesystem, shell, dialog, plugin,
+audio, import, Lua, raw-SQL, or imported-code command. The production CSP blocks
+remote browser networking. The trusted main WebView has narrow credential,
+provider-stream, and typed product-storage command surfaces; provider traffic
+leaves through the Rust HTTP client, not browser `fetch`. See the
+[native provider runtime contract](provider-runtime.md) and
+[product storage record](product-storage.md).
 
 The product-owned [LLM provider catalog](llm-provider-catalog.md) records six
 providers and a UI-independent request compiler. Five API-key providers now
 connect through the native vault and bounded stream runtime. Vertex request
 compilation exists, but invocation remains fail-closed until the native Google
-OAuth flow is implemented. The settings screen now writes API keys directly to
-the native vault, keeps only a volatile provider/model profile in the WebView,
-and the chat screen consumes the authenticated stream with ordered ACK,
+OAuth flow is implemented. The settings screen writes API keys directly to the
+native vault and persists only the non-secret provider/model profile, theme,
+and default mode in SQLite. The chat screen consumes the authenticated stream with ordered ACK,
 cancellation, fixed public errors, terminal snapshot recovery/cleanup, and a
-native-owned fixed first-chat prompt.
+native-owned fixed first-chat prompt. Each turn is stored before generation;
+bounded response checkpoints survive interruption, and a terminal result is
+published only after its final SQLite transaction commits.
 
 This bootstrap contract is an internal startup seam. It does not freeze the
 blocked public plugin API or any M-1 spike contract.

@@ -37,4 +37,14 @@ describe("provider settings surface", () => {
     expect(source).toContain("activeProviderProfile.setModelId");
     expect(source).not.toMatch(/defaultModel|localStorage|sessionStorage/i);
   });
+
+  it("persists only typed non-secret provider and display preferences", () => {
+    expect(source).toContain(
+      'from "$lib/storage/app-preferences.svelte"',
+    );
+    expect(source).toContain("appPreferences.setProvider");
+    expect(source).toContain("appPreferences.setModelId");
+    expect(source).toContain("appPreferences.setTheme");
+    expect(source).toContain("appPreferences.setDefaultMode");
+  });
 });

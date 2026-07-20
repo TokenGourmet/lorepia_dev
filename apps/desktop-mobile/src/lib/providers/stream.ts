@@ -491,11 +491,12 @@ function validateTerminalSnapshot(
 
 export function startFirstChatStream(
   profile: ActiveProviderProfile,
+  chatId: string,
   userMessage: string,
   callbacks: FirstChatStreamCallbacks,
   dependencies: FirstChatStreamDependencies = defaultDependencies,
 ): FirstChatStreamHandle {
-  const command = buildFirstChatCommand(profile, userMessage);
+  const command = buildFirstChatCommand(profile, chatId, userMessage);
 
   let authorization: StreamAuthorization | null = null;
   let expectedSeq = 0;

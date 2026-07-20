@@ -9,6 +9,13 @@ macro_rules! with_product_app_commands {
             ack_provider_stream,
             cancel_provider_stream,
             get_provider_stream_snapshot,
+            get_storage_status,
+            create_chat,
+            list_chats,
+            load_chat_messages,
+            delete_chat,
+            get_app_preferences,
+            update_app_preferences,
         )
     };
 }

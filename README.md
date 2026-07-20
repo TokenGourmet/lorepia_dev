@@ -64,6 +64,7 @@ No 5-OS runtime support claim is valid until the [M-1 verification matrix](docs/
 ├── crates/lorepia-providers/   # Provider options and wire compiler
 ├── crates/lorepia-credential-vault/ # Five-OS native credential storage
 ├── crates/lorepia-provider-runtime/ # Native HTTPS and stream decoding
+├── crates/lorepia-storage/     # Product SQLite chats, stream state, and settings
 ├── crates/lorepia-tool-runtime/ # Deny-by-default tool/MCP policy contracts
 ├── apps/desktop-mobile/        # Tauri 2 + Svelte 5 product shell
 ├── docs/m0/                    # Product scaffold scope and open gates
@@ -94,9 +95,11 @@ npm run check
 npm run tauri dev
 ```
 
-The current owner-authored screen set is not yet wired to the headless provider
-commands. The native implementation boundary is documented in
-[`docs/m0/provider-runtime.md`](docs/m0/provider-runtime.md).
+The first chat screen is wired to the native provider stream and product
+SQLite store. It restores canonical messages after restart and persists
+non-secret provider/model, theme, and default-mode preferences. The native
+boundaries are documented in [`docs/m0/provider-runtime.md`](docs/m0/provider-runtime.md)
+and [`docs/m0/product-storage.md`](docs/m0/product-storage.md).
 
 ## Run and check a spike
 

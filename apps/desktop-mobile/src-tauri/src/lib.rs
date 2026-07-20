@@ -1,5 +1,6 @@
 mod credential_commands;
 mod provider_stream;
+mod storage_commands;
 
 use credential_commands::{
     CredentialVaultState, delete_provider_credential, get_provider_credential_status,
@@ -10,7 +11,11 @@ use provider_stream::{
     ProviderStreamRegistry, ack_provider_stream, cancel_provider_stream,
     get_provider_stream_snapshot, start_provider_stream,
 };
-use tauri::State;
+use storage_commands::{
+    StorageState, create_chat, delete_chat, get_app_preferences, get_storage_status, list_chats,
+    load_chat_messages, update_app_preferences,
+};
+use tauri::{Manager, State};
 
 include!("app_commands.rs");
 
@@ -31,6 +36,11 @@ pub fn run() {
         .manage(LorePiaCore::new())
         .manage(CredentialVaultState::default())
         .manage(ProviderStreamRegistry::default())
+        .setup(|app| {
+            let storage = StorageState::open(app.path().app_local_data_dir());
+            app.manage(storage);
+            Ok(())
+        })
         .invoke_handler(with_product_app_commands!(generate_product_handler))
         .run(tauri::generate_context!())
         .expect("failed to run LorePia");
@@ -93,6 +103,13 @@ mod command_surface_tests {
                 "ack_provider_stream",
                 "cancel_provider_stream",
                 "get_provider_stream_snapshot",
+                "get_storage_status",
+                "create_chat",
+                "list_chats",
+                "load_chat_messages",
+                "delete_chat",
+                "get_app_preferences",
+                "update_app_preferences",
             ]
         );
     }

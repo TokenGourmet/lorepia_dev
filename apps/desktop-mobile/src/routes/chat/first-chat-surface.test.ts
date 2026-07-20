@@ -9,8 +9,18 @@ describe("first chat surface", () => {
       'from "$lib/providers/active-profile.svelte"',
     );
     expect(source).toContain('from "$lib/providers/stream"');
-    expect(source).toContain("startFirstChatStream(profile, text");
+    expect(source).toContain(
+      "startFirstChatStream(profile, targetChatId, text",
+    );
     expect(source).toContain("streaming: true");
+  });
+
+  it("loads the canonical SQLite history and refreshes it after terminal", () => {
+    expect(source).toContain('from "$lib/storage/chat-history"');
+    expect(source).toContain("loadOrCreateFirstChat()");
+    expect(source).toContain("storageClient.loadChatMessages(targetChatId)");
+    expect(source).toContain("void reloadHistory(targetChatId)");
+    expect(source).not.toContain('id: "m1"');
   });
 
   it("exposes stop and clears streaming state for every terminal result", () => {

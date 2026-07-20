@@ -67,4 +67,26 @@ describe("active provider profile", () => {
       activeProviderProfile.isCredentialOperationCurrent("openai", current),
     ).toBe(true);
   });
+
+  it("restores provider and model preferences without credential state", () => {
+    activeProviderProfile.setCredentialConfigured("anthropic", true);
+    activeProviderProfile.restoreNonSecretSettings("anthropic", {
+      openai: "gpt-example",
+      anthropic: "claude-example",
+    });
+
+    expect(activeProviderProfile.selectedProviderId).toBe("anthropic");
+    expect(activeProviderProfile.modelId).toBe("claude-example");
+    expect(activeProviderProfile.current).toEqual({
+      providerId: "anthropic",
+      modelId: "claude-example",
+    });
+    expect(activeProviderProfile.nonSecretModelIds()).toEqual({
+      openai: "gpt-example",
+      anthropic: "claude-example",
+    });
+    expect(JSON.stringify(activeProviderProfile.nonSecretModelIds())).not.toMatch(
+      /credential|api.?key|secret/i,
+    );
+  });
 });

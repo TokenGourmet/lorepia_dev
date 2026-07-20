@@ -32,6 +32,7 @@ describe("native product boundary", () => {
     expect(capabilityFiles).toEqual(["default.json"]);
     expect(capability.webviews).toEqual(["main"]);
     expect(capability.permissions).toEqual([
+      "core:window:allow-destroy",
       "allow-get-product-bootstrap",
       "allow-get-provider-credential-status",
       "allow-save-provider-api-key",
@@ -40,6 +41,13 @@ describe("native product boundary", () => {
       "allow-ack-provider-stream",
       "allow-cancel-provider-stream",
       "allow-get-provider-stream-snapshot",
+      "allow-get-storage-status",
+      "allow-create-chat",
+      "allow-list-chats",
+      "allow-load-chat-messages",
+      "allow-delete-chat",
+      "allow-get-app-preferences",
+      "allow-update-app-preferences",
     ]);
   });
 

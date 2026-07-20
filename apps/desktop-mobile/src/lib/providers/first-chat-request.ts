@@ -6,6 +6,7 @@ import {
 export const FIRST_CHAT_MAX_INPUT_BYTES = 64 * 1024;
 
 export type FirstChatCommand = Readonly<{
+  chatId: string;
   profile: ActiveProviderProfile;
   userMessage: string;
 }>;
@@ -30,12 +31,17 @@ function validateUserMessage(value: string): string {
 
 export function buildFirstChatCommand(
   profile: ActiveProviderProfile,
+  chatId: string,
   userMessage: string,
 ): FirstChatCommand {
   if (modelIdValidationMessage(profile.providerId, profile.modelId) !== null) {
     throw new Error("FIRST_CHAT_PROFILE_INVALID");
   }
+  if (!/^[a-f0-9]{32}$/u.test(chatId)) {
+    throw new Error("FIRST_CHAT_ID_INVALID");
+  }
   return Object.freeze({
+    chatId,
     profile: Object.freeze({
       providerId: profile.providerId,
       modelId: profile.modelId.trim(),

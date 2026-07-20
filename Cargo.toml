@@ -9,6 +9,7 @@ members = [
   "crates/lorepia-prompt",
   "crates/lorepia-provider-runtime",
   "crates/lorepia-providers",
+  "crates/lorepia-storage",
   "crates/lorepia-tool-runtime",
 ]
 exclude = [

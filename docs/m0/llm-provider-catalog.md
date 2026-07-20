@@ -110,10 +110,10 @@ acknowledged in sequence. Terminal results are published only after their ACK
 and authenticated snapshot agree, and a bounded snapshot poll recovers a lost
 terminal callback. The native control token remains inside the stream adapter.
 
-There is still no provider profile database or model-list cache, so a restart
-requires selecting the profile again. Vertex compilation does not imply a
-working Vertex login; the stream command rejects it until a native OAuth flow
-exists.
+The selected provider and manually entered model IDs are now persisted as
+typed, non-secret app preferences. There is still no verified provider model
+metadata/list cache. Vertex compilation does not imply a working Vertex login;
+the stream command rejects it until a native OAuth flow exists.
 
 ## Implemented connection gates and remaining evidence
 
@@ -129,7 +129,7 @@ The native slice now implements the source-level parts of the earlier gate:
 5. 4096-byte Tauri events with request-control ownership, sequence, cumulative
    ACK, four-event backpressure, and a reserved terminal slot.
 
-Still open are verified model metadata/cache persistence, the native Vertex
+Still open are verified model metadata/list caching, the native Vertex
 OAuth flow, live requests against user-owned test accounts, physical
 Android/iOS evidence, signed iOS Keychain evidence, and packaged Windows/Linux
 runtime evidence.

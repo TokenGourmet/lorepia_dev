@@ -20,6 +20,7 @@ lorepia-credential-vault = { path = "../../../crates/lorepia-credential-vault" }
 lorepia-core = { path = "../../../crates/lorepia-core" }
 lorepia-provider-runtime = { path = "../../../crates/lorepia-provider-runtime" }
 lorepia-providers = { path = "../../../crates/lorepia-providers" }
+lorepia-storage = { path = "../../../crates/lorepia-storage" }
 serde.workspace = true
 serde_json.workspace = true
 subtle = "=2.6.1"

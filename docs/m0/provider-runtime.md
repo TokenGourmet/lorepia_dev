@@ -36,12 +36,13 @@ ACK, cancellation, and snapshot requests require both. This binds control
 messages to the caller that started the request instead of treating a guessed
 request ID as authority.
 
-For the first-chat slice, start accepts only a provider/model profile, one user
-message, and the event channel. Native code constructs the fixed system prompt,
-provider-default options, 512-token output cap, and official endpoint. The
-WebView cannot pass a raw `ProviderRequest` or endpoint selection through this
-product command. Prompt-preset sessions remain closed until native-owned preset
-IDs and bindings can use the exact-token prompt runtime.
+For the first-chat slice, start accepts only an existing product chat ID, a
+provider/model profile, one user message, and the event channel. Native code
+constructs the fixed system prompt, provider-default options, 512-token output
+cap, and official endpoint. The WebView cannot pass a raw `ProviderRequest` or
+endpoint selection through this product command. Prompt-preset sessions remain
+closed until native-owned preset IDs and bindings can use the exact-token prompt
+runtime.
 
 ## Native transport
 
@@ -93,6 +94,14 @@ full. ACK is cumulative and monotonic. Once cancellation is accepted, the same
 state lock prevents any later delta/completed/failed event; exactly one
 `cancelled` terminal is emitted. Terminal state remains available for a bounded
 snapshot/ACK window and is then evicted.
+
+The product store creates the user and pending assistant messages atomically
+before the stream starts. Visible text and bounded metadata are checkpointed in
+batches; reasoning is not stored. Completion, cancellation, or failure commits
+the final checkpoint and request status before the corresponding terminal event
+is sent to the WebView. A process restart converts any remaining running request
+to an interrupted partial response. See
+[`product-storage.md`](product-storage.md).
 
 ## Tool and MCP boundary
 

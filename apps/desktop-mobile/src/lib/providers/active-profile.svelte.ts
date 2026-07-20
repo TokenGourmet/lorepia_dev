@@ -101,6 +101,25 @@ export const activeProviderProfile = {
     modelIds[selectedProviderId] = value;
     reconcile();
   },
+  restoreNonSecretSettings(
+    providerId: LlmProviderId,
+    restoredModelIds: Readonly<Partial<Record<ApiKeyProviderId, string>>>,
+  ): void {
+    for (const existing of Object.keys(modelIds) as ApiKeyProviderId[]) {
+      delete modelIds[existing];
+    }
+    for (const [id, modelId] of Object.entries(restoredModelIds) as [
+      ApiKeyProviderId,
+      string,
+    ][]) {
+      modelIds[id] = modelId;
+    }
+    selectedProviderId = providerId;
+    reconcile();
+  },
+  nonSecretModelIds(): Readonly<Partial<Record<ApiKeyProviderId, string>>> {
+    return Object.freeze({ ...modelIds });
+  },
   setCredentialConfigured(
     providerId: LlmProviderId,
     configured: CredentialState,

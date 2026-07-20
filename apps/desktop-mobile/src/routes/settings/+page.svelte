@@ -19,6 +19,7 @@
     MAX_MODEL_ID_BYTES,
     activeProviderProfile,
   } from "$lib/providers/active-profile.svelte";
+  import { appPreferences } from "$lib/storage/app-preferences.svelte";
 
   const themeOptions: { value: ThemePreference; label: string }[] = [
     { value: "system", label: "시스템" },
@@ -31,7 +32,7 @@
     { value: "story", label: "스토리" },
   ];
 
-  let defaultMode = $state<ThreadMode>("chat");
+  let defaultMode = $derived(appPreferences.current.defaultMode);
   let selectedProviderId = $derived(activeProviderProfile.selectedProviderId);
   let selectedProvider = $derived(getLlmProvider(selectedProviderId));
 
@@ -56,6 +57,17 @@
   let credentialBusy = $state(false);
   let credentialError = $state<string | null>(null);
   let keyDraft = $state("");
+
+  function selectProvider(providerId: LlmProviderId): void {
+    activeProviderProfile.select(providerId);
+    appPreferences.setProvider(providerId);
+  }
+
+  function updateModelId(value: string): void {
+    if (selectedProviderId === "google-vertex-ai") return;
+    activeProviderProfile.setModelId(value);
+    appPreferences.setModelId(selectedProviderId, value);
+  }
 
   async function refreshCredentialStatus(
     providerId: LlmProviderId,
@@ -183,7 +195,8 @@
           <button
             type="button"
             class:active={theme.preference === option.value}
-            onclick={() => theme.set(option.value)}>{option.label}</button
+            onclick={() => appPreferences.setTheme(option.value)}
+            >{option.label}</button
           >
         {/each}
       </div>
@@ -195,7 +208,8 @@
           <button
             type="button"
             class:active={defaultMode === option.value}
-            onclick={() => (defaultMode = option.value)}>{option.label}</button
+            onclick={() => appPreferences.setDefaultMode(option.value)}
+            >{option.label}</button
           >
         {/each}
       </div>
@@ -226,7 +240,7 @@
               value={provider.id}
               checked={selectedProviderId === provider.id}
               disabled={credentialBusy}
-              onchange={() => activeProviderProfile.select(provider.id)}
+              onchange={() => selectProvider(provider.id)}
             />
             <span>{provider.label}</span>
             {#if provider.id === "ollama-cloud"}
@@ -280,8 +294,7 @@
                 spellcheck="false"
                 maxlength={MAX_MODEL_ID_BYTES}
                 aria-invalid={modelId.length > 0 && modelError !== null}
-                oninput={(event) =>
-                  activeProviderProfile.setModelId(event.currentTarget.value)}
+                oninput={(event) => updateModelId(event.currentTarget.value)}
               />
               <small class:error={modelId.length > 0 && modelError !== null}
                 >{modelId.length > 0 && modelError !== null

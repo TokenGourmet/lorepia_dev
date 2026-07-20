@@ -14,6 +14,12 @@
     type FirstChatStreamHandle,
   } from "$lib/providers/stream";
   import { FIRST_CHAT_MAX_INPUT_BYTES } from "$lib/providers/first-chat-request";
+  import {
+    loadOrCreateFirstChat,
+    toChatMessage,
+  } from "$lib/storage/chat-history";
+  import { appPreferences } from "$lib/storage/app-preferences.svelte";
+  import { storageClient } from "$lib/storage/client";
   import Avatar from "$lib/ui/Avatar.svelte";
   import { horizontalSwipe, type SwipeCommit } from "$lib/ui/horizontal-swipe";
 
@@ -29,36 +35,43 @@
   let backDrag = $state(0);
   let dragging = $state(false);
   let activeStream = $state<FirstChatStreamHandle | null>(null);
+  let chatId = $state<string | null>(null);
+  let storageUnavailable = $state(false);
+  let historyEpoch = 0;
   let disposed = false;
 
-  let messages = $state<ChatMessage[]>([
-    {
-      id: "m1",
-      role: "character",
-      narration: "낡은 책장 사이로 촛불이 흔들린다. 세라핀은 읽던 책을 덮고 천천히 고개를 든다.",
-      text: "“이 시간에 서고를 찾는 손님은 오랜만이네요. 찾는 책이 있나요, 아니면… 잠이 오지 않는 밤인가요?”",
-      sentAt: new Date(2026, 6, 18, 23, 42),
-    },
-    {
-      id: "m2",
-      role: "user",
-      text: "잠이 안 와서. 아무 책이나 추천해줄래?",
-      sentAt: new Date(2026, 6, 18, 23, 43),
-    },
-    {
-      id: "m3",
-      role: "character",
-      narration: "그녀는 사다리를 밀며 높은 선반으로 손을 뻗는다.",
-      text: "“그렇다면 이야기가 긴 책이 좋겠어요. 끝이 궁금해서 잠들지 못하게.”",
-      sentAt: new Date(2026, 6, 18, 23, 44),
-    },
-    {
-      id: "m4",
-      role: "character",
-      text: "“짧은 우화집도 함께 챙겨드릴게요. 어느 쪽이든, 오늘 밤은 혼자가 아니에요.”",
-      sentAt: new Date(2026, 6, 18, 23, 44),
-    },
-  ]);
+  let messages = $state<ChatMessage[]>([]);
+
+  async function initializeHistory(): Promise<void> {
+    const epoch = ++historyEpoch;
+    try {
+      await appPreferences.hydrate();
+      const loaded = await loadOrCreateFirstChat();
+      if (disposed || epoch !== historyEpoch) return;
+      mode = appPreferences.current.defaultMode;
+      chatId = loaded.chat.id;
+      messages = [...loaded.messages];
+      storageUnavailable = false;
+    } catch {
+      if (disposed || epoch !== historyEpoch) return;
+      chatId = null;
+      messages = [];
+      storageUnavailable = true;
+    }
+  }
+
+  async function reloadHistory(targetChatId: string): Promise<void> {
+    const epoch = ++historyEpoch;
+    try {
+      const loaded = await storageClient.loadChatMessages(targetChatId);
+      if (disposed || epoch !== historyEpoch || chatId !== targetChatId) return;
+      messages = loaded.items.map(toChatMessage);
+    } catch {
+      if (!disposed && epoch === historyEpoch) {
+        storageUnavailable = true;
+      }
+    }
+  }
 
   function panelWidth(): number {
     return panelElement?.offsetWidth ?? 320;
@@ -129,10 +142,12 @@
 
   function handleSend(text: string): void {
     const profile = activeProviderProfile.current;
-    if (activeStream !== null || profile === null) {
+    const targetChatId = chatId;
+    if (activeStream !== null || profile === null || targetChatId === null) {
       return;
     }
 
+    historyEpoch += 1;
     const nonce = `${Date.now()}-${crypto.randomUUID()}`;
     const assistantId = `assistant-${nonce}`;
     messages = [
@@ -154,7 +169,7 @@
 
     let failureShown = false;
     try {
-      const handle = startFirstChatStream(profile, text, {
+      const handle = startFirstChatStream(profile, targetChatId, text, {
         onDelta(delta) {
           replaceMessage(assistantId, (message) => ({
             ...message,
@@ -186,6 +201,7 @@
                       : "응답을 완료하지 못했습니다.",
             streaming: false,
           }));
+          void reloadHistory(targetChatId);
         },
       });
       activeStream = handle;
@@ -210,7 +226,10 @@
     }
   }
 
-  onMount(() => keyboardInset.start());
+  onMount(() => {
+    keyboardInset.start();
+    void initializeHistory();
+  });
   onDestroy(() => {
     disposed = true;
     const handle = activeStream;
@@ -276,9 +295,13 @@
       onSend={handleSend}
       onCancel={handleCancel}
       busy={activeStream !== null}
-      disabled={activeProviderProfile.current === null}
+      disabled={activeProviderProfile.current === null || chatId === null}
       maxLength={FIRST_CHAT_MAX_INPUT_BYTES}
-      placeholder={activeProviderProfile.current === null
+      placeholder={storageUnavailable
+        ? "로컬 저장소를 사용할 수 없습니다"
+        : chatId === null
+          ? "대화를 불러오는 중"
+          : activeProviderProfile.current === null
         ? "설정에서 API 키와 모델을 준비하세요"
         : "메시지 보내기"}
     />

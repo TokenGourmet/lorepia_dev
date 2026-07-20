@@ -13,6 +13,7 @@ import {
 
 const requestId = `provider-${"a".repeat(32)}`;
 const controlToken = "b".repeat(32);
+const chatId = "d".repeat(32);
 const profile = { providerId: "openai" as const, modelId: "model-example" };
 
 function deferred<T>(): {
@@ -115,6 +116,7 @@ describe("first chat provider stream", () => {
 
     const handle = startFirstChatStream(
       profile,
+      chatId,
       "hello",
       callbacks(log),
       { invokeCommand, createChannel },
@@ -138,6 +140,7 @@ describe("first chat provider stream", () => {
         providerId: "openai",
         modelId: "model-example",
       }),
+      chatId,
       userMessage: "hello",
       onEvent: { channel: "fake" },
     });
@@ -161,6 +164,7 @@ describe("first chat provider stream", () => {
 
     const handle = startFirstChatStream(
       profile,
+      chatId,
       "hello",
       callbacks([]),
       { invokeCommand, createChannel },
@@ -202,7 +206,7 @@ describe("first chat provider stream", () => {
         throw new Error(`unexpected ${command}`);
       });
 
-      const handle = startFirstChatStream(profile, "hello", callbacks([]), {
+      const handle = startFirstChatStream(profile, chatId, "hello", callbacks([]), {
         invokeCommand,
         createChannel(handler) {
           deliver = handler;
@@ -241,7 +245,7 @@ describe("first chat provider stream", () => {
       throw new Error(`unexpected ${command}`);
     });
 
-    const handle = startFirstChatStream(profile, "hello", callbacks(log), {
+    const handle = startFirstChatStream(profile, chatId, "hello", callbacks(log), {
       invokeCommand,
       createChannel(handler) {
         deliver = handler;
@@ -303,7 +307,7 @@ describe("first chat provider stream", () => {
       throw new Error(`unexpected ${command}`);
     });
 
-    const handle = startFirstChatStream(profile, "hello", callbacks(log), {
+    const handle = startFirstChatStream(profile, chatId, "hello", callbacks(log), {
       invokeCommand,
       createChannel(handler) {
         deliver = handler;
@@ -357,7 +361,7 @@ describe("first chat provider stream", () => {
         throw new Error(`unexpected ${command}`);
       });
 
-      const handle = startFirstChatStream(profile, "hello", callbacks(log), {
+      const handle = startFirstChatStream(profile, chatId, "hello", callbacks(log), {
         invokeCommand,
         createChannel(handler) {
           deliver = handler;
@@ -410,7 +414,7 @@ describe("first chat provider stream", () => {
         throw new Error(`unexpected ${command}`);
       });
 
-      const handle = startFirstChatStream(profile, "hello", callbacks(log), {
+      const handle = startFirstChatStream(profile, chatId, "hello", callbacks(log), {
         invokeCommand,
         createChannel(handler) {
           deliver = handler;
@@ -467,7 +471,7 @@ describe("first chat provider stream", () => {
       throw new Error(`unexpected ${command}`);
     });
 
-    const handle = startFirstChatStream(profile, "hello", callbacks(log), {
+    const handle = startFirstChatStream(profile, chatId, "hello", callbacks(log), {
       invokeCommand,
       createChannel(handler) {
         deliver = handler;
