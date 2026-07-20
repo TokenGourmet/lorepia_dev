@@ -43,18 +43,26 @@ jobs:
         run: gradle --no-daemon --stacktrace clean testDebugUnitTest lintDebug assembleDebug
 
       - name: Verify APK permissions, signing, and forbidden surfaces
-        run: bash scripts/security-check.sh app/build/outputs/apk/debug/app-debug.apk
+        id: security
+        continue-on-error: true
+        run: |
+          set -o pipefail
+          bash -x scripts/security-check.sh app/build/outputs/apk/debug/app-debug.apk 2>&1 | tee security-check.log
 
       - name: Record dependency graph
+        if: always()
         run: gradle --no-daemon app:dependencies --configuration debugRuntimeClasspath > dependencies.txt
 
       - name: Stage deliverables
+        if: always()
         run: |
           rm -rf dist
           mkdir -p dist
           cp app/build/outputs/apk/debug/app-debug.apk dist/DC-Cleaner-Safe-0.1.0-debug.apk
-          cp permissions.txt apk-badging.txt manifest-tree.txt signature.txt dependencies.txt dist/
           cp README.md AUDIT.md LICENSE dist/
+          for report in permissions.txt apk-badging.txt manifest-tree.txt signature.txt dependencies.txt security-check.log app-debug.apk.sha256; do
+            if [[ -f "$report" ]]; then cp "$report" dist/; fi
+          done
           curl --fail --location --silent --show-error \
             https://www.gnu.org/licenses/agpl-3.0.txt \
             --output dist/LICENSE-AGPL-3.0.txt
@@ -66,8 +74,14 @@ jobs:
             LICENSE-AGPL-3.0.txt > SHA256SUMS.txt)
 
       - uses: actions/upload-artifact@v4
+        if: always()
         with:
           name: dc-cleaner-safe-apk
           path: dccleaner-safe/dist/
           if-no-files-found: error
           retention-days: 14
+
+      - name: Enforce security gate
+        if: always()
+        run: |
+          test '${{ steps.security.outcome }}' = 'success'
