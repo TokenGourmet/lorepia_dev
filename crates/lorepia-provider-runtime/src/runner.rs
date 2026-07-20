@@ -1,7 +1,13 @@
 use std::time::Duration;
 
 use futures_util::StreamExt;
-use lorepia_providers::{ProviderId, ProviderRequest, StreamProtocol, compile_request};
+use lorepia_prompt::{
+    CompiledPrompt, ExactTokenCountErrorKind, ModelPresetSnapshot, PromptError,
+    compile_prompt_request,
+};
+use lorepia_providers::{
+    CompiledProviderRequest, ProviderId, ProviderRequest, StreamProtocol, compile_request,
+};
 use reqwest::{Response, StatusCode, header::CONTENT_TYPE};
 use tokio::{sync::mpsc, time::Instant};
 use tokio_util::sync::CancellationToken;
@@ -14,6 +20,7 @@ use crate::{
     decode::{DecodedFrame, ProviderDecoder},
     endpoint::resolve_endpoint,
     framing::{NdjsonFramer, SseFramer},
+    token_count::ProviderExactTokenCounter,
 };
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
@@ -21,11 +28,13 @@ pub struct RuntimeLimits {
     pub max_request_body_bytes: usize,
     pub max_stream_frame_bytes: usize,
     pub max_http_error_body_bytes: usize,
+    pub max_token_count_response_bytes: usize,
     pub dns_timeout: Duration,
     pub connect_timeout: Duration,
     pub response_header_timeout: Duration,
     pub stream_idle_timeout: Duration,
     pub overall_timeout: Duration,
+    pub token_count_timeout: Duration,
 }
 
 impl Default for RuntimeLimits {
@@ -34,11 +43,13 @@ impl Default for RuntimeLimits {
             max_request_body_bytes: 5 * 1024 * 1024,
             max_stream_frame_bytes: 256 * 1024,
             max_http_error_body_bytes: 64 * 1024,
+            max_token_count_response_bytes: 64 * 1024,
             dns_timeout: Duration::from_secs(10),
             connect_timeout: Duration::from_secs(10),
             response_header_timeout: Duration::from_secs(60),
             stream_idle_timeout: Duration::from_secs(120),
             overall_timeout: Duration::from_secs(30 * 60),
+            token_count_timeout: Duration::from_secs(30),
         }
     }
 }
@@ -61,12 +72,16 @@ impl ProviderRuntime {
         Ok(Self { limits })
     }
 
-    /// Compile, authorize, and stream one provider request.
+    /// Compile, authorize, and stream one classic provider request.
     ///
     /// `events` must be a bounded channel. The runtime awaits channel capacity,
     /// so consumer pressure propagates to the HTTP body rather than accumulating
     /// an unbounded native queue.
-    pub async fn run_stream(
+    ///
+    /// This low-level path does not accept prompt presets and does not satisfy
+    /// their exact-token capacity gate. Native product routing must never use
+    /// it for a prompt-bound chat.
+    pub async fn run_classic_stream(
         &self,
         request: ProviderRequest,
         endpoint_selection: EndpointSelection,
@@ -74,13 +89,7 @@ impl ProviderRuntime {
         cancellation: CancellationToken,
         events: mpsc::Sender<ProviderStreamEvent>,
     ) -> Result<ProviderRunOutcome> {
-        if events.max_capacity() == usize::MAX {
-            return Err(RuntimeError::new(
-                RuntimeErrorKind::InvalidRequest,
-                "UNBOUNDED_EVENT_CHANNEL",
-                "provider runtime requires a bounded event channel",
-            ));
-        }
+        validate_event_channel(&events)?;
         if cancellation.is_cancelled() {
             return Ok(ProviderRunOutcome::Cancelled);
         }
@@ -91,17 +100,90 @@ impl ProviderRuntime {
                 error.to_string(),
             )
         })?;
+        self.run_compiled_stream(
+            &request,
+            &compiled,
+            endpoint_selection,
+            credential,
+            cancellation,
+            events,
+        )
+        .await
+    }
+
+    /// Compile a prompt request, obtain an authoritative provider-side input
+    /// token count, seal the counted wire request, and stream that same wire
+    /// request without recompilation.
+    ///
+    /// This is the only runtime entry point for prompt presets. Providers that
+    /// expose only estimates, post-generation usage, or no official preflight
+    /// fail closed before the generation request is sent.
+    pub async fn run_prompt_stream(
+        &self,
+        prompt: &CompiledPrompt,
+        model: &ModelPresetSnapshot,
+        endpoint_selection: EndpointSelection,
+        credential: ProviderCredential,
+        cancellation: CancellationToken,
+        events: mpsc::Sender<ProviderStreamEvent>,
+    ) -> Result<ProviderRunOutcome> {
+        validate_event_channel(&events)?;
+        if cancellation.is_cancelled() {
+            return Ok(ProviderRunOutcome::Cancelled);
+        }
+
+        let sealed = {
+            let counter = ProviderExactTokenCounter::new(
+                self.limits,
+                &endpoint_selection,
+                &credential,
+                &cancellation,
+            );
+            match compile_prompt_request(prompt, model, &counter).await {
+                Ok(sealed) => sealed,
+                Err(PromptError::ExactTokenCount(error))
+                    if error.kind() == ExactTokenCountErrorKind::Cancelled =>
+                {
+                    return Ok(ProviderRunOutcome::Cancelled);
+                }
+                Err(error) => return Err(map_prompt_error(error)),
+            }
+        };
+
+        self.run_compiled_stream(
+            sealed.provider_request(),
+            sealed.compiled_provider_request(),
+            endpoint_selection,
+            credential,
+            cancellation,
+            events,
+        )
+        .await
+    }
+
+    async fn run_compiled_stream(
+        &self,
+        request: &ProviderRequest,
+        compiled: &CompiledProviderRequest,
+        endpoint_selection: EndpointSelection,
+        credential: ProviderCredential,
+        cancellation: CancellationToken,
+        events: mpsc::Sender<ProviderStreamEvent>,
+    ) -> Result<ProviderRunOutcome> {
+        if cancellation.is_cancelled() {
+            return Ok(ProviderRunOutcome::Cancelled);
+        }
         let endpoint = tokio::select! {
             _ = cancellation.cancelled() => return Ok(ProviderRunOutcome::Cancelled),
             result = resolve_endpoint(
-                &request,
-                &compiled,
+                request,
+                compiled,
                 &endpoint_selection,
                 self.limits.dns_timeout,
             ) => result?,
         };
         let parts = build_http_request(
-            &compiled,
+            compiled,
             &endpoint,
             &credential,
             self.limits.max_request_body_bytes,
@@ -400,11 +482,14 @@ fn validate_limits(limits: &RuntimeLimits) -> Result<()> {
     const MAX_REQUEST_BODY_BYTES: usize = 8 * 1024 * 1024;
     const MAX_STREAM_FRAME_BYTES: usize = 256 * 1024;
     const MAX_HTTP_ERROR_BODY_BYTES: usize = 64 * 1024;
+    const MAX_TOKEN_COUNT_RESPONSE_BYTES: usize = 64 * 1024;
     if !(1024..=MAX_REQUEST_BODY_BYTES).contains(&limits.max_request_body_bytes)
         || limits.max_stream_frame_bytes < 1024
         || limits.max_stream_frame_bytes > MAX_STREAM_FRAME_BYTES
         || limits.max_http_error_body_bytes < 1024
         || limits.max_http_error_body_bytes > MAX_HTTP_ERROR_BODY_BYTES
+        || limits.max_token_count_response_bytes < 1024
+        || limits.max_token_count_response_bytes > MAX_TOKEN_COUNT_RESPONSE_BYTES
         || limits.dns_timeout.is_zero()
         || limits.dns_timeout > Duration::from_secs(60)
         || limits.connect_timeout.is_zero()
@@ -415,6 +500,8 @@ fn validate_limits(limits: &RuntimeLimits) -> Result<()> {
         || limits.stream_idle_timeout > Duration::from_secs(10 * 60)
         || limits.overall_timeout.is_zero()
         || limits.overall_timeout > Duration::from_secs(30 * 60)
+        || limits.token_count_timeout.is_zero()
+        || limits.token_count_timeout > Duration::from_secs(5 * 60)
     {
         return Err(RuntimeError::new(
             RuntimeErrorKind::InvalidRequest,
@@ -423,6 +510,45 @@ fn validate_limits(limits: &RuntimeLimits) -> Result<()> {
         ));
     }
     Ok(())
+}
+
+fn validate_event_channel(events: &mpsc::Sender<ProviderStreamEvent>) -> Result<()> {
+    if events.max_capacity() == usize::MAX {
+        Err(RuntimeError::new(
+            RuntimeErrorKind::InvalidRequest,
+            "UNBOUNDED_EVENT_CHANNEL",
+            "provider runtime requires a bounded event channel",
+        ))
+    } else {
+        Ok(())
+    }
+}
+
+fn map_prompt_error(error: PromptError) -> RuntimeError {
+    match error {
+        PromptError::ExactTokenCount(error) => {
+            let kind = match error.kind() {
+                ExactTokenCountErrorKind::Unavailable => RuntimeErrorKind::InvalidRequest,
+                ExactTokenCountErrorKind::InvalidRequest => RuntimeErrorKind::InvalidRequest,
+                ExactTokenCountErrorKind::Transport => RuntimeErrorKind::Http,
+                ExactTokenCountErrorKind::HttpStatus => RuntimeErrorKind::HttpStatus,
+                ExactTokenCountErrorKind::InvalidResponse => RuntimeErrorKind::Provider,
+                ExactTokenCountErrorKind::Timeout => RuntimeErrorKind::Timeout,
+                ExactTokenCountErrorKind::Cancelled => RuntimeErrorKind::Cancelled,
+            };
+            let mut mapped = RuntimeError::new(kind, error.code(), error.message())
+                .retriable(error.is_retriable());
+            if let Some(status) = error.http_status() {
+                mapped = mapped.with_http_status(status);
+            }
+            mapped
+        }
+        error => RuntimeError::new(
+            RuntimeErrorKind::InvalidRequest,
+            "PROMPT_REQUEST_INVALID",
+            error.to_string(),
+        ),
+    }
 }
 
 #[cfg(test)]
@@ -453,6 +579,18 @@ mod tests {
             ..RuntimeLimits::default()
         };
         assert!(ProviderRuntime::with_limits(limits).is_err());
+
+        let limits = RuntimeLimits {
+            max_token_count_response_bytes: usize::MAX,
+            ..RuntimeLimits::default()
+        };
+        assert!(ProviderRuntime::with_limits(limits).is_err());
+
+        let limits = RuntimeLimits {
+            token_count_timeout: Duration::ZERO,
+            ..RuntimeLimits::default()
+        };
+        assert!(ProviderRuntime::with_limits(limits).is_err());
     }
 
     #[test]
@@ -465,6 +603,22 @@ mod tests {
             stable_http_error(ProviderId::GoogleVertexAi),
             ("GOOGLE_HTTP_ERROR", "provider returned an HTTP error")
         );
+    }
+
+    #[test]
+    fn token_count_http_metadata_survives_prompt_error_mapping() {
+        let error = map_prompt_error(PromptError::ExactTokenCount(
+            lorepia_prompt::ExactTokenCountError::new(
+                ExactTokenCountErrorKind::HttpStatus,
+                "EXACT_TOKEN_HTTP_ERROR",
+                "provider token counting returned HTTP 429",
+            )
+            .with_http_status(429)
+            .retriable(true),
+        ));
+        assert_eq!(error.kind(), RuntimeErrorKind::HttpStatus);
+        assert_eq!(error.http_status(), Some(429));
+        assert!(error.is_retriable());
     }
 
     #[tokio::test]
@@ -498,5 +652,62 @@ mod tests {
         .expect_err("idle stream must time out");
         assert_eq!(error.kind(), RuntimeErrorKind::Timeout);
         assert_eq!(error.code(), "STREAM_IDLE_TIMEOUT");
+    }
+
+    #[tokio::test]
+    async fn prompt_path_fails_closed_before_network_when_exact_count_is_unavailable() {
+        use std::collections::BTreeMap;
+
+        use lorepia_prompt::{
+            AdvancedSettings, ModelCapacity, PromptBlock, PromptCompileInput, PromptPreset,
+            PromptRole, PromptSampling, compile_prompt,
+        };
+        use lorepia_providers::{AnthropicOptions, GenerationOptions, ProviderOptions};
+
+        let prompt = compile_prompt(
+            &PromptPreset {
+                name: "test".to_owned(),
+                blocks: vec![PromptBlock::Raw {
+                    name: "user".to_owned(),
+                    enabled: true,
+                    role: PromptRole::User,
+                    special: None,
+                    prompt: "hello".to_owned(),
+                }],
+                sampling: PromptSampling::default(),
+                advanced: AdvancedSettings::default(),
+            },
+            &PromptCompileInput::default(),
+        )
+        .unwrap();
+        let model = ModelPresetSnapshot {
+            provider: ProviderId::Anthropic,
+            model_id: "claude-test".to_owned(),
+            capacity: ModelCapacity {
+                max_context_tokens: 4_096,
+                max_output_tokens: 512,
+            },
+            provider_options: ProviderOptions::Anthropic(AnthropicOptions::default()),
+            tokenizer_override: None,
+            additional_parameters: BTreeMap::new(),
+            generation: GenerationOptions::default(),
+        };
+        let credential =
+            ProviderCredential::for_official(ProviderId::Anthropic, "test-secret").unwrap();
+        let (events, _receiver) = mpsc::channel(1);
+
+        let error = ProviderRuntime::new()
+            .run_prompt_stream(
+                &prompt,
+                &model,
+                EndpointSelection::Official,
+                credential,
+                CancellationToken::new(),
+                events,
+            )
+            .await
+            .unwrap_err();
+        assert_eq!(error.code(), "EXACT_TOKEN_COUNT_IS_ESTIMATE");
+        assert_eq!(error.kind(), RuntimeErrorKind::InvalidRequest);
     }
 }

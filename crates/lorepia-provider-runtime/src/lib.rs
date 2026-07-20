@@ -8,6 +8,7 @@ mod error;
 mod event;
 mod framing;
 mod runner;
+mod token_count;
 
 pub use credential::{CredentialScope, ProviderCredential};
 pub use endpoint::{EndpointSelection, OverrideEndpoint};

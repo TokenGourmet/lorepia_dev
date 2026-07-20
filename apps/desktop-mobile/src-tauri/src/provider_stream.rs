@@ -514,7 +514,10 @@ async fn run_stream_bridge(
     let (event_tx, mut event_rx) = mpsc::channel(1);
     let runtime = ProviderRuntime::new();
     let cancellation = state.cancellation.clone();
-    let run = runtime.run_stream(
+    // This existing IPC is the classic raw-request path. Prompt-bound sessions
+    // stay disabled until native-owned preset IDs and binding state can route
+    // them exclusively through ProviderRuntime::run_prompt_stream.
+    let run = runtime.run_classic_stream(
         request,
         endpoint,
         credential,

@@ -1,0 +1,20 @@
+[package]
+name = "lorepia-prompt"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+authors.workspace = true
+repository.workspace = true
+description = "Pure prompt-preset validation and compilation for LorePia"
+
+[dependencies]
+lorepia-providers = { path = "../lorepia-providers" }
+regex = "=1.13.1"
+serde.workspace = true
+serde_json.workspace = true
+
+[lints.rust]
+unsafe_code = "forbid"
+
+[dev-dependencies]
+tokio = { version = "=1.53.0", features = ["macros", "rt"] }

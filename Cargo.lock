@@ -2202,11 +2202,45 @@ dependencies = [
 ]
 
 [[package]]
+name = "lorepia-memory"
+version = "0.1.0"
+dependencies = [
+ "lorepia-persona",
+ "lorepia-prompt",
+ "lorepia-providers",
+ "regex",
+ "serde",
+ "serde_json",
+ "sha2",
+]
+
+[[package]]
+name = "lorepia-persona"
+version = "0.1.0"
+dependencies = [
+ "lorepia-prompt",
+ "serde",
+ "serde_json",
+]
+
+[[package]]
+name = "lorepia-prompt"
+version = "0.1.0"
+dependencies = [
+ "lorepia-providers",
+ "regex",
+ "serde",
+ "serde_json",
+ "tokio",
+]
+
+[[package]]
 name = "lorepia-provider-runtime"
 version = "0.1.0"
 dependencies = [
  "bytes",
  "futures-util",
+ "lorepia-prompt",
  "lorepia-providers",
  "reqwest",
  "serde",

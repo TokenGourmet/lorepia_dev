@@ -10,6 +10,7 @@ description = "Headless, bounded native streaming runtime for LorePia LLM provid
 [dependencies]
 bytes = "=1.12.1"
 futures-util = "=0.3.33"
+lorepia-prompt = { path = "../lorepia-prompt" }
 lorepia-providers = { path = "../lorepia-providers" }
 reqwest = { version = "=0.13.4", default-features = false, features = ["http2", "json", "rustls", "stream"] }
 serde = { version = "=1.0.229", features = ["derive"] }

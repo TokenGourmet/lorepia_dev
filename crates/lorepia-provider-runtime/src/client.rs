@@ -41,23 +41,7 @@ pub(crate) fn build_http_request(
         ));
     }
 
-    let mut builder = reqwest::Client::builder()
-        .https_only(true)
-        .redirect(reqwest::redirect::Policy::none())
-        .no_proxy()
-        .referer(false)
-        .connect_timeout(connect_timeout)
-        .read_timeout(read_timeout)
-        .pool_max_idle_per_host(0)
-        .user_agent("LorePia/0.1");
-    builder = builder.resolve_to_addrs(&endpoint.host, &endpoint.pinned_addresses);
-    let client = builder.build().map_err(|_| {
-        RuntimeError::new(
-            RuntimeErrorKind::Http,
-            "HTTP_CLIENT_BUILD_FAILED",
-            "secure HTTP client could not be initialized",
-        )
-    })?;
+    let client = build_secure_client(endpoint, connect_timeout, read_timeout)?;
 
     let mut headers = HeaderMap::new();
     for (name, value) in compiled.static_headers() {
@@ -101,7 +85,31 @@ pub(crate) fn build_http_request(
     Ok(HttpRequestParts { client, request })
 }
 
-fn validate_credential_scope(
+pub(crate) fn build_secure_client(
+    endpoint: &ResolvedEndpoint,
+    connect_timeout: Duration,
+    read_timeout: Duration,
+) -> Result<Client> {
+    let mut builder = reqwest::Client::builder()
+        .https_only(true)
+        .redirect(reqwest::redirect::Policy::none())
+        .no_proxy()
+        .referer(false)
+        .connect_timeout(connect_timeout)
+        .read_timeout(read_timeout)
+        .pool_max_idle_per_host(0)
+        .user_agent("LorePia/0.1");
+    builder = builder.resolve_to_addrs(&endpoint.host, &endpoint.pinned_addresses);
+    builder.build().map_err(|_| {
+        RuntimeError::new(
+            RuntimeErrorKind::Http,
+            "HTTP_CLIENT_BUILD_FAILED",
+            "secure HTTP client could not be initialized",
+        )
+    })
+}
+
+pub(crate) fn validate_credential_scope(
     provider: ProviderId,
     endpoint: &ResolvedEndpoint,
     scope: &CredentialScope,
@@ -122,7 +130,11 @@ fn validate_credential_scope(
     }
 }
 
-fn attach_credential(headers: &mut HeaderMap, scheme: AuthScheme, secret: &str) -> Result<()> {
+pub(crate) fn attach_credential(
+    headers: &mut HeaderMap,
+    scheme: AuthScheme,
+    secret: &str,
+) -> Result<()> {
     let (name, mut value) = match scheme {
         AuthScheme::AuthorizationBearer | AuthScheme::GoogleOAuthBearer => {
             let bearer = Zeroizing::new(format!("Bearer {secret}"));
