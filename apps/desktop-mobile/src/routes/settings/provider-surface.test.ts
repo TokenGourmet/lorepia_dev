@@ -15,13 +15,17 @@ describe("provider settings surface", () => {
     expect(source).not.toContain("aria-pressed");
   });
 
-  it("does not collect credentials before the UI is wired to the native vault", () => {
-    expect(source).not.toMatch(/type=["']password["']/i);
+  // The pre-wiring "collect nothing" guard retired when this screen was wired
+  // to the native vault through $lib/providers/credentials. The remaining
+  // permanent contract: secrets flow only through that write-only module, are
+  // masked at entry, and never touch web storage or direct transports.
+  it("collects the key only through the write-only native vault path", () => {
+    expect(source).toContain('from "$lib/providers/credentials"');
+    expect(source).toMatch(/type="password"/);
+    expect(source).toContain('autocomplete="off"');
     expect(source).not.toMatch(/localStorage|sessionStorage|document\.cookie/i);
     expect(source).not.toMatch(/\bfetch\s*\(|\binvoke\s*\(/i);
-    expect(source).toMatch(
-      /API 키·토큰·서비스\s+계정 파일은 입력하거나 수집하지 않습니다/,
-    );
-    expect(source).toContain("<button class=\"connect\" type=\"button\" disabled>");
+    expect(source).toContain("keyDraft = \"\"");
+    expect(source).toMatch(/다시 읽어오는\s+경로 자체가 없습니다/);
   });
 });

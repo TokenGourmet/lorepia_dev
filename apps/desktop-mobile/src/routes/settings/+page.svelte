@@ -9,6 +9,12 @@
     type LlmProviderId,
     type LlmProviderDefinition,
   } from "$lib/providers/catalog";
+  import {
+    deleteProviderCredential,
+    publicCredentialErrorMessage,
+    requestCredentialStatus,
+    saveProviderApiKey,
+  } from "$lib/providers/credentials";
 
   const themeOptions: { value: ThemePreference; label: string }[] = [
     { value: "system", label: "시스템" },
@@ -31,6 +37,73 @@
     }
 
     return `${provider.target.serviceDomain} · 리전에 따라 지역 엔드포인트`;
+  }
+
+  const isApiKeyProvider = $derived(selectedProvider.authKind === "api-key");
+
+  let credentialConfigured = $state<boolean | null>(null);
+  let credentialBusy = $state(false);
+  let credentialError = $state<string | null>(null);
+  let keyDraft = $state("");
+
+  async function refreshCredentialStatus(
+    providerId: LlmProviderId,
+  ): Promise<void> {
+    try {
+      const status = await requestCredentialStatus(providerId);
+      if (providerId === selectedProviderId) {
+        credentialConfigured = status.configured;
+      }
+    } catch (error) {
+      if (providerId === selectedProviderId) {
+        credentialConfigured = null;
+        credentialError = publicCredentialErrorMessage(error);
+      }
+    }
+  }
+
+  $effect(() => {
+    const providerId = selectedProviderId;
+    keyDraft = "";
+    credentialError = null;
+    credentialConfigured = null;
+    if (getLlmProvider(providerId).authKind === "api-key") {
+      void refreshCredentialStatus(providerId);
+    }
+  });
+
+  async function saveKey(): Promise<void> {
+    const secret = keyDraft.trim();
+    if (!secret || credentialBusy) {
+      return;
+    }
+    credentialBusy = true;
+    credentialError = null;
+    try {
+      const status = await saveProviderApiKey(selectedProviderId, secret);
+      credentialConfigured = status.configured;
+      keyDraft = "";
+    } catch (error) {
+      credentialError = publicCredentialErrorMessage(error);
+    } finally {
+      credentialBusy = false;
+    }
+  }
+
+  async function removeKey(): Promise<void> {
+    if (credentialBusy) {
+      return;
+    }
+    credentialBusy = true;
+    credentialError = null;
+    try {
+      const status = await deleteProviderCredential(selectedProviderId);
+      credentialConfigured = status.configured;
+    } catch (error) {
+      credentialError = publicCredentialErrorMessage(error);
+    } finally {
+      credentialBusy = false;
+    }
   }
 </script>
 
@@ -91,7 +164,9 @@
     <h2>연결</h2>
     <div class="connection-heading">
       <span class="label">LLM 제공자</span>
-      <span class="status">연결 전</span>
+      <span class="status" class:configured={credentialConfigured === true}
+        >{credentialConfigured === true ? "키 저장됨" : "연결 전"}</span
+      >
     </div>
 
     <fieldset class="provider-picker">
@@ -151,20 +226,61 @@
             <small>{field.placeholder}</small>
           </div>
         {/each}
-        <div class="field-preview protected">
-          <span>{selectedProvider.authLabel}</span>
-          <small>설정 화면 연결 후 네이티브 보안 저장소에 입력 가능</small>
-        </div>
       </div>
 
-      <button class="connect" type="button" disabled>연결 UI 준비 중</button>
+      {#if isApiKeyProvider}
+        <div class="key-entry">
+          <label class="key-label" for="provider-key"
+            >{selectedProvider.authLabel}</label
+          >
+          <div class="key-line">
+            <input
+              id="provider-key"
+              type="password"
+              placeholder="입력 후 저장하면 기기 보안 저장소로만 이동"
+              autocomplete="off"
+              bind:value={keyDraft}
+              disabled={credentialBusy}
+            />
+            <button
+              class="save"
+              type="button"
+              onclick={saveKey}
+              disabled={credentialBusy || keyDraft.trim().length === 0}
+              >저장</button
+            >
+          </div>
+          <div class="key-status">
+            {#if credentialConfigured === true}
+              <span class="chip ok">저장됨 · 값은 다시 표시되지 않음</span>
+              <button
+                class="remove"
+                type="button"
+                onclick={removeKey}
+                disabled={credentialBusy}>키 삭제</button
+              >
+            {:else if credentialConfigured === false}
+              <span class="chip">저장된 키 없음</span>
+            {:else}
+              <span class="chip">상태 확인 중</span>
+            {/if}
+          </div>
+          {#if credentialError}
+            <p class="key-error" role="alert">{credentialError}</p>
+          {/if}
+        </div>
+      {:else}
+        <div class="field-preview protected">
+          <span>{selectedProvider.authLabel}</span>
+          <small>Google OAuth 흐름이 구현되기 전까지 연결할 수 없습니다</small>
+        </div>
+      {/if}
     </div>
 
     <p class="note security-note">
-      지금은 제공자만 미리 선택할 수 있고 저장되지는 않습니다. API 키·토큰·서비스
-      계정 파일은 입력하거나 수집하지 않습니다. 네이티브 OS 자격증명 저장소와
-      고정 호스트 통신 경계는 구현되어 있으며, 이 화면의 저장·연결 동작은 별도
-      배선 후 활성화됩니다.
+      키는 이 기기의 OS 자격증명 저장소에만 저장되며, 앱 화면으로 다시 읽어오는
+      경로 자체가 없습니다. 외부 요청은 선택한 제공자의 고정 호스트로만
+      나갑니다.
     </p>
   </section>
 
@@ -467,16 +583,119 @@
     border-style: dashed;
   }
 
-  .connect {
-    width: 100%;
-    min-height: var(--size-touch);
+  .key-entry {
     margin-top: var(--sp-3);
+    display: flex;
+    flex-direction: column;
+    gap: var(--sp-2);
+  }
+
+  .key-label {
+    font-size: var(--fs-caption);
+    font-weight: 500;
+    color: var(--text-mid);
+  }
+
+  .key-line {
+    display: flex;
+    gap: var(--sp-2);
+  }
+
+  .key-line input {
+    flex: 1;
+    min-width: 0;
+    min-height: var(--size-touch);
+    box-sizing: border-box;
+    padding: 0 var(--sp-3);
+    border: 0.5px solid var(--field-border);
+    border-radius: var(--r-block);
+    background: var(--surface-page);
+    color: var(--text-strong);
+    font-family: var(--font-ui);
+    font-size: 16px;
+    outline: none;
+    transition: border-color var(--dur-fast) var(--ease-out);
+  }
+
+  .key-line input::placeholder {
+    color: var(--text-faint);
+    font-size: var(--fs-label);
+  }
+
+  .key-line input:focus-visible {
+    border-color: var(--text-mid);
+  }
+
+  .key-line .save {
+    min-height: var(--size-touch);
+    padding: 0 var(--sp-4);
     border: none;
     border-radius: var(--r-pill);
-    background: var(--hairline);
-    color: var(--text-faint);
+    background: var(--invert-surface);
+    color: var(--invert-text);
     font-family: var(--font-ui);
     font-size: var(--fs-ui);
+    font-weight: 500;
+    cursor: pointer;
+    flex-shrink: 0;
+    transition: opacity var(--dur-fast) var(--ease-out);
+  }
+
+  .key-line .save:disabled {
+    opacity: 0.35;
+    cursor: default;
+  }
+
+  .key-status {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: var(--sp-3);
+  }
+
+  .chip {
+    display: inline-flex;
+    align-items: center;
+    min-height: 24px;
+    padding: 0 var(--sp-2);
+    border: 0.5px solid var(--hairline);
+    border-radius: var(--r-pill);
+    color: var(--text-mid);
+    font-size: var(--fs-caption);
+  }
+
+  .chip.ok {
+    border-color: var(--text-mid);
+    color: var(--text-strong);
+  }
+
+  .remove {
+    min-height: 32px;
+    padding: 0 var(--sp-2);
+    border: none;
+    background: transparent;
+    color: var(--text-mid);
+    font-family: var(--font-ui);
+    font-size: var(--fs-label);
+    text-decoration: underline;
+    cursor: pointer;
+  }
+
+  .remove:disabled {
+    opacity: 0.5;
+    cursor: default;
+  }
+
+  .key-error {
+    margin: 0;
+    font-size: var(--fs-label);
+    line-height: 1.5;
+    color: var(--text-strong);
+  }
+
+  .status.configured {
+    border-color: var(--text-mid);
+    color: var(--text-strong);
   }
 
   .security-note {
