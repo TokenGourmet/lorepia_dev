@@ -2,8 +2,9 @@
 
 This record defines the product-owned LLM provider catalog and its UI-independent
 request-compilation contract. Five API-key providers can be authenticated and
-called through the native runtime, but the settings UI is not wired to it yet.
-Vertex remains blocked until the native Google OAuth flow is implemented.
+called through the native runtime. The settings and first-chat path are wired
+for those five providers. Vertex remains blocked until the native Google OAuth
+flow is implemented.
 
 ## Included providers
 
@@ -77,7 +78,8 @@ endpoint-override field.
 
 ## Current product boundary
 
-The settings screen can select and inspect one of the six catalog entries. The
+The settings screen can select one of the six catalog entries, save an API key
+through the write-only native vault, and manually enter a model ID. The
 selection is volatile and is not persisted. Its profile draft contains only:
 
 - provider ID and model ID for API-key providers;
@@ -97,10 +99,21 @@ typed request, loads the provider key without returning it to the WebView, and
 normalizes the five wire protocols described in
 [`provider-runtime.md`](provider-runtime.md).
 
-The settings screen remains deliberately unwired: it renders no password field
-or enabled connection action. There is still no provider profile database or
-model-list cache. Vertex compilation does not imply a working Vertex login;
-the stream command rejects it until a native OAuth flow exists.
+The first-chat path activates only after native credential status is positive
+and a bounded model ID is present. The WebView sends only that non-secret
+profile and the current user message. The narrow native command constructs the
+fixed system message, provider defaults, official endpoint, and 512-token output
+limit; callers cannot submit a raw provider request or endpoint. It does not
+bind prompt presets, personas, memory, tools, endpoint overrides, tokenizer
+overrides, or additional parameters. Channel deltas are applied and then
+acknowledged in sequence. Terminal results are published only after their ACK
+and authenticated snapshot agree, and a bounded snapshot poll recovers a lost
+terminal callback. The native control token remains inside the stream adapter.
+
+There is still no provider profile database or model-list cache, so a restart
+requires selecting the profile again. Vertex compilation does not imply a
+working Vertex login; the stream command rejects it until a native OAuth flow
+exists.
 
 ## Implemented connection gates and remaining evidence
 
@@ -140,8 +153,16 @@ Gemini/Vertex split, the Ollama Cloud HTTPS target, the absence of custom
 endpoints and hard-coded models, and the non-secret draft shape.
 
 `src/routes/settings/provider-surface.test.ts` fixes the settings surface's
-catalog use and proves that it adds no password field, browser persistence,
-`fetch`, Tauri invocation, or enabled connection action.
+catalog use and proves that secrets flow only through the write-only native
+vault, never browser persistence or `fetch`.
+
+`src/lib/providers/first-chat-request.test.ts` fixes the five-provider narrow
+command shape and absence of raw prompt/transport controls. Native
+`provider_stream` tests fix the actual system message and request defaults.
+`stream.test.ts` covers events arriving before start resolves,
+apply-before-ACK ordering, monotonically serialized ACKs, exact cancellation
+ownership, forged identity rejection, fixed public errors, lost-terminal
+recovery, and terminal snapshot cleanup.
 
 `crates/lorepia-providers` unit tests fix all six official targets and request
 envelopes, role merging, provider-option mismatches, JSON-format differences,

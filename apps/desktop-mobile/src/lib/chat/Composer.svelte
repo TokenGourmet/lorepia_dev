@@ -1,21 +1,27 @@
 <script lang="ts">
   let {
     onSend,
+    onCancel,
+    busy = false,
     disabled = false,
+    maxLength,
     placeholder = "메시지 보내기",
   }: {
     onSend: (text: string) => void;
+    onCancel?: () => void;
+    busy?: boolean;
     disabled?: boolean;
+    maxLength?: number;
     placeholder?: string;
   } = $props();
 
   let draft = $state("");
 
-  const canSend = $derived(!disabled && draft.trim().length > 0);
+  const canSend = $derived(!disabled && !busy && draft.trim().length > 0);
 
   function submit(): void {
     const text = draft.trim();
-    if (!text || disabled) {
+    if (!text || disabled || busy) {
       return;
     }
     onSend(text);
@@ -28,6 +34,14 @@
       submit();
     }
   }
+
+  function activate(): void {
+    if (busy) {
+      onCancel?.();
+      return;
+    }
+    submit();
+  }
 </script>
 
 <div class="composer">
@@ -35,31 +49,39 @@
     rows="1"
     {placeholder}
     enterkeyhint="send"
+    maxlength={maxLength}
     bind:value={draft}
     onkeydown={handleKeydown}
-    {disabled}
+    disabled={disabled || busy}
   ></textarea>
   <button
     type="button"
     class="send"
-    onclick={submit}
-    disabled={!canSend}
-    aria-label="보내기"
+    class:stop={busy}
+    onclick={activate}
+    disabled={busy ? onCancel === undefined : !canSend}
+    aria-label={busy ? "응답 중지" : "보내기"}
   >
-    <svg
-      viewBox="0 0 24 24"
-      width="20"
-      height="20"
-      fill="none"
-      stroke="currentColor"
-      stroke-width="2"
-      stroke-linecap="round"
-      stroke-linejoin="round"
-      aria-hidden="true"
-    >
-      <path d="M12 19V5" />
-      <path d="m5 12 7-7 7 7" />
-    </svg>
+    {#if busy}
+      <svg viewBox="0 0 24 24" width="20" height="20" aria-hidden="true">
+        <rect x="7" y="7" width="10" height="10" rx="1" fill="currentColor" />
+      </svg>
+    {:else}
+      <svg
+        viewBox="0 0 24 24"
+        width="20"
+        height="20"
+        fill="none"
+        stroke="currentColor"
+        stroke-width="2"
+        stroke-linecap="round"
+        stroke-linejoin="round"
+        aria-hidden="true"
+      >
+        <path d="M12 19V5" />
+        <path d="m5 12 7-7 7 7" />
+      </svg>
+    {/if}
   </button>
 </div>
 
@@ -124,5 +146,10 @@
 
   .send:not(:disabled):active {
     transform: scale(0.94);
+  }
+
+  .send.stop {
+    background: var(--surface-bubble);
+    color: var(--text-strong);
   }
 </style>

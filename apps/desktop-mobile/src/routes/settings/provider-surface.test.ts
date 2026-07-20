@@ -28,4 +28,13 @@ describe("provider settings surface", () => {
     expect(source).toContain("keyDraft = \"\"");
     expect(source).toMatch(/다시 읽어오는\s+경로 자체가 없습니다/);
   });
+
+  it("activates a volatile non-secret provider and model profile", () => {
+    expect(source).toContain(
+      'from "$lib/providers/active-profile.svelte"',
+    );
+    expect(source).toContain('id="provider-model-id"');
+    expect(source).toContain("activeProviderProfile.setModelId");
+    expect(source).not.toMatch(/defaultModel|localStorage|sessionStorage/i);
+  });
 });

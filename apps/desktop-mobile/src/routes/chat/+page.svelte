@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { onMount } from "svelte";
+  import { onDestroy, onMount } from "svelte";
   import { goto } from "$app/navigation";
 
   import "$lib/design/tokens.css";
@@ -8,6 +8,12 @@
   import MessageThread from "$lib/chat/MessageThread.svelte";
   import type { ChatMessage, ThreadMode } from "$lib/chat/types";
   import { keyboardInset } from "$lib/design/keyboard-inset.svelte";
+  import { activeProviderProfile } from "$lib/providers/active-profile.svelte";
+  import {
+    startFirstChatStream,
+    type FirstChatStreamHandle,
+  } from "$lib/providers/stream";
+  import { FIRST_CHAT_MAX_INPUT_BYTES } from "$lib/providers/first-chat-request";
   import Avatar from "$lib/ui/Avatar.svelte";
   import { horizontalSwipe, type SwipeCommit } from "$lib/ui/horizontal-swipe";
 
@@ -22,6 +28,8 @@
   let panelShift = $state(0);
   let backDrag = $state(0);
   let dragging = $state(false);
+  let activeStream = $state<FirstChatStreamHandle | null>(null);
+  let disposed = false;
 
   let messages = $state<ChatMessage[]>([
     {
@@ -109,19 +117,107 @@
     backDrag = 0;
   }
 
+  function replaceMessage(
+    id: string,
+    update: (message: ChatMessage) => ChatMessage,
+  ): void {
+    if (disposed) return;
+    messages = messages.map((message) =>
+      message.id === id ? update(message) : message,
+    );
+  }
+
   function handleSend(text: string): void {
+    const profile = activeProviderProfile.current;
+    if (activeStream !== null || profile === null) {
+      return;
+    }
+
+    const nonce = `${Date.now()}-${crypto.randomUUID()}`;
+    const assistantId = `assistant-${nonce}`;
     messages = [
       ...messages,
       {
-        id: `m${messages.length + 1}-${Date.now()}`,
+        id: `user-${nonce}`,
         role: "user",
         text,
         sentAt: new Date(),
       },
+      {
+        id: assistantId,
+        role: "character",
+        text: "",
+        sentAt: new Date(),
+        streaming: true,
+      },
     ];
+
+    let failureShown = false;
+    try {
+      const handle = startFirstChatStream(profile, text, {
+        onDelta(delta) {
+          replaceMessage(assistantId, (message) => ({
+            ...message,
+            text: `${message.text}${delta}`,
+          }));
+        },
+        onError(message) {
+          failureShown = true;
+          replaceMessage(assistantId, (current) => ({
+            ...current,
+            text:
+              current.text.length === 0
+                ? message
+                : `${current.text}\n\n${message}`,
+          }));
+        },
+        onTerminal(terminal) {
+          replaceMessage(assistantId, (message) => ({
+            ...message,
+            text:
+              message.text.length > 0
+                ? message.text
+                : terminal === "cancelled"
+                  ? "응답을 중지했습니다."
+                  : terminal === "completed"
+                    ? "제공자가 빈 응답을 반환했습니다."
+                    : failureShown
+                      ? message.text
+                      : "응답을 완료하지 못했습니다.",
+            streaming: false,
+          }));
+        },
+      });
+      activeStream = handle;
+      void handle.done.then(() => {
+        if (activeStream === handle) {
+          activeStream = null;
+        }
+      });
+    } catch {
+      replaceMessage(assistantId, (message) => ({
+        ...message,
+        text: "메시지를 전송할 수 없습니다. 입력 내용을 확인해 주세요.",
+        streaming: false,
+      }));
+    }
+  }
+
+  function handleCancel(): void {
+    const handle = activeStream;
+    if (handle !== null) {
+      void handle.cancel().catch(() => undefined);
+    }
   }
 
   onMount(() => keyboardInset.start());
+  onDestroy(() => {
+    disposed = true;
+    const handle = activeStream;
+    if (handle !== null) {
+      void handle.cancel().catch(() => undefined);
+    }
+  });
 
   $effect(() => {
     void messages.length;
@@ -176,7 +272,16 @@
   </div>
 
   <div class="composer-slot" style:padding-bottom={`${keyboardInset.value}px`}>
-    <Composer onSend={handleSend} />
+    <Composer
+      onSend={handleSend}
+      onCancel={handleCancel}
+      busy={activeStream !== null}
+      disabled={activeProviderProfile.current === null}
+      maxLength={FIRST_CHAT_MAX_INPUT_BYTES}
+      placeholder={activeProviderProfile.current === null
+        ? "설정에서 API 키와 모델을 준비하세요"
+        : "메시지 보내기"}
+    />
   </div>
 
   <button

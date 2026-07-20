@@ -36,6 +36,13 @@ ACK, cancellation, and snapshot requests require both. This binds control
 messages to the caller that started the request instead of treating a guessed
 request ID as authority.
 
+For the first-chat slice, start accepts only a provider/model profile, one user
+message, and the event channel. Native code constructs the fixed system prompt,
+provider-default options, 512-token output cap, and official endpoint. The
+WebView cannot pass a raw `ProviderRequest` or endpoint selection through this
+product command. Prompt-preset sessions remain closed until native-owned preset
+IDs and bindings can use the exact-token prompt runtime.
+
 ## Native transport
 
 `lorepia-provider-runtime` accepts a typed `ProviderRequest`, compiles it
@@ -61,6 +68,9 @@ reading the response body and propagates backpressure toward the socket.
 An override is an exact compatible HTTPS endpoint URL, not a generation
 parameter and not a replacement for provider wire-format validation. Selecting
 one explicitly scopes the credential to its exact DNS host.
+
+This remains a runtime-library contract and is not exposed by the first-chat
+product command, which always selects the official endpoint.
 
 The runtime rejects HTTP, userinfo, fragments, non-443 ports, IP literals,
 localhost and local-name suffixes, and query keys that look like embedded
@@ -120,4 +130,6 @@ Current local verification covers Rust unit/contract tests, Clippy, the macOS
 host build, and an `aarch64-linux-android` Rust compile. No live provider request
 was made because no user credential was supplied. No physical Android/iOS,
 packaged Windows/Linux, signed iOS Keychain, or real MCP runtime pass is claimed.
-The provider settings UI is intentionally not wired in this slice.
+The five API-key settings and first-chat surfaces are now wired to this runtime,
+but that source-level connection is not live-provider or physical-device
+evidence. Vertex OAuth remains unavailable.

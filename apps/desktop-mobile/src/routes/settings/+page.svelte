@@ -15,6 +15,10 @@
     requestCredentialStatus,
     saveProviderApiKey,
   } from "$lib/providers/credentials";
+  import {
+    MAX_MODEL_ID_BYTES,
+    activeProviderProfile,
+  } from "$lib/providers/active-profile.svelte";
 
   const themeOptions: { value: ThemePreference; label: string }[] = [
     { value: "system", label: "시스템" },
@@ -28,7 +32,7 @@
   ];
 
   let defaultMode = $state<ThreadMode>("chat");
-  let selectedProviderId = $state<LlmProviderId>("openai");
+  let selectedProviderId = $derived(activeProviderProfile.selectedProviderId);
   let selectedProvider = $derived(getLlmProvider(selectedProviderId));
 
   function targetLabel(provider: LlmProviderDefinition): string {
@@ -40,8 +44,15 @@
   }
 
   const isApiKeyProvider = $derived(selectedProvider.authKind === "api-key");
+  const credentialConfigured = $derived(
+    activeProviderProfile.credentialConfigured,
+  );
+  const modelId = $derived(activeProviderProfile.modelId);
+  const modelError = $derived(activeProviderProfile.modelError);
+  const selectedProfileReady = $derived(
+    activeProviderProfile.current?.providerId === selectedProviderId,
+  );
 
-  let credentialConfigured = $state<boolean | null>(null);
   let credentialBusy = $state(false);
   let credentialError = $state<string | null>(null);
   let keyDraft = $state("");
@@ -49,14 +60,23 @@
   async function refreshCredentialStatus(
     providerId: LlmProviderId,
   ): Promise<void> {
+    const epoch = activeProviderProfile.beginCredentialOperation(providerId);
     try {
       const status = await requestCredentialStatus(providerId);
-      if (providerId === selectedProviderId) {
-        credentialConfigured = status.configured;
+      if (
+        activeProviderProfile.isCredentialOperationCurrent(providerId, epoch)
+      ) {
+        activeProviderProfile.setCredentialConfigured(
+          providerId,
+          status.configured,
+        );
       }
     } catch (error) {
-      if (providerId === selectedProviderId) {
-        credentialConfigured = null;
+      if (
+        activeProviderProfile.isCredentialOperationCurrent(providerId, epoch) &&
+        providerId === selectedProviderId
+      ) {
+        activeProviderProfile.setCredentialConfigured(providerId, null);
         credentialError = publicCredentialErrorMessage(error);
       }
     }
@@ -66,9 +86,11 @@
     const providerId = selectedProviderId;
     keyDraft = "";
     credentialError = null;
-    credentialConfigured = null;
+    activeProviderProfile.setCredentialConfigured(providerId, null);
     if (getLlmProvider(providerId).authKind === "api-key") {
       void refreshCredentialStatus(providerId);
+    } else {
+      activeProviderProfile.setCredentialConfigured(providerId, false);
     }
   });
 
@@ -79,12 +101,22 @@
     }
     credentialBusy = true;
     credentialError = null;
+    const providerId = selectedProviderId;
+    activeProviderProfile.beginCredentialOperation(providerId);
     try {
-      const status = await saveProviderApiKey(selectedProviderId, secret);
-      credentialConfigured = status.configured;
+      const status = await saveProviderApiKey(providerId, secret);
+      activeProviderProfile.beginCredentialOperation(providerId);
+      activeProviderProfile.setCredentialConfigured(
+        providerId,
+        status.configured,
+      );
       keyDraft = "";
     } catch (error) {
-      credentialError = publicCredentialErrorMessage(error);
+      activeProviderProfile.beginCredentialOperation(providerId);
+      if (providerId === selectedProviderId) {
+        credentialError = publicCredentialErrorMessage(error);
+      }
+      void refreshCredentialStatus(providerId);
     } finally {
       credentialBusy = false;
     }
@@ -96,11 +128,21 @@
     }
     credentialBusy = true;
     credentialError = null;
+    const providerId = selectedProviderId;
+    activeProviderProfile.beginCredentialOperation(providerId);
     try {
-      const status = await deleteProviderCredential(selectedProviderId);
-      credentialConfigured = status.configured;
+      const status = await deleteProviderCredential(providerId);
+      activeProviderProfile.beginCredentialOperation(providerId);
+      activeProviderProfile.setCredentialConfigured(
+        providerId,
+        status.configured,
+      );
     } catch (error) {
-      credentialError = publicCredentialErrorMessage(error);
+      activeProviderProfile.beginCredentialOperation(providerId);
+      if (providerId === selectedProviderId) {
+        credentialError = publicCredentialErrorMessage(error);
+      }
+      void refreshCredentialStatus(providerId);
     } finally {
       credentialBusy = false;
     }
@@ -164,8 +206,12 @@
     <h2>연결</h2>
     <div class="connection-heading">
       <span class="label">LLM 제공자</span>
-      <span class="status" class:configured={credentialConfigured === true}
-        >{credentialConfigured === true ? "키 저장됨" : "연결 전"}</span
+      <span class="status" class:configured={selectedProfileReady}
+        >{selectedProfileReady
+          ? "사용 준비됨"
+          : credentialConfigured === true
+            ? "모델 선택 필요"
+            : "연결 전"}</span
       >
     </div>
 
@@ -179,7 +225,8 @@
               name="llm-provider"
               value={provider.id}
               checked={selectedProviderId === provider.id}
-              onchange={() => (selectedProviderId = provider.id)}
+              disabled={credentialBusy}
+              onchange={() => activeProviderProfile.select(provider.id)}
             />
             <span>{provider.label}</span>
             {#if provider.id === "ollama-cloud"}
@@ -200,7 +247,7 @@
           <strong>{selectedProvider.label}</strong>
           <p>{selectedProvider.description}</p>
         </div>
-        <span class="candidate">구성 후보</span>
+        <span class="candidate">{selectedProfileReady ? "첫 대화 연결" : "구성 중"}</span>
       </div>
 
       <dl>
@@ -214,17 +261,40 @@
         </div>
         <div>
           <dt>모델</dt>
-          <dd>연결 후 목록 조회 · 수동 ID 입력 지원 예정</dd>
+          <dd>{modelId.trim() || "공식 모델 ID를 직접 입력"}</dd>
         </div>
       </dl>
 
       <div class="required-settings">
         <h3>필요한 설정</h3>
         {#each selectedProvider.setupFields as field (field.id)}
-          <div class="field-preview">
-            <span>{field.label}</span>
-            <small>{field.placeholder}</small>
-          </div>
+          {#if field.id === "modelId" && isApiKeyProvider}
+            <label class="setting-input" for="provider-model-id">
+              <span>{field.label}</span>
+              <input
+                id="provider-model-id"
+                type="text"
+                value={modelId}
+                placeholder="제공자의 공식 모델 ID"
+                autocomplete="off"
+                spellcheck="false"
+                maxlength={MAX_MODEL_ID_BYTES}
+                aria-invalid={modelId.length > 0 && modelError !== null}
+                oninput={(event) =>
+                  activeProviderProfile.setModelId(event.currentTarget.value)}
+              />
+              <small class:error={modelId.length > 0 && modelError !== null}
+                >{modelId.length > 0 && modelError !== null
+                  ? modelError
+                  : "키는 포함하지 말고 모델 식별자만 입력하세요."}</small
+              >
+            </label>
+          {:else}
+            <div class="field-preview">
+              <span>{field.label}</span>
+              <small>{field.placeholder}</small>
+            </div>
+          {/if}
         {/each}
       </div>
 
@@ -555,7 +625,8 @@
     font-weight: 500;
   }
 
-  .field-preview {
+  .field-preview,
+  .setting-input {
     min-height: var(--size-touch);
     display: flex;
     flex-direction: column;
@@ -570,13 +641,38 @@
     font-size: var(--fs-label);
   }
 
-  .field-preview + .field-preview {
+  .field-preview + .field-preview,
+  .setting-input + .field-preview,
+  .field-preview + .setting-input {
     margin-top: var(--sp-2);
   }
 
-  .field-preview small {
+  .field-preview small,
+  .setting-input small {
     color: var(--text-faint);
     font-size: var(--fs-caption);
+  }
+
+  .setting-input input {
+    min-height: 36px;
+    margin: var(--sp-1) 0;
+    box-sizing: border-box;
+    padding: 0 var(--sp-2);
+    border: 0.5px solid var(--field-border);
+    border-radius: var(--r-block);
+    background: var(--surface-field);
+    color: var(--text-strong);
+    font-family: var(--font-ui);
+    font-size: 16px;
+    outline: none;
+  }
+
+  .setting-input input:focus-visible {
+    border-color: var(--text-mid);
+  }
+
+  .setting-input small.error {
+    color: var(--danger, #a33);
   }
 
   .field-preview.protected {

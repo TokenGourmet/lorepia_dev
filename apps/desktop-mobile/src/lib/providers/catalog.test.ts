@@ -56,7 +56,11 @@ describe("LLM provider catalog", () => {
 
   it("does not ship a mutable custom endpoint or a hard-coded model choice", () => {
     for (const provider of LLM_PROVIDER_CATALOG) {
-      expect(provider.status).toBe("configuration-only");
+      expect(provider.status).toBe(
+        provider.id === "google-vertex-ai"
+          ? "configuration-only"
+          : "first-chat-ready",
+      );
       expect(provider.setupFields[0]?.id).toBe("modelId");
       expect(provider.setupFields[0]?.placeholder).toContain("연결 후");
       expect(JSON.stringify(provider)).not.toMatch(/defaultModel|customEndpoint/i);

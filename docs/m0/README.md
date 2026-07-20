@@ -37,8 +37,11 @@ The product-owned [LLM provider catalog](llm-provider-catalog.md) records six
 providers and a UI-independent request compiler. Five API-key providers now
 connect through the native vault and bounded stream runtime. Vertex request
 compilation exists, but invocation remains fail-closed until the native Google
-OAuth flow is implemented. The existing settings UI is not wired to these
-commands in this slice.
+OAuth flow is implemented. The settings screen now writes API keys directly to
+the native vault, keeps only a volatile provider/model profile in the WebView,
+and the chat screen consumes the authenticated stream with ordered ACK,
+cancellation, fixed public errors, terminal snapshot recovery/cleanup, and a
+native-owned fixed first-chat prompt.
 
 This bootstrap contract is an internal startup seam. It does not freeze the
 blocked public plugin API or any M-1 spike contract.

@@ -1,5 +1,5 @@
 use std::{
-    collections::HashMap,
+    collections::{BTreeMap, HashMap},
     sync::{Arc, Mutex},
     time::Duration,
 };
@@ -9,8 +9,12 @@ use lorepia_provider_runtime::{
     CompletionReason, EndpointSelection, ProviderCredential, ProviderRunOutcome, ProviderRuntime,
     ProviderStreamEvent as RuntimeStreamEvent, RuntimeError, TokenUsage,
 };
-use lorepia_providers::{ProviderId, ProviderRequest};
-use serde::Serialize;
+use lorepia_providers::{
+    AnthropicOptions, ChatMessage, DeepSeekOptions, GenerationOptions, GoogleOptions, MessageRole,
+    OllamaCloudOptions, OpenAiOptions, ProviderId, ProviderOptions, ProviderRequest,
+    compile_request,
+};
+use serde::{Deserialize, Serialize};
 use subtle::ConstantTimeEq;
 use tauri::{State, ipc::Channel};
 use tokio::sync::{Mutex as AsyncMutex, Notify, mpsc};
@@ -28,6 +32,9 @@ const TERMINAL_RETENTION: Duration = Duration::from_secs(5 * 60);
 const DIRECT_CHANNEL_BUDGET_BYTES: usize = 4_096;
 const MAX_DELTA_FRAGMENT_BYTES: usize = 512;
 const MAX_PROVIDER_RESPONSE_ID_BYTES: usize = 256;
+const FIRST_CHAT_MAX_INPUT_BYTES: usize = 64 * 1024;
+const FIRST_CHAT_MAX_OUTPUT_TOKENS: u32 = 512;
+const FIRST_CHAT_SYSTEM_PROMPT: &str = "You are Seraphine, the librarian of a moonlit archive. Stay in character, answer the user's latest message naturally in the user's language, and never claim access to tools, memories, or facts that are not included in this request.";
 
 #[derive(Clone, Debug, Serialize)]
 #[serde(rename_all = "camelCase")]
@@ -303,6 +310,13 @@ pub(crate) struct StartProviderStreamResponse {
     control_token: String,
 }
 
+#[derive(Debug, Deserialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+pub(crate) struct FirstChatProfile {
+    provider_id: ProviderId,
+    model_id: String,
+}
+
 #[derive(Debug, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub(crate) struct AckProviderStreamResponse {
@@ -331,12 +345,14 @@ pub(crate) struct ProviderStreamSnapshot {
 
 #[tauri::command]
 pub(crate) async fn start_provider_stream(
-    request: ProviderRequest,
-    endpoint: EndpointSelection,
+    profile: FirstChatProfile,
+    user_message: String,
     on_event: Channel<ProviderChannelEvent>,
     vault: State<'_, CredentialVaultState>,
     registry: State<'_, ProviderStreamRegistry>,
 ) -> Result<StartProviderStreamResponse, ProviderCommandError> {
+    let request = build_first_chat_request(profile, user_message)?;
+    let endpoint = EndpointSelection::Official;
     let credential = load_provider_credential(&request, &endpoint, vault.vault()).await?;
     let (request_id, state) = registry.insert_new()?;
     let started = ProviderChannelEvent::Started {
@@ -368,6 +384,62 @@ pub(crate) async fn start_provider_stream(
         request_id,
         control_token,
     })
+}
+
+fn build_first_chat_request(
+    profile: FirstChatProfile,
+    user_message: String,
+) -> Result<ProviderRequest, ProviderCommandError> {
+    let model_id = profile.model_id.trim().to_owned();
+    if model_id != profile.model_id {
+        return Err(ProviderCommandError::new(
+            "FIRST_CHAT_PROFILE_INVALID",
+            "model identifier must use its canonical form",
+        ));
+    }
+    let content = user_message.trim().to_owned();
+    if content.is_empty() || content.len() > FIRST_CHAT_MAX_INPUT_BYTES || content.contains('\0') {
+        return Err(ProviderCommandError::new(
+            "FIRST_CHAT_MESSAGE_INVALID",
+            "first chat message is empty or exceeds the product limit",
+        ));
+    }
+
+    let provider_options = match profile.provider_id {
+        ProviderId::OpenAi => ProviderOptions::OpenAi(OpenAiOptions::default()),
+        ProviderId::Anthropic => ProviderOptions::Anthropic(AnthropicOptions::default()),
+        ProviderId::DeepSeek => ProviderOptions::DeepSeek(DeepSeekOptions::default()),
+        ProviderId::OllamaCloud => ProviderOptions::OllamaCloud(OllamaCloudOptions::default()),
+        ProviderId::GoogleGemini => ProviderOptions::GoogleGemini(GoogleOptions::default()),
+        ProviderId::GoogleVertexAi => {
+            return Err(ProviderCommandError::new(
+                "VERTEX_OAUTH_NOT_CONFIGURED",
+                "Vertex AI requires a native OAuth access-token flow",
+            ));
+        }
+    };
+    let request = ProviderRequest {
+        provider: profile.provider_id,
+        model_id,
+        messages: vec![
+            ChatMessage::new(MessageRole::System, FIRST_CHAT_SYSTEM_PROMPT),
+            ChatMessage::new(MessageRole::User, content),
+        ],
+        generation: GenerationOptions {
+            max_output_tokens: Some(FIRST_CHAT_MAX_OUTPUT_TOKENS),
+            ..GenerationOptions::default()
+        },
+        provider_options,
+        tokenizer_override: None,
+        additional_parameters: BTreeMap::new(),
+    };
+    compile_request(&request).map_err(|_| {
+        ProviderCommandError::new(
+            "FIRST_CHAT_PROFILE_INVALID",
+            "provider or model selection is invalid",
+        )
+    })?;
+    Ok(request)
 }
 
 #[tauri::command]
@@ -514,9 +586,10 @@ async fn run_stream_bridge(
     let (event_tx, mut event_rx) = mpsc::channel(1);
     let runtime = ProviderRuntime::new();
     let cancellation = state.cancellation.clone();
-    // This existing IPC is the classic raw-request path. Prompt-bound sessions
-    // stay disabled until native-owned preset IDs and binding state can route
-    // them exclusively through ProviderRuntime::run_prompt_stream.
+    // This narrow command builds the first-chat request natively. It uses the
+    // classic compiler only because no prompt preset is bound in this slice.
+    // Preset-bound sessions remain disabled until native-owned preset IDs and
+    // binding state can route them through ProviderRuntime::run_prompt_stream.
     let run = runtime.run_classic_stream(
         request,
         endpoint,
@@ -912,5 +985,58 @@ mod tests {
             }),
         };
         ensure_direct_serializable(&snapshot).unwrap();
+    }
+
+    #[test]
+    fn first_chat_request_is_native_owned_and_minimal() {
+        let request = build_first_chat_request(
+            FirstChatProfile {
+                provider_id: ProviderId::Anthropic,
+                model_id: "claude-test".to_owned(),
+            },
+            "  안녕하세요  ".to_owned(),
+        )
+        .unwrap();
+
+        assert_eq!(request.provider, ProviderId::Anthropic);
+        assert_eq!(request.model_id, "claude-test");
+        assert_eq!(request.messages.len(), 2);
+        assert_eq!(request.messages[0].role, MessageRole::System);
+        assert_eq!(request.messages[0].content, FIRST_CHAT_SYSTEM_PROMPT);
+        assert_eq!(
+            request.messages[1],
+            ChatMessage::new(MessageRole::User, "안녕하세요")
+        );
+        assert_eq!(
+            request.generation.max_output_tokens,
+            Some(FIRST_CHAT_MAX_OUTPUT_TOKENS)
+        );
+        assert!(request.additional_parameters.is_empty());
+        assert!(request.tokenizer_override.is_none());
+    }
+
+    #[test]
+    fn first_chat_rejects_vertex_invalid_models_and_unbounded_messages() {
+        let build = |provider_id, model_id: &str, message: String| {
+            build_first_chat_request(
+                FirstChatProfile {
+                    provider_id,
+                    model_id: model_id.to_owned(),
+                },
+                message,
+            )
+        };
+
+        assert!(build(ProviderId::GoogleVertexAi, "model", "hello".into()).is_err());
+        assert!(build(ProviderId::GoogleGemini, "models/escape", "hello".into()).is_err());
+        assert!(build(ProviderId::OpenAi, "bad\nmodel", "hello".into()).is_err());
+        assert!(
+            build(
+                ProviderId::OpenAi,
+                "model",
+                "a".repeat(FIRST_CHAT_MAX_INPUT_BYTES + 1),
+            )
+            .is_err()
+        );
     }
 }

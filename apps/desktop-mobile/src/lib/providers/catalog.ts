@@ -38,7 +38,7 @@ export interface LlmProviderDefinition {
   readonly target: FixedProviderTarget | VertexProviderTarget;
   readonly setupFields: readonly ProviderSetupField[];
   readonly documentationUrl: `https://${string}`;
-  readonly status: "configuration-only";
+  readonly status: "first-chat-ready" | "configuration-only";
 }
 
 const modelField = Object.freeze({
@@ -72,7 +72,7 @@ function fixedProvider(
   const { origin, ...rest } = definition;
   return Object.freeze({
     ...rest,
-    status: "configuration-only",
+    status: "first-chat-ready",
     target: Object.freeze({ kind: "fixed-origin", origin }),
     setupFields: Object.freeze([modelField]),
   });
@@ -141,7 +141,7 @@ export const LLM_PROVIDER_CATALOG = Object.freeze([
   } satisfies LlmProviderDefinition),
 ] as const satisfies readonly LlmProviderDefinition[]);
 
-type ApiKeyProviderId = Exclude<LlmProviderId, "google-vertex-ai">;
+export type ApiKeyProviderId = Exclude<LlmProviderId, "google-vertex-ai">;
 
 export type ProviderProfileDraft =
   | Readonly<{
