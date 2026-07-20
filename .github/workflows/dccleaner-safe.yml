@@ -60,7 +60,7 @@ jobs:
           mkdir -p dist
           cp app/build/outputs/apk/debug/app-debug.apk dist/DC-Cleaner-Safe-0.1.0-debug.apk
           cp README.md AUDIT.md LICENSE dist/
-          for report in permissions.txt apk-badging.txt manifest-tree.txt signature.txt dependencies.txt security-check.log app-debug.apk.sha256; do
+          for report in permissions.txt apk-badging.txt manifest-tree.txt signature.txt dependencies.txt security-check.log app-debug.apk.sha256 dex-files.txt dex-packages.txt; do
             if [[ -f "$report" ]]; then cp "$report" dist/; fi
           done
           curl --fail --location --silent --show-error \
