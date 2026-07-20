@@ -81,8 +81,11 @@ if [[ "$DEX_COUNT" -lt 1 || "$DEX_COUNT" -gt 2 ]]; then
   exit 1
 fi
 
+mapfile -t defined_classes < <(
+  awk '$1 == "C" && $2 == "d" {print $NF}' dex-packages.txt
+)
 mapfile -t unexpected_classes < <(
-  awk '$1 == "C" && $2 == "d" {print $NF}' dex-packages.txt \
+  printf '%s\n' "${defined_classes[@]}" \
     | grep -Ev '^com\.tokengourmet\.dccleanersafe(\.|$)' \
     || true
 )
@@ -96,7 +99,7 @@ for required_class in \
   'com.tokengourmet.dccleanersafe.MainActivity' \
   'com.tokengourmet.dccleanersafe.DcClient' \
   'com.tokengourmet.dccleanersafe.SafeUrlPolicy'; do
-  if ! grep -Eq "^C d .* ${required_class//./\\.}$" dex-packages.txt; then
+  if ! printf '%s\n' "${defined_classes[@]}" | grep -Fxq "$required_class"; then
     echo "Required class missing from APK: $required_class" >&2
     exit 1
   fi
