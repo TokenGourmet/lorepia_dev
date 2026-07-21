@@ -248,8 +248,8 @@ describe("terminal snapshot contract", () => {
         ...snapshot,
         requestId: "request-2",
         status: "failed",
-        lastSeq: 4,
-        lastAckedSeq: 2,
+        lastSeq: 5,
+        lastAckedSeq: 4,
         inFlight: 1,
         text: "다름",
         error: { code: "MOCK_FAILURE", message: "failed" },
@@ -282,6 +282,30 @@ describe("terminal snapshot contract", () => {
     expect(result).toEqual({
       accepted: false,
       error: "최종 스냅샷 데이터 형식이 유효하지 않습니다.",
+      mismatches: ["payload"],
+    });
+  });
+
+  it("rejects terminal snapshots without an emitted sequence", () => {
+    const result = validateTerminalSnapshot(
+      { ...snapshot, lastSeq: null, lastAckedSeq: null, inFlight: 0 },
+      expected,
+    );
+
+    expect(result).toMatchObject({
+      accepted: false,
+      mismatches: ["payload"],
+    });
+  });
+
+  it("rejects internally inconsistent cumulative ACK accounting", () => {
+    const result = validateTerminalSnapshot(
+      { ...snapshot, lastAckedSeq: 2, inFlight: 0 },
+      expected,
+    );
+
+    expect(result).toMatchObject({
+      accepted: false,
       mismatches: ["payload"],
     });
   });

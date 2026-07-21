@@ -13,10 +13,11 @@ use tokio::sync::{Mutex as AsyncMutex, Notify};
 const MIN_BATCH_WINDOW_MS: u64 = 16;
 const MAX_BATCH_WINDOW_MS: u64 = 50;
 const DEFAULT_BATCH_WINDOW_MS: u64 = 24;
-const DEFAULT_MAX_IN_FLIGHT: usize = 4;
+const DEFAULT_MAX_IN_FLIGHT: u64 = 4;
 const DEFAULT_CHUNK_INTERVAL_MS: u64 = 8;
 const DEFAULT_ACK_TIMEOUT_MS: u64 = 1_000;
 const MAX_REQUESTS: usize = 128;
+const MAX_SEQUENCE: u64 = 9_007_199_254_740_991;
 const NO_TERMINAL_SEQ: u64 = u64::MAX;
 
 #[derive(Debug, Clone, Serialize, PartialEq, Eq)]
@@ -46,7 +47,7 @@ enum StreamEvent {
         request_id: String,
         seq: u64,
         batch_window_ms: u64,
-        max_in_flight: usize,
+        max_in_flight: u64,
     },
     Delta {
         request_id: String,
@@ -75,7 +76,7 @@ enum StreamEvent {
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
 struct StreamConfig {
     batch_window_ms: Option<u64>,
-    max_in_flight: Option<usize>,
+    max_in_flight: Option<u64>,
     chunk_interval_ms: Option<u64>,
     chunks: Option<Vec<String>>,
     fail_after_chunks: Option<usize>,
@@ -85,7 +86,7 @@ struct StreamConfig {
 #[derive(Debug, Clone)]
 struct ValidatedConfig {
     batch_window_ms: u64,
-    max_in_flight: usize,
+    max_in_flight: u64,
     chunk_interval_ms: u64,
     chunks: Vec<String>,
     fail_after_chunks: Option<usize>,
@@ -205,13 +206,13 @@ impl StreamStatus {
 struct StreamMachine {
     request_id: String,
     status: StreamStatus,
-    last_seq: u64,
-    last_acked_seq: i64,
+    last_seq: Option<u64>,
+    last_acked_seq: Option<u64>,
     text: String,
     error: Option<StreamFailure>,
     batch_window_ms: u64,
     effective_batch_window_ms: u64,
-    max_in_flight: usize,
+    max_in_flight: u64,
     cancel_requested: bool,
 }
 
@@ -220,8 +221,8 @@ impl StreamMachine {
         Self {
             request_id,
             status: StreamStatus::Queued,
-            last_seq: 0,
-            last_acked_seq: -1,
+            last_seq: None,
+            last_acked_seq: None,
             text: String::new(),
             error: None,
             batch_window_ms: config.batch_window_ms,
@@ -231,8 +232,10 @@ impl StreamMachine {
         }
     }
 
-    fn in_flight(&self) -> usize {
-        (self.last_seq as i64 - self.last_acked_seq).max(0) as usize
+    fn in_flight(&self) -> u64 {
+        let emitted = self.last_seq.map_or(0, |seq| seq + 1);
+        let acknowledged = self.last_acked_seq.map_or(0, |seq| seq + 1);
+        emitted.saturating_sub(acknowledged)
     }
 
     fn has_data_capacity(&self) -> bool {
@@ -245,28 +248,46 @@ impl StreamMachine {
         self.in_flight() < self.max_in_flight
     }
 
+    fn advance_sequence(&mut self) -> Result<u64, CommandError> {
+        let next = match self.last_seq {
+            Some(last) => last
+                .checked_add(1)
+                .ok_or_else(CommandError::sequence_exhausted)?,
+            None => 0,
+        };
+        if next > MAX_SEQUENCE {
+            return Err(CommandError::sequence_exhausted());
+        }
+        self.last_seq = Some(next);
+        Ok(next)
+    }
+
     fn start(&mut self) -> Result<StreamEvent, CommandError> {
         if self.status != StreamStatus::Queued {
             return Err(CommandError::invalid_state("stream already started"));
         }
+        let seq = self.advance_sequence()?;
         self.status = StreamStatus::Streaming;
         Ok(StreamEvent::Started {
             request_id: self.request_id.clone(),
-            seq: 0,
+            seq,
             batch_window_ms: self.batch_window_ms,
             max_in_flight: self.max_in_flight,
         })
     }
 
-    fn acknowledge(&mut self, seq: u64) -> Result<(), CommandError> {
-        if seq > self.last_seq {
+    fn acknowledge(&mut self, seq: u64) -> Result<u64, CommandError> {
+        let last_seq = self.last_seq.ok_or_else(|| {
+            CommandError::invalid_ack("cannot acknowledge before the first event is emitted")
+        })?;
+        if seq > last_seq {
             return Err(CommandError::invalid_ack(format!(
-                "seq {seq} has not been emitted; last emitted seq is {}",
-                self.last_seq
+                "seq {seq} has not been emitted; last emitted seq is {last_seq}"
             )));
         }
-        self.last_acked_seq = self.last_acked_seq.max(seq as i64);
-        Ok(())
+        let acknowledged_through = self.last_acked_seq.map_or(seq, |last| last.max(seq));
+        self.last_acked_seq = Some(acknowledged_through);
+        Ok(acknowledged_through)
     }
 
     fn apply_pressure(&mut self) {
@@ -286,11 +307,11 @@ impl StreamMachine {
         if !self.has_data_capacity() {
             return Err(CommandError::backpressure());
         }
-        self.last_seq += 1;
+        let seq = self.advance_sequence()?;
         self.text.push_str(&text);
         Ok(StreamEvent::Delta {
             request_id: self.request_id.clone(),
-            seq: self.last_seq,
+            seq,
             text,
         })
     }
@@ -302,22 +323,22 @@ impl StreamMachine {
                 "completion is not allowed after cancellation is accepted",
             ));
         }
+        let seq = self.advance_sequence()?;
         self.status = StreamStatus::Completed;
-        self.last_seq += 1;
         Ok(StreamEvent::Completed {
             request_id: self.request_id.clone(),
-            seq: self.last_seq,
+            seq,
             text: self.text.clone(),
         })
     }
 
     fn cancel(&mut self) -> Result<StreamEvent, CommandError> {
         self.ensure_terminal_allowed()?;
+        let seq = self.advance_sequence()?;
         self.status = StreamStatus::Cancelled;
-        self.last_seq += 1;
         Ok(StreamEvent::Cancelled {
             request_id: self.request_id.clone(),
-            seq: self.last_seq,
+            seq,
             partial_text: self.text.clone(),
         })
     }
@@ -329,12 +350,12 @@ impl StreamMachine {
                 "failure is not allowed after cancellation is accepted",
             ));
         }
+        let seq = self.advance_sequence()?;
         self.status = StreamStatus::Failed;
         self.error = Some(failure.clone());
-        self.last_seq += 1;
         Ok(StreamEvent::Failed {
             request_id: self.request_id.clone(),
-            seq: self.last_seq,
+            seq,
             partial_text: self.text.clone(),
             error: failure,
         })
@@ -404,9 +425,9 @@ impl StreamRequest {
         self.terminal_seq.store(seq, Ordering::Release);
     }
 
-    fn record_acknowledged_through(&self, acknowledged_through: i64) {
+    fn record_acknowledged_through(&self, acknowledged_through: u64) {
         let terminal_seq = self.terminal_seq.load(Ordering::Acquire);
-        if terminal_seq != NO_TERMINAL_SEQ && acknowledged_through >= terminal_seq as i64 {
+        if terminal_seq != NO_TERMINAL_SEQ && acknowledged_through >= terminal_seq {
             self.terminal_acked.store(true, Ordering::Release);
             self.refresh_evictable();
         }
@@ -425,7 +446,7 @@ impl StreamRequest {
         let terminal_seq = self.terminal_seq.load(Ordering::Acquire);
         let delivered_terminal = terminal_seq != NO_TERMINAL_SEQ
             && snapshot.status.is_terminal()
-            && snapshot.last_seq == terminal_seq;
+            && snapshot.last_seq == Some(terminal_seq);
         let undeliverable_failure = terminal_seq == NO_TERMINAL_SEQ
             && self.channel_delivery_impossible.load(Ordering::Acquire)
             && snapshot.status == StreamStatus::Failed
@@ -469,9 +490,15 @@ struct StreamRegistry {
 }
 
 impl StreamRegistry {
-    fn next_request_id(&self) -> String {
-        let id = self.next_id.fetch_add(1, Ordering::Relaxed) + 1;
-        format!("m1-channel-{id:016x}")
+    fn next_request_id(&self) -> Result<String, CommandError> {
+        let previous = self
+            .next_id
+            .fetch_update(Ordering::Relaxed, Ordering::Relaxed, |current| {
+                current.checked_add(1)
+            })
+            .map_err(|_| CommandError::internal("request ID space exhausted"))?;
+        let id = previous + 1;
+        Ok(format!("m1-channel-{id:016x}"))
     }
 
     fn insert(&self, request_id: String, request: Arc<StreamRequest>) -> Result<(), CommandError> {
@@ -530,8 +557,8 @@ struct StartStreamResponse {
 #[serde(rename_all = "camelCase")]
 struct AckStreamResponse {
     request_id: String,
-    acknowledged_through: i64,
-    in_flight: usize,
+    acknowledged_through: u64,
+    in_flight: u64,
 }
 
 #[derive(Debug, Clone, Serialize)]
@@ -546,14 +573,14 @@ struct CancelStreamResponse {
 struct StreamSnapshot {
     request_id: String,
     status: StreamStatus,
-    last_seq: u64,
-    last_acked_seq: i64,
-    in_flight: usize,
+    last_seq: Option<u64>,
+    last_acked_seq: Option<u64>,
+    in_flight: u64,
     text: String,
     error: Option<StreamFailure>,
     batch_window_ms: u64,
     effective_batch_window_ms: u64,
-    max_in_flight: usize,
+    max_in_flight: u64,
 }
 
 #[derive(Debug, Clone, Serialize, PartialEq, Eq)]
@@ -586,6 +613,13 @@ impl CommandError {
         Self::new("BACKPRESSURE", "maxInFlight limit reached")
     }
 
+    fn sequence_exhausted() -> Self {
+        Self::new(
+            "SEQUENCE_EXHAUSTED",
+            "stream sequence exceeded JavaScript's safe integer range",
+        )
+    }
+
     fn not_found(request_id: &str) -> Self {
         Self::new(
             "STREAM_NOT_FOUND",
@@ -612,7 +646,7 @@ async fn start_mock_stream(
     registry: State<'_, StreamRegistry>,
 ) -> Result<StartStreamResponse, CommandError> {
     let config = ValidatedConfig::try_from(config.unwrap_or_default())?;
-    let request_id = registry.next_request_id();
+    let request_id = registry.next_request_id()?;
     let request = Arc::new(StreamRequest::new(StreamMachine::new(
         request_id.clone(),
         &config,
@@ -643,11 +677,11 @@ async fn ack_stream(
     let request = registry.get(&request_id)?;
     let response = {
         let mut machine = request.machine.lock().await;
-        machine.acknowledge(seq)?;
-        request.record_acknowledged_through(machine.last_acked_seq);
+        let acknowledged_through = machine.acknowledge(seq)?;
+        request.record_acknowledged_through(acknowledged_through);
         AckStreamResponse {
             request_id,
-            acknowledged_through: machine.last_acked_seq,
+            acknowledged_through,
             in_flight: machine.in_flight(),
         }
     };
@@ -943,7 +977,14 @@ async fn deliver_terminal(
         }
         Err(_) => return TerminalDelivery::Failed,
     };
-    let terminal_seq = machine.last_seq;
+    let terminal_seq = match &event {
+        StreamEvent::Completed { seq, .. }
+        | StreamEvent::Cancelled { seq, .. }
+        | StreamEvent::Failed { seq, .. } => *seq,
+        StreamEvent::Started { .. } | StreamEvent::Delta { .. } => {
+            return TerminalDelivery::Failed;
+        }
+    };
 
     if let Err(error) = channel.send(event) {
         // Roll back the undelivered terminal transition before publishing the
@@ -985,7 +1026,7 @@ pub fn run() {
 mod tests {
     use super::*;
 
-    fn config(batch_window_ms: u64, max_in_flight: usize) -> ValidatedConfig {
+    fn config(batch_window_ms: u64, max_in_flight: u64) -> ValidatedConfig {
         ValidatedConfig {
             batch_window_ms,
             max_in_flight,
@@ -996,7 +1037,7 @@ mod tests {
         }
     }
 
-    fn started_machine(max_in_flight: usize) -> StreamMachine {
+    fn started_machine(max_in_flight: u64) -> StreamMachine {
         let mut machine = StreamMachine::new("request-1".into(), &config(24, max_in_flight));
         assert!(matches!(
             machine.start().unwrap(),
@@ -1136,10 +1177,48 @@ mod tests {
         let mut machine = started_machine(2);
         let error = machine.acknowledge(1).unwrap_err();
         assert_eq!(error.code, "INVALID_ACK");
-        assert_eq!(machine.last_acked_seq, -1);
+        assert_eq!(machine.last_acked_seq, None);
         machine.acknowledge(0).unwrap();
         machine.acknowledge(0).unwrap();
-        assert_eq!(machine.last_acked_seq, 0);
+        assert_eq!(machine.last_acked_seq, Some(0));
+    }
+
+    #[test]
+    fn queued_stream_has_no_phantom_event_and_rejects_early_ack() {
+        let mut machine = StreamMachine::new("request-queued".into(), &config(24, 3));
+        let snapshot = machine.snapshot();
+        assert_eq!(snapshot.status, StreamStatus::Queued);
+        assert_eq!(snapshot.last_seq, None);
+        assert_eq!(snapshot.last_acked_seq, None);
+        assert_eq!(snapshot.in_flight, 0);
+
+        let error = machine.acknowledge(0).unwrap_err();
+        assert_eq!(error.code, "INVALID_ACK");
+        assert_eq!(machine.last_seq, None);
+        assert_eq!(machine.last_acked_seq, None);
+    }
+
+    #[test]
+    fn sequence_exhaustion_is_reported_without_mutating_the_machine() {
+        let mut machine = started_machine(3);
+        machine.last_seq = Some(MAX_SEQUENCE);
+        machine.last_acked_seq = Some(MAX_SEQUENCE);
+        let before = machine.snapshot();
+
+        let error = machine.delta("never emitted".into()).unwrap_err();
+        assert_eq!(error.code, "SEQUENCE_EXHAUSTED");
+        assert_eq!(machine.snapshot(), before);
+    }
+
+    #[test]
+    fn request_id_exhaustion_is_reported_without_wrapping() {
+        let registry = StreamRegistry {
+            next_id: AtomicU64::new(u64::MAX),
+            inner: Mutex::new(RegistryInner::default()),
+        };
+        let error = registry.next_request_id().unwrap_err();
+        assert_eq!(error.code, "INTERNAL");
+        assert!(error.message.contains("exhausted"));
     }
 
     #[test]
@@ -1190,9 +1269,17 @@ mod tests {
             assert!(!object.contains_key("partial_text"));
         }
 
+        let queued_snapshot =
+            serde_json::to_value(StreamMachine::new("queued".into(), &config(24, 2)).snapshot())
+                .unwrap();
+        assert!(queued_snapshot["lastSeq"].is_null());
+        assert!(queued_snapshot["lastAckedSeq"].is_null());
+        assert_eq!(queued_snapshot["inFlight"], 0);
+
         let snapshot = serde_json::to_value(started_machine(2).snapshot()).unwrap();
         assert_eq!(snapshot["status"], "streaming");
-        assert_eq!(snapshot["lastAckedSeq"], -1);
+        assert_eq!(snapshot["lastSeq"], 0);
+        assert!(snapshot["lastAckedSeq"].is_null());
         assert_eq!(snapshot["effectiveBatchWindowMs"], 24);
         assert!(snapshot.get("last_acked_seq").is_none());
     }
@@ -1233,7 +1320,9 @@ mod tests {
             let ack_request = Arc::clone(&callback_request);
             tokio::spawn(async move {
                 tokio::time::sleep(Duration::from_millis(5)).await;
-                ack_request.machine.lock().await.acknowledge(seq).unwrap();
+                let acknowledged_through =
+                    ack_request.machine.lock().await.acknowledge(seq).unwrap();
+                ack_request.record_acknowledged_through(acknowledged_through);
                 ack_request.notify.notify_one();
             });
             Ok(())
@@ -1287,7 +1376,7 @@ mod tests {
         ));
         let snapshot = request.machine.lock().await.snapshot();
         assert_eq!(snapshot.status, StreamStatus::Failed);
-        assert_eq!(snapshot.last_seq, 0);
+        assert_eq!(snapshot.last_seq, Some(0));
         assert_eq!(
             snapshot.error.as_ref().map(|error| error.code.as_str()),
             Some("CHANNEL_DELIVERY_FAILED")
@@ -1318,7 +1407,7 @@ mod tests {
         ));
         let snapshot = request.machine.lock().await.snapshot();
         assert_eq!(snapshot.status, StreamStatus::Failed);
-        assert_eq!(snapshot.last_seq, 0);
+        assert_eq!(snapshot.last_seq, Some(0));
         assert_eq!(snapshot.text, "");
         assert_eq!(
             snapshot.error.as_ref().map(|error| error.code.as_str()),
@@ -1378,8 +1467,8 @@ mod tests {
 
         let snapshot = request.machine.lock().await.snapshot();
         assert_eq!(snapshot.status, StreamStatus::Cancelled);
-        assert_eq!(snapshot.last_seq, 1);
-        assert_eq!(snapshot.last_acked_seq, -1);
+        assert_eq!(snapshot.last_seq, Some(1));
+        assert_eq!(snapshot.last_acked_seq, None);
         assert_eq!(snapshot.in_flight, 2);
         assert!(snapshot.in_flight <= snapshot.max_in_flight);
     }
@@ -1574,8 +1663,7 @@ mod tests {
 
         let acknowledged_through = {
             let mut machine = first.machine.lock().await;
-            machine.acknowledge(1).unwrap();
-            machine.last_acked_seq
+            machine.acknowledge(1).unwrap()
         };
         first.record_acknowledged_through(acknowledged_through);
         assert!(first.terminal_acked.load(Ordering::Acquire));
@@ -1642,7 +1730,7 @@ mod tests {
 
         let snapshot = clone_snapshot_for_return(&request).await;
         assert_eq!(snapshot.status, StreamStatus::Completed);
-        assert_eq!(snapshot.last_seq, 1);
+        assert_eq!(snapshot.last_seq, Some(1));
         assert_eq!(request.terminal_seq.load(Ordering::Acquire), 1);
     }
 
@@ -1694,8 +1782,7 @@ mod tests {
                     }
                     let acknowledged_through = {
                         let mut machine = ack_request.machine.lock().await;
-                        machine.acknowledge(seq).unwrap();
-                        machine.last_acked_seq
+                        machine.acknowledge(seq).unwrap()
                     };
                     ack_request.record_acknowledged_through(acknowledged_through);
                     ack_request.notify.notify_one();
@@ -1774,8 +1861,8 @@ mod tests {
 
         let snapshot = request.machine.lock().await.snapshot();
         assert_eq!(snapshot.status, StreamStatus::Failed);
-        assert_eq!(snapshot.last_seq, 1);
-        assert_eq!(snapshot.last_acked_seq, -1);
+        assert_eq!(snapshot.last_seq, Some(1));
+        assert_eq!(snapshot.last_acked_seq, None);
         assert_eq!(snapshot.in_flight, 2);
         assert_eq!(snapshot.text, "");
         assert_eq!(

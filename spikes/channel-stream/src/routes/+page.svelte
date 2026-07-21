@@ -471,9 +471,9 @@
         <dt>상태</dt>
         <dd>{backendStatusLabel[snapshot.status]}</dd>
         <dt>마지막 seq</dt>
-        <dd>{snapshot.lastSeq}</dd>
+        <dd>{snapshot.lastSeq ?? "—"}</dd>
         <dt>마지막 ACK seq</dt>
-        <dd>{snapshot.lastAckedSeq}</dd>
+        <dd>{snapshot.lastAckedSeq ?? "—"}</dd>
         <dt>in-flight</dt>
         <dd>{snapshot.inFlight}</dd>
         <dt>기본 배칭 윈도우</dt>
