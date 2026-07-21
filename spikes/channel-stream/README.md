@@ -10,6 +10,8 @@ This disposable Tauri 2 + SvelteKit application validates LorePia's native-to-we
 - The frontend acknowledges consumed sequence numbers. A bounded in-flight window prevents an unbounded producer queue, and consumer delay expands the effective batching window without dropping text. If no ACK frees capacity within `ackTimeoutMs`, the producer emits one structured `ACK_TIMEOUT` failure instead of polling forever.
 - Cancellation produces one `cancelled` terminal event and preserves the exact partial text and last sequence in the backend snapshot.
 - Deterministic failure injection produces one `failed` terminal event with the same recovery snapshot guarantees.
+- A retained Rust terminal signal forms a control plane independent of Channel delivery. The frontend can recover the authoritative terminal snapshot even when a Channel handoff fails or a terminal callback is missed.
+- Snapshot reads are side-effect free. After validating and cumulatively acknowledging the final snapshot, the frontend calls `release_stream` with its exact terminal sequence; only that matching terminal request is removed from the registry.
 
 The mock proves the transport and lifecycle mechanics only. It does not claim real provider SSE, mobile physical-device behavior, persistence, or production performance.
 
