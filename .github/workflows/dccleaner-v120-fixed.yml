@@ -63,14 +63,29 @@ jobs:
           gradle-version: '8.9'
 
       - name: Test, lint, and build
+        id: android_build
+        continue-on-error: true
         working-directory: dccleaner-v120-src
-        run: gradle --no-daemon --stacktrace clean testDebugUnitTest lintDebug assembleDebug
+        shell: bash
+        run: |
+          set -o pipefail
+          gradle --no-daemon --stacktrace clean testDebugUnitTest lintDebug assembleDebug 2>&1 | tee android-build.log
+
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: dc-cleaner-v1.2-build-log
+          path: dccleaner-v120-src/android-build.log
+          if-no-files-found: error
+          retention-days: 2
 
       - name: Verify APK
+        if: steps.android_build.outcome == 'success'
         working-directory: dccleaner-v120-src
         run: bash scripts/security-check.sh app/build/outputs/apk/debug/app-debug.apk
 
       - name: Stage artifact
+        if: steps.android_build.outcome == 'success'
         working-directory: dccleaner-v120-src
         shell: bash
         run: |
@@ -85,8 +100,14 @@ jobs:
           (cd dist && sha256sum DC-Cleaner-1.2.0.apk DC-Cleaner-1.2.0-source.tar.gz > SHA256SUMS.txt)
 
       - uses: actions/upload-artifact@v4
+        if: steps.android_build.outcome == 'success'
         with:
           name: dc-cleaner-v1.2-fixed-apk
           path: dccleaner-v120-src/dist/
           if-no-files-found: error
           retention-days: 14
+
+      - name: Enforce build result
+        if: always()
+        shell: bash
+        run: test '${{ steps.android_build.outcome }}' = 'success'
