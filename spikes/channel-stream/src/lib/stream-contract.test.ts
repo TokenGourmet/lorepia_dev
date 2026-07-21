@@ -2,7 +2,9 @@ import { describe, expect, it } from "vitest";
 
 import {
   createStreamContractState,
+  expectedTerminalSnapshotFromSnapshot,
   validateStreamEvent,
+  validateTerminalRecoverySnapshot,
   validateTerminalSnapshot,
   type EventValidation,
   type StreamContractState,
@@ -354,5 +356,120 @@ describe("terminal snapshot contract", () => {
         failedExpected,
       ),
     ).toMatchObject({ accepted: false, mismatches: ["error"] });
+  });
+});
+
+
+describe("control-plane terminal recovery contract", () => {
+  function stateAfterOneDelta(): StreamContractState {
+    let state = accept(createStreamContractState(), started()).nextState;
+    state = accept(state, delta(1, requestId, "일부")).nextState;
+    return state;
+  }
+
+  const recoveryFailure: StreamSnapshot = {
+    requestId,
+    status: "failed",
+    lastSeq: 1,
+    lastAckedSeq: 0,
+    inFlight: 1,
+    text: "일부",
+    error: { code: "CHANNEL_DELIVERY_FAILED", message: "closed channel" },
+    batchWindowMs: 32,
+    effectiveBatchWindowMs: 32,
+    maxInFlight: 2,
+  };
+
+  it("accepts a channel-delivery failure at the last observed sequence", () => {
+    const result = validateTerminalRecoverySnapshot(
+      recoveryFailure,
+      stateAfterOneDelta(),
+      requestId,
+    );
+
+    expect(result).toEqual({ accepted: true, snapshot: recoveryFailure });
+    expect(expectedTerminalSnapshotFromSnapshot(recoveryFailure)).toEqual({
+      requestId,
+      status: "failed",
+      lastSeq: 1,
+      text: "일부",
+      error: { code: "CHANNEL_DELIVERY_FAILED", message: "closed channel" },
+    });
+  });
+
+  it("accepts an authoritative terminal snapshot that extends the observed prefix", () => {
+    const recovered: StreamSnapshot = {
+      ...recoveryFailure,
+      status: "completed",
+      lastSeq: 2,
+      lastAckedSeq: 1,
+      text: "일부나머지",
+      error: null,
+    };
+
+    expect(
+      validateTerminalRecoverySnapshot(recovered, stateAfterOneDelta(), requestId),
+    ).toEqual({ accepted: true, snapshot: recovered });
+  });
+
+  it("rejects a wrong request, regressed sequence, and non-prefix text", () => {
+    let state = stateAfterOneDelta();
+    state = accept(state, delta(2, requestId, "더")).nextState;
+    const result = validateTerminalRecoverySnapshot(
+      {
+        ...recoveryFailure,
+        requestId: "request-2",
+        text: "불일치",
+      },
+      state,
+      requestId,
+    );
+
+    expect(result).toMatchObject({
+      accepted: false,
+      mismatches: ["requestId", "lastSeq", "text"],
+    });
+  });
+
+  it("rejects a nonterminal snapshot returned by the terminal waiter", () => {
+    const result = validateTerminalRecoverySnapshot(
+      {
+        ...recoveryFailure,
+        status: "streaming",
+        error: null,
+      },
+      stateAfterOneDelta(),
+      requestId,
+    );
+
+    expect(result).toMatchObject({ accepted: false, mismatches: ["status"] });
+  });
+
+  it("requires exact terminal content when the Channel terminal was observed", () => {
+    let state = stateAfterOneDelta();
+    state = accept(state, {
+      type: "completed",
+      requestId,
+      seq: 2,
+      text: "일부",
+    }).nextState;
+
+    const result = validateTerminalRecoverySnapshot(
+      {
+        ...recoveryFailure,
+        status: "failed",
+        lastSeq: 2,
+        lastAckedSeq: 1,
+        text: "일부",
+        error: { code: "OTHER", message: "different" },
+      },
+      state,
+      requestId,
+    );
+
+    expect(result).toMatchObject({
+      accepted: false,
+      mismatches: ["status", "error"],
+    });
   });
 });

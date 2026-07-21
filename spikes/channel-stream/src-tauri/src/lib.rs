@@ -1,14 +1,14 @@
 use serde::{Deserialize, Serialize};
 use std::{
-    collections::{HashMap, VecDeque},
+    collections::HashMap,
     sync::{
-        atomic::{AtomicBool, AtomicU64, Ordering},
+        atomic::{AtomicU64, Ordering},
         Arc, Mutex,
     },
     time::Duration,
 };
 use tauri::{ipc::Channel, State};
-use tokio::sync::{Mutex as AsyncMutex, Notify};
+use tokio::sync::{watch, Mutex as AsyncMutex, Notify};
 
 const MIN_BATCH_WINDOW_MS: u64 = 16;
 const MAX_BATCH_WINDOW_MS: u64 = 50;
@@ -18,7 +18,6 @@ const DEFAULT_CHUNK_INTERVAL_MS: u64 = 8;
 const DEFAULT_ACK_TIMEOUT_MS: u64 = 1_000;
 const MAX_REQUESTS: usize = 128;
 const MAX_SEQUENCE: u64 = 9_007_199_254_740_991;
-const NO_TERMINAL_SEQ: u64 = u64::MAX;
 
 #[derive(Debug, Clone, Serialize, PartialEq, Eq)]
 #[serde(rename_all = "camelCase")]
@@ -401,78 +400,33 @@ impl StreamMachine {
 struct StreamRequest {
     machine: AsyncMutex<StreamMachine>,
     notify: Notify,
-    terminal_seq: AtomicU64,
-    terminal_acked: AtomicBool,
-    terminal_snapshot_returned: AtomicBool,
-    channel_delivery_impossible: AtomicBool,
-    evictable: AtomicBool,
+    terminal_signal: watch::Sender<bool>,
 }
 
 impl StreamRequest {
     fn new(machine: StreamMachine) -> Self {
+        let (terminal_signal, _terminal_receiver) = watch::channel(false);
         Self {
             machine: AsyncMutex::new(machine),
             notify: Notify::new(),
-            terminal_seq: AtomicU64::new(NO_TERMINAL_SEQ),
-            terminal_acked: AtomicBool::new(false),
-            terminal_snapshot_returned: AtomicBool::new(false),
-            channel_delivery_impossible: AtomicBool::new(false),
-            evictable: AtomicBool::new(false),
+            terminal_signal,
         }
     }
 
-    fn record_terminal_delivery(&self, seq: u64) {
-        self.terminal_seq.store(seq, Ordering::Release);
+    fn signal_terminal(&self) {
+        let _previous = self.terminal_signal.send_replace(true);
     }
 
-    fn record_acknowledged_through(&self, acknowledged_through: u64) {
-        let terminal_seq = self.terminal_seq.load(Ordering::Acquire);
-        if terminal_seq != NO_TERMINAL_SEQ && acknowledged_through >= terminal_seq {
-            self.terminal_acked.store(true, Ordering::Release);
-            self.refresh_evictable();
-        }
-    }
-
-    fn record_channel_delivery_impossible(&self) {
-        // No terminal sequence can be ACKed after the Channel handoff itself
-        // fails. This explicit state selects the snapshot-only cleanup policy;
-        // normal delivered terminals still require both ACK and snapshot.
-        self.channel_delivery_impossible
-            .store(true, Ordering::Release);
-        self.refresh_evictable();
-    }
-
-    fn record_terminal_snapshot_returned(&self, snapshot: &StreamSnapshot) {
-        let terminal_seq = self.terminal_seq.load(Ordering::Acquire);
-        let delivered_terminal = terminal_seq != NO_TERMINAL_SEQ
-            && snapshot.status.is_terminal()
-            && snapshot.last_seq == Some(terminal_seq);
-        let undeliverable_failure = terminal_seq == NO_TERMINAL_SEQ
-            && self.channel_delivery_impossible.load(Ordering::Acquire)
-            && snapshot.status == StreamStatus::Failed
-            && snapshot
-                .error
-                .as_ref()
-                .is_some_and(|error| error.code == "CHANNEL_DELIVERY_FAILED");
-
-        if delivered_terminal || undeliverable_failure {
-            self.terminal_snapshot_returned
-                .store(true, Ordering::Release);
-            self.refresh_evictable();
-        }
-    }
-
-    fn refresh_evictable(&self) {
-        let terminal_seq = self.terminal_seq.load(Ordering::Acquire);
-        let delivered_terminal_is_releasable =
-            terminal_seq != NO_TERMINAL_SEQ && self.terminal_acked.load(Ordering::Acquire);
-        let undeliverable_failure_is_releasable = terminal_seq == NO_TERMINAL_SEQ
-            && self.channel_delivery_impossible.load(Ordering::Acquire);
-
-        if self.terminal_snapshot_returned.load(Ordering::Acquire)
-            && (delivered_terminal_is_releasable || undeliverable_failure_is_releasable)
-        {
-            self.evictable.store(true, Ordering::Release);
+    async fn wait_for_terminal(&self) -> Result<(), CommandError> {
+        let mut receiver = self.terminal_signal.subscribe();
+        loop {
+            if *receiver.borrow_and_update() {
+                return Ok(());
+            }
+            receiver
+                .changed()
+                .await
+                .map_err(|_| CommandError::internal("terminal signal closed unexpectedly"))?;
         }
     }
 }
@@ -480,7 +434,6 @@ impl StreamRequest {
 #[derive(Default)]
 struct RegistryInner {
     requests: HashMap<String, Arc<StreamRequest>>,
-    order: VecDeque<String>,
 }
 
 #[derive(Default)]
@@ -507,22 +460,15 @@ impl StreamRegistry {
             .lock()
             .map_err(|_| CommandError::internal("stream registry lock poisoned"))?;
 
-        while inner.requests.len() >= MAX_REQUESTS {
-            let evictable = inner.order.iter().position(|id| {
-                inner
-                    .requests
-                    .get(id)
-                    .is_some_and(|entry| entry.evictable.load(Ordering::Acquire))
-            });
-            let Some(index) = evictable else {
-                return Err(CommandError::capacity());
-            };
-            if let Some(id) = inner.order.remove(index) {
-                inner.requests.remove(&id);
-            }
+        if inner.requests.len() >= MAX_REQUESTS {
+            return Err(CommandError::capacity());
+        }
+        if inner.requests.contains_key(&request_id) {
+            return Err(CommandError::internal(format!(
+                "duplicate requestId {request_id}"
+            )));
         }
 
-        inner.order.push_back(request_id.clone());
         inner.requests.insert(request_id, request);
         Ok(())
     }
@@ -539,11 +485,23 @@ impl StreamRegistry {
             .ok_or_else(|| CommandError::not_found(request_id))
     }
 
-    fn remove(&self, request_id: &str) {
-        if let Ok(mut inner) = self.inner.lock() {
+    fn remove_exact(
+        &self,
+        request_id: &str,
+        expected: &Arc<StreamRequest>,
+    ) -> Result<bool, CommandError> {
+        let mut inner = self
+            .inner
+            .lock()
+            .map_err(|_| CommandError::internal("stream registry lock poisoned"))?;
+        let matches = inner
+            .requests
+            .get(request_id)
+            .is_some_and(|registered| Arc::ptr_eq(registered, expected));
+        if matches {
             inner.requests.remove(request_id);
-            inner.order.retain(|id| id != request_id);
         }
+        Ok(matches)
     }
 }
 
@@ -566,6 +524,13 @@ struct AckStreamResponse {
 struct CancelStreamResponse {
     request_id: String,
     accepted: bool,
+}
+
+#[derive(Debug, Clone, Serialize, PartialEq, Eq)]
+#[serde(rename_all = "camelCase")]
+struct ReleaseStreamResponse {
+    request_id: String,
+    released: bool,
 }
 
 #[derive(Debug, Clone, Serialize, PartialEq, Eq)]
@@ -609,6 +574,10 @@ impl CommandError {
         Self::new("INVALID_ACK", message)
     }
 
+    fn invalid_release(message: impl Into<String>) -> Self {
+        Self::new("INVALID_RELEASE", message)
+    }
+
     fn backpressure() -> Self {
         Self::new("BACKPRESSURE", "maxInFlight limit reached")
     }
@@ -630,7 +599,7 @@ impl CommandError {
     fn capacity() -> Self {
         Self::new(
             "REGISTRY_CAPACITY",
-            "too many retained streams; ACK and snapshot a delivered terminal or snapshot a channel delivery failure before retrying",
+            "too many retained streams; finalize and release a terminal stream before retrying",
         )
     }
 
@@ -655,10 +624,25 @@ async fn start_mock_stream(
 
     let started = {
         let mut machine = request.machine.lock().await;
-        machine.start()?
+        machine.start()
+    };
+    let started = match started {
+        Ok(started) => started,
+        Err(error) => {
+            if !registry.remove_exact(&request_id, &request)? {
+                return Err(CommandError::internal(
+                    "failed to remove a stream after start transition failure",
+                ));
+            }
+            return Err(error);
+        }
     };
     if let Err(error) = on_event.send(started) {
-        registry.remove(&request_id);
+        if !registry.remove_exact(&request_id, &request)? {
+            return Err(CommandError::internal(
+                "failed to remove a stream after started-event delivery failure",
+            ));
+        }
         return Err(CommandError::internal(format!(
             "failed to deliver started event: {error}"
         )));
@@ -678,7 +662,6 @@ async fn ack_stream(
     let response = {
         let mut machine = request.machine.lock().await;
         let acknowledged_through = machine.acknowledge(seq)?;
-        request.record_acknowledged_through(acknowledged_through);
         AckStreamResponse {
             request_id,
             acknowledged_through,
@@ -714,17 +697,73 @@ async fn get_stream_snapshot(
     registry: State<'_, StreamRegistry>,
 ) -> Result<StreamSnapshot, CommandError> {
     let request = registry.get(&request_id)?;
-    Ok(clone_snapshot_for_return(&request).await)
+    Ok(clone_snapshot(&request).await)
 }
 
-async fn clone_snapshot_for_return(request: &StreamRequest) -> StreamSnapshot {
-    let machine = request.machine.lock().await;
-    let snapshot = machine.snapshot();
-    // This marker is deliberately set only after the terminal snapshot has been
-    // fully cloned for the command return value. Registry eviction therefore
-    // cannot invalidate the request while this snapshot is being assembled.
-    request.record_terminal_snapshot_returned(&snapshot);
-    snapshot
+#[tauri::command]
+async fn wait_stream_terminal(
+    request_id: String,
+    registry: State<'_, StreamRegistry>,
+) -> Result<StreamSnapshot, CommandError> {
+    let request = registry.get(&request_id)?;
+    wait_for_terminal_snapshot(&request).await
+}
+
+#[tauri::command]
+async fn release_stream(
+    request_id: String,
+    snapshot_seq: u64,
+    registry: State<'_, StreamRegistry>,
+) -> Result<ReleaseStreamResponse, CommandError> {
+    release_request(&registry, request_id, snapshot_seq).await
+}
+
+async fn clone_snapshot(request: &StreamRequest) -> StreamSnapshot {
+    request.machine.lock().await.snapshot()
+}
+
+async fn wait_for_terminal_snapshot(
+    request: &StreamRequest,
+) -> Result<StreamSnapshot, CommandError> {
+    request.wait_for_terminal().await?;
+    let snapshot = clone_snapshot(request).await;
+    if !snapshot.status.is_terminal() {
+        return Err(CommandError::internal(
+            "terminal signal was set before the stream reached a terminal state",
+        ));
+    }
+    Ok(snapshot)
+}
+
+async fn release_request(
+    registry: &StreamRegistry,
+    request_id: String,
+    snapshot_seq: u64,
+) -> Result<ReleaseStreamResponse, CommandError> {
+    let request = registry.get(&request_id)?;
+    {
+        let machine = request.machine.lock().await;
+        if !machine.status.is_terminal() {
+            return Err(CommandError::invalid_release(
+                "stream must be terminal before it can be released",
+            ));
+        }
+        if machine.last_seq != Some(snapshot_seq) {
+            return Err(CommandError::invalid_release(format!(
+                "snapshotSeq {snapshot_seq} does not match current lastSeq {:?}",
+                machine.last_seq
+            )));
+        }
+    }
+
+    if !registry.remove_exact(&request_id, &request)? {
+        return Err(CommandError::not_found(&request_id));
+    }
+
+    Ok(ReleaseStreamResponse {
+        request_id,
+        released: true,
+    })
 }
 
 async fn run_stream(
@@ -931,7 +970,7 @@ async fn emit_delta(
             "CHANNEL_DELIVERY_FAILED",
             error.to_string(),
         ));
-        request.record_channel_delivery_impossible();
+        request.signal_terminal();
         request.notify.notify_one();
         return DeltaDelivery::Failed;
     }
@@ -977,15 +1016,6 @@ async fn deliver_terminal(
         }
         Err(_) => return TerminalDelivery::Failed,
     };
-    let terminal_seq = match &event {
-        StreamEvent::Completed { seq, .. }
-        | StreamEvent::Cancelled { seq, .. }
-        | StreamEvent::Failed { seq, .. } => *seq,
-        StreamEvent::Started { .. } | StreamEvent::Delta { .. } => {
-            return TerminalDelivery::Failed;
-        }
-    };
-
     if let Err(error) = channel.send(event) {
         // Roll back the undelivered terminal transition before publishing the
         // local delivery failure. Both changes happen under the same lock, so a
@@ -998,12 +1028,12 @@ async fn deliver_terminal(
             "CHANNEL_DELIVERY_FAILED",
             error.to_string(),
         ));
-        request.record_channel_delivery_impossible();
+        request.signal_terminal();
         request.notify.notify_one();
         return TerminalDelivery::Failed;
     }
 
-    request.record_terminal_delivery(terminal_seq);
+    request.signal_terminal();
     request.notify.notify_one();
     TerminalDelivery::Sent
 }
@@ -1016,7 +1046,9 @@ pub fn run() {
             start_mock_stream,
             ack_stream,
             cancel_stream,
-            get_stream_snapshot
+            get_stream_snapshot,
+            wait_stream_terminal,
+            release_stream
         ])
         .run(tauri::generate_context!())
         .expect("error while running LorePia Channel spike");
@@ -1320,9 +1352,7 @@ mod tests {
             let ack_request = Arc::clone(&callback_request);
             tokio::spawn(async move {
                 tokio::time::sleep(Duration::from_millis(5)).await;
-                let acknowledged_through =
-                    ack_request.machine.lock().await.acknowledge(seq).unwrap();
-                ack_request.record_acknowledged_through(acknowledged_through);
+                ack_request.machine.lock().await.acknowledge(seq).unwrap();
                 ack_request.notify.notify_one();
             });
             Ok(())
@@ -1352,29 +1382,62 @@ mod tests {
             .collect();
         assert_eq!(received, "ABC");
 
-        let snapshot = request.machine.lock().await.snapshot();
+        let snapshot = wait_for_terminal_snapshot(&request).await.unwrap();
         assert_eq!(snapshot.status, StreamStatus::Completed);
         assert_eq!(snapshot.text, "ABC");
         assert!((snapshot.batch_window_ms..=MAX_BATCH_WINDOW_MS)
             .contains(&snapshot.effective_batch_window_ms));
-        assert_ne!(
-            request.terminal_seq.load(Ordering::Acquire),
-            NO_TERMINAL_SEQ
-        );
     }
 
     #[tokio::test(flavor = "current_thread")]
-    async fn terminal_delivery_failure_is_visible_in_snapshot() {
+    async fn terminal_waiter_wakes_after_successful_terminal_delivery() {
         let mut machine = started_machine(2);
         machine.acknowledge(0).unwrap();
         let request = Arc::new(StreamRequest::new(machine));
+        let waiter_request = Arc::clone(&request);
+        let waiter =
+            tokio::spawn(async move { wait_for_terminal_snapshot(&waiter_request).await.unwrap() });
+        let channel = Channel::new(|_| Ok(()));
+
+        assert!(matches!(
+            deliver_terminal(&request, &channel, TerminalTransition::Complete).await,
+            TerminalDelivery::Sent
+        ));
+        let snapshot = tokio::time::timeout(Duration::from_secs(1), waiter)
+            .await
+            .expect("terminal waiter should wake")
+            .unwrap();
+        assert_eq!(snapshot.status, StreamStatus::Completed);
+        assert_eq!(snapshot.last_seq, Some(1));
+
+        let late_snapshot = tokio::time::timeout(
+            Duration::from_millis(20),
+            wait_for_terminal_snapshot(&request),
+        )
+        .await
+        .expect("late terminal subscriber should observe retained signal")
+        .unwrap();
+        assert_eq!(late_snapshot, snapshot);
+    }
+
+    #[tokio::test(flavor = "current_thread")]
+    async fn terminal_waiter_recovers_terminal_delivery_failure() {
+        let mut machine = started_machine(2);
+        machine.acknowledge(0).unwrap();
+        let request = Arc::new(StreamRequest::new(machine));
+        let waiter_request = Arc::clone(&request);
+        let waiter =
+            tokio::spawn(async move { wait_for_terminal_snapshot(&waiter_request).await.unwrap() });
         let channel = Channel::new(|_| Err(std::io::Error::other("closed channel").into()));
 
         assert!(matches!(
             deliver_terminal(&request, &channel, TerminalTransition::Complete).await,
             TerminalDelivery::Failed
         ));
-        let snapshot = request.machine.lock().await.snapshot();
+        let snapshot = tokio::time::timeout(Duration::from_secs(1), waiter)
+            .await
+            .expect("control-plane waiter should recover a failed terminal handoff")
+            .unwrap();
         assert_eq!(snapshot.status, StreamStatus::Failed);
         assert_eq!(snapshot.last_seq, Some(0));
         assert_eq!(
@@ -1382,30 +1445,26 @@ mod tests {
             Some("CHANNEL_DELIVERY_FAILED")
         );
         assert!(snapshot.error.unwrap().message.contains("closed channel"));
-        assert_eq!(
-            request.terminal_seq.load(Ordering::Acquire),
-            NO_TERMINAL_SEQ
-        );
-        assert!(request.channel_delivery_impossible.load(Ordering::Acquire));
-        assert!(!request.evictable.load(Ordering::Acquire));
-
-        let returned_snapshot = clone_snapshot_for_return(&request).await;
-        assert_eq!(returned_snapshot.status, StreamStatus::Failed);
-        assert!(request.evictable.load(Ordering::Acquire));
     }
 
     #[tokio::test(flavor = "current_thread")]
-    async fn delta_delivery_failure_is_releasable_only_after_snapshot_return() {
+    async fn terminal_waiter_recovers_delta_delivery_failure_without_phantom_text() {
         let mut machine = started_machine(2);
         machine.acknowledge(0).unwrap();
         let request = Arc::new(StreamRequest::new(machine));
+        let waiter_request = Arc::clone(&request);
+        let waiter =
+            tokio::spawn(async move { wait_for_terminal_snapshot(&waiter_request).await.unwrap() });
         let channel = Channel::new(|_| Err(std::io::Error::other("closed channel").into()));
 
         assert!(matches!(
             emit_delta(&request, &channel, "undelivered".into()).await,
             DeltaDelivery::Failed
         ));
-        let snapshot = request.machine.lock().await.snapshot();
+        let snapshot = tokio::time::timeout(Duration::from_secs(1), waiter)
+            .await
+            .expect("control-plane waiter should recover a failed delta handoff")
+            .unwrap();
         assert_eq!(snapshot.status, StreamStatus::Failed);
         assert_eq!(snapshot.last_seq, Some(0));
         assert_eq!(snapshot.text, "");
@@ -1413,16 +1472,6 @@ mod tests {
             snapshot.error.as_ref().map(|error| error.code.as_str()),
             Some("CHANNEL_DELIVERY_FAILED")
         );
-        assert_eq!(
-            request.terminal_seq.load(Ordering::Acquire),
-            NO_TERMINAL_SEQ
-        );
-        assert!(request.channel_delivery_impossible.load(Ordering::Acquire));
-        assert!(!request.evictable.load(Ordering::Acquire));
-
-        let returned_snapshot = clone_snapshot_for_return(&request).await;
-        assert_eq!(returned_snapshot.status, StreamStatus::Failed);
-        assert!(request.evictable.load(Ordering::Acquire));
     }
 
     #[tokio::test(flavor = "current_thread")]
@@ -1545,15 +1594,97 @@ mod tests {
         assert_eq!(failed_events[1]["type"], "failed");
     }
 
-    #[derive(Clone, Copy)]
-    enum DeliveryFailurePoint {
-        Delta,
-        Terminal,
-    }
-
-    async fn assert_registry_recovers_from_delivery_failure(point: DeliveryFailurePoint) {
+    #[tokio::test(flavor = "current_thread")]
+    async fn snapshot_reads_are_side_effect_free_and_release_is_explicit() {
         let registry = StreamRegistry::default();
         let config = config(24, 2);
+        let mut machine = StreamMachine::new("request-release".into(), &config);
+        machine.start().unwrap();
+        machine.acknowledge(0).unwrap();
+        let request = Arc::new(StreamRequest::new(machine));
+        registry
+            .insert("request-release".into(), Arc::clone(&request))
+            .unwrap();
+        let channel = Channel::new(|_| Ok(()));
+        assert!(matches!(
+            deliver_terminal(&request, &channel, TerminalTransition::Complete).await,
+            TerminalDelivery::Sent
+        ));
+
+        let first = clone_snapshot(&request).await;
+        let second = clone_snapshot(&request).await;
+        assert_eq!(first, second);
+        assert!(registry.get("request-release").is_ok());
+
+        let stale = release_request(&registry, "request-release".into(), 99)
+            .await
+            .unwrap_err();
+        assert_eq!(stale.code, "INVALID_RELEASE");
+        assert!(registry.get("request-release").is_ok());
+
+        let response =
+            release_request(&registry, "request-release".into(), first.last_seq.unwrap())
+                .await
+                .unwrap();
+        assert!(response.released);
+        assert!(matches!(
+            registry.get("request-release"),
+            Err(CommandError { ref code, .. }) if code == "STREAM_NOT_FOUND"
+        ));
+    }
+
+    #[tokio::test(flavor = "current_thread")]
+    async fn release_rejects_a_nonterminal_stream_without_removing_it() {
+        let registry = StreamRegistry::default();
+        let mut machine = started_machine(2);
+        machine.acknowledge(0).unwrap();
+        let request = Arc::new(StreamRequest::new(machine));
+        registry
+            .insert("request-active".into(), Arc::clone(&request))
+            .unwrap();
+
+        let error = release_request(&registry, "request-active".into(), 0)
+            .await
+            .unwrap_err();
+        assert_eq!(error.code, "INVALID_RELEASE");
+        assert!(registry.get("request-active").is_ok());
+    }
+
+    #[tokio::test(flavor = "current_thread")]
+    async fn channel_delivery_failure_can_be_recovered_and_released_immediately() {
+        let registry = StreamRegistry::default();
+        let mut machine = started_machine(2);
+        machine.acknowledge(0).unwrap();
+        let request = Arc::new(StreamRequest::new(machine));
+        registry
+            .insert("request-channel-failure".into(), Arc::clone(&request))
+            .unwrap();
+        let channel = Channel::new(|_| Err(std::io::Error::other("closed channel").into()));
+
+        assert!(matches!(
+            emit_delta(&request, &channel, "undelivered".into()).await,
+            DeltaDelivery::Failed
+        ));
+        let snapshot = wait_for_terminal_snapshot(&request).await.unwrap();
+        let response = release_request(
+            &registry,
+            "request-channel-failure".into(),
+            snapshot.last_seq.unwrap(),
+        )
+        .await
+        .unwrap();
+        assert!(response.released);
+        assert!(matches!(
+            registry.get("request-channel-failure"),
+            Err(CommandError { ref code, .. }) if code == "STREAM_NOT_FOUND"
+        ));
+    }
+
+    #[tokio::test(flavor = "current_thread")]
+    async fn registry_capacity_recovers_only_after_explicit_release() {
+        let registry = StreamRegistry::default();
+        let config = config(24, 2);
+
         let mut first_machine = StreamMachine::new("request-000".into(), &config);
         first_machine.start().unwrap();
         first_machine.acknowledge(0).unwrap();
@@ -1571,121 +1702,75 @@ mod tests {
             registry.insert(request_id, request).unwrap();
         }
 
-        let closed_channel = Channel::new(|_| Err(std::io::Error::other("closed channel").into()));
-        match point {
-            DeliveryFailurePoint::Delta => assert!(matches!(
-                emit_delta(&first, &closed_channel, "undelivered".into()).await,
-                DeltaDelivery::Failed
-            )),
-            DeliveryFailurePoint::Terminal => assert!(matches!(
-                deliver_terminal(&first, &closed_channel, TerminalTransition::Complete).await,
-                TerminalDelivery::Failed
-            )),
-        }
-
-        assert!(first.channel_delivery_impossible.load(Ordering::Acquire));
-        assert!(!first.evictable.load(Ordering::Acquire));
         let candidate = Arc::new(StreamRequest::new(StreamMachine::new(
             "request-new".into(),
             &config,
         )));
-        let before_snapshot = registry
+        let full = registry
             .insert("request-new".into(), Arc::clone(&candidate))
             .unwrap_err();
-        assert_eq!(before_snapshot.code, "REGISTRY_CAPACITY");
-
-        let failure_snapshot = clone_snapshot_for_return(&first).await;
-        assert_eq!(failure_snapshot.status, StreamStatus::Failed);
-        assert_eq!(
-            failure_snapshot
-                .error
-                .as_ref()
-                .map(|error| error.code.as_str()),
-            Some("CHANNEL_DELIVERY_FAILED")
-        );
-        assert!(first.evictable.load(Ordering::Acquire));
-
-        registry.insert("request-new".into(), candidate).unwrap();
-        assert!(matches!(
-            registry.get("request-000"),
-            Err(CommandError { ref code, .. }) if code == "STREAM_NOT_FOUND"
-        ));
-        assert!(registry.get("request-new").is_ok());
-        assert_eq!(registry.inner.lock().unwrap().requests.len(), MAX_REQUESTS);
-    }
-
-    #[tokio::test(flavor = "current_thread")]
-    async fn registry_recovers_at_128_after_delta_delivery_failure_snapshot() {
-        assert_registry_recovers_from_delivery_failure(DeliveryFailurePoint::Delta).await;
-    }
-
-    #[tokio::test(flavor = "current_thread")]
-    async fn registry_recovers_at_128_after_terminal_delivery_failure_snapshot() {
-        assert_registry_recovers_from_delivery_failure(DeliveryFailurePoint::Terminal).await;
-    }
-
-    #[tokio::test(flavor = "current_thread")]
-    async fn registry_evicts_only_after_terminal_ack_and_snapshot_return() {
-        let registry = StreamRegistry::default();
-        let config = config(24, 2);
-
-        let mut first_machine = StreamMachine::new("request-000".into(), &config);
-        first_machine.start().unwrap();
-        first_machine.acknowledge(0).unwrap();
-        let first = Arc::new(StreamRequest::new(first_machine));
-        registry
-            .insert("request-000".into(), Arc::clone(&first))
-            .unwrap();
-
-        for index in 1..MAX_REQUESTS {
-            let request_id = format!("request-{index:03}");
-            let request = Arc::new(StreamRequest::new(StreamMachine::new(
-                request_id.clone(),
-                &config,
-            )));
-            registry.insert(request_id, request).unwrap();
-        }
+        assert_eq!(full.code, "REGISTRY_CAPACITY");
 
         let channel = Channel::new(|_| Ok(()));
         assert!(matches!(
             deliver_terminal(&first, &channel, TerminalTransition::Complete).await,
             TerminalDelivery::Sent
         ));
+        let snapshot = wait_for_terminal_snapshot(&first).await.unwrap();
 
-        let candidate = Arc::new(StreamRequest::new(StreamMachine::new(
-            "request-new".into(),
-            &config,
-        )));
-        let before_ack = registry
+        let still_full = registry
             .insert("request-new".into(), Arc::clone(&candidate))
             .unwrap_err();
-        assert_eq!(before_ack.code, "REGISTRY_CAPACITY");
+        assert_eq!(still_full.code, "REGISTRY_CAPACITY");
 
-        let acknowledged_through = {
-            let mut machine = first.machine.lock().await;
-            machine.acknowledge(1).unwrap()
-        };
-        first.record_acknowledged_through(acknowledged_through);
-        assert!(first.terminal_acked.load(Ordering::Acquire));
-        assert!(!first.evictable.load(Ordering::Acquire));
-
-        let before_snapshot = registry
-            .insert("request-new".into(), Arc::clone(&candidate))
-            .unwrap_err();
-        assert_eq!(before_snapshot.code, "REGISTRY_CAPACITY");
-
-        let terminal_snapshot = clone_snapshot_for_return(&first).await;
-        assert_eq!(terminal_snapshot.status, StreamStatus::Completed);
-        assert!(first.terminal_snapshot_returned.load(Ordering::Acquire));
-        assert!(first.evictable.load(Ordering::Acquire));
-
+        release_request(&registry, "request-000".into(), snapshot.last_seq.unwrap())
+            .await
+            .unwrap();
         registry.insert("request-new".into(), candidate).unwrap();
-        assert!(matches!(
-            registry.get("request-000"),
-            Err(CommandError { ref code, .. }) if code == "STREAM_NOT_FOUND"
-        ));
-        assert!(registry.get("request-new").is_ok());
         assert_eq!(registry.inner.lock().unwrap().requests.len(), MAX_REQUESTS);
+    }
+
+    #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+    async fn concurrent_release_succeeds_exactly_once() {
+        let registry = Arc::new(StreamRegistry::default());
+        let mut machine = started_machine(2);
+        machine.acknowledge(0).unwrap();
+        let request = Arc::new(StreamRequest::new(machine));
+        registry
+            .insert("request-race".into(), Arc::clone(&request))
+            .unwrap();
+        let channel = Channel::new(|_| Ok(()));
+        assert!(matches!(
+            deliver_terminal(&request, &channel, TerminalTransition::Complete).await,
+            TerminalDelivery::Sent
+        ));
+        let seq = wait_for_terminal_snapshot(&request)
+            .await
+            .unwrap()
+            .last_seq
+            .unwrap();
+
+        let left_registry = Arc::clone(&registry);
+        let left = tokio::spawn(async move {
+            release_request(&left_registry, "request-race".into(), seq).await
+        });
+        let right_registry = Arc::clone(&registry);
+        let right = tokio::spawn(async move {
+            release_request(&right_registry, "request-race".into(), seq).await
+        });
+
+        let results = [left.await.unwrap(), right.await.unwrap()];
+        assert_eq!(results.iter().filter(|result| result.is_ok()).count(), 1);
+        assert_eq!(
+            results
+                .iter()
+                .filter(|result| matches!(
+                    result,
+                    Err(CommandError { code, .. }) if code == "STREAM_NOT_FOUND"
+                ))
+                .count(),
+            1
+        );
     }
 
     #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
@@ -1728,10 +1813,9 @@ mod tests {
         release_tx.send(()).unwrap();
         assert!(matches!(delivery.await.unwrap(), TerminalDelivery::Sent));
 
-        let snapshot = clone_snapshot_for_return(&request).await;
+        let snapshot = wait_for_terminal_snapshot(&request).await.unwrap();
         assert_eq!(snapshot.status, StreamStatus::Completed);
         assert_eq!(snapshot.last_seq, Some(1));
-        assert_eq!(request.terminal_seq.load(Ordering::Acquire), 1);
     }
 
     #[tokio::test(flavor = "current_thread")]
@@ -1780,11 +1864,7 @@ mod tests {
                             tokio::task::yield_now().await;
                         }
                     }
-                    let acknowledged_through = {
-                        let mut machine = ack_request.machine.lock().await;
-                        machine.acknowledge(seq).unwrap()
-                    };
-                    ack_request.record_acknowledged_through(acknowledged_through);
+                    ack_request.machine.lock().await.acknowledge(seq).unwrap();
                     ack_request.notify.notify_one();
                 });
             }
@@ -1859,7 +1939,7 @@ mod tests {
             .unwrap()
             .contains("10 ms"));
 
-        let snapshot = request.machine.lock().await.snapshot();
+        let snapshot = wait_for_terminal_snapshot(&request).await.unwrap();
         assert_eq!(snapshot.status, StreamStatus::Failed);
         assert_eq!(snapshot.last_seq, Some(1));
         assert_eq!(snapshot.last_acked_seq, None);
@@ -1869,6 +1949,5 @@ mod tests {
             snapshot.error.as_ref().map(|error| error.code.as_str()),
             Some("ACK_TIMEOUT")
         );
-        assert_eq!(request.terminal_seq.load(Ordering::Acquire), 1);
     }
 }

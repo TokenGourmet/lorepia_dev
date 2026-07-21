@@ -365,6 +365,95 @@ function hasValidSnapshotPayload(value: unknown): value is StreamSnapshot {
   );
 }
 
+function terminalContentMismatches(
+  snapshot: StreamSnapshot,
+  expected: ExpectedTerminalSnapshot,
+): string[] {
+  const mismatches: string[] = [];
+  if (snapshot.requestId !== expected.requestId) mismatches.push("requestId");
+  if (snapshot.status !== expected.status) mismatches.push("status");
+  if (snapshot.lastSeq !== expected.lastSeq) mismatches.push("lastSeq");
+  if (snapshot.text !== expected.text) mismatches.push("text");
+
+  const errorMatches =
+    (snapshot.error === null && expected.error === null) ||
+    (snapshot.error !== null &&
+      expected.error !== null &&
+      snapshot.error.code === expected.error.code &&
+      snapshot.error.message === expected.error.message);
+  if (!errorMatches) mismatches.push("error");
+  return mismatches;
+}
+
+export function expectedTerminalSnapshotFromSnapshot(
+  snapshot: StreamSnapshot,
+): ExpectedTerminalSnapshot | null {
+  if (
+    snapshot.lastSeq === null ||
+    (snapshot.status !== "completed" &&
+      snapshot.status !== "cancelled" &&
+      snapshot.status !== "failed")
+  ) {
+    return null;
+  }
+
+  return {
+    requestId: snapshot.requestId,
+    status: snapshot.status,
+    lastSeq: snapshot.lastSeq,
+    text: snapshot.text,
+    error: snapshot.error,
+  };
+}
+
+export function validateTerminalRecoverySnapshot(
+  value: unknown,
+  state: StreamContractState,
+  expectedRequestId: string,
+): SnapshotValidation {
+  if (!hasValidSnapshotPayload(value)) {
+    return {
+      accepted: false,
+      error: "종료 복구 스냅샷 데이터 형식이 유효하지 않습니다.",
+      mismatches: ["payload"],
+    };
+  }
+
+  const terminalExpectation = expectedTerminalSnapshotFromSnapshot(value);
+  if (terminalExpectation === null) {
+    return {
+      accepted: false,
+      error: "종료 복구 명령이 비종료 스냅샷을 반환했습니다.",
+      mismatches: ["status"],
+    };
+  }
+
+  const mismatches: string[] = [];
+  if (value.requestId !== expectedRequestId) mismatches.push("requestId");
+  if (state.requestId !== null && value.requestId !== state.requestId) {
+    if (!mismatches.includes("requestId")) mismatches.push("requestId");
+  }
+  if (state.lastSeq !== null && terminalExpectation.lastSeq < state.lastSeq) {
+    mismatches.push("lastSeq");
+  }
+  if (!terminalExpectation.text.startsWith(state.text)) mismatches.push("text");
+  if (state.expectedTerminal !== null) {
+    for (const mismatch of terminalContentMismatches(value, state.expectedTerminal)) {
+      if (!mismatches.includes(mismatch)) mismatches.push(mismatch);
+    }
+  }
+
+  if (mismatches.length > 0) {
+    return {
+      accepted: false,
+      error: `종료 복구 스냅샷 불일치: ${mismatches.join(", ")}`,
+      mismatches,
+    };
+  }
+
+  return { accepted: true, snapshot: value };
+}
+
 export function snapshotMismatches(
   snapshot: StreamSnapshot,
   expected: ExpectedTerminalSnapshot,
