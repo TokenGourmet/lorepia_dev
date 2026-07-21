@@ -1,0 +1,109 @@
+name: Build DC Cleaner 1.1 APK
+
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - 'dccleaner-next-v110/**'
+      - '.github/workflows/dccleaner-1.1.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Restore and verify exact source
+        shell: bash
+        run: |
+          set -euo pipefail
+          echo 'c4ea9dfaf7bef364cc9a818aa1153946364a1b3fbf732de1204ff2f60a0ab903  dccleaner-next-v110/source.b64.part-00' | sha256sum -c -
+          echo '1b6d35f7cd2f6461a6c3ed56564f85b42f24ec1a51c1356f425f484359c7448a  dccleaner-next-v110/source.b64.part-01' | sha256sum -c -
+          echo 'bb0804a51408462dd0345dd7c1fd1847c3ebec21c6f8fedf895438aa37bee009  dccleaner-next-v110/source.b64.part-02' | sha256sum -c -
+          echo '58052cd067669bfce5f40131a6c246c133d9e28dd3d1ac768a2e1348731412f8  dccleaner-next-v110/source.b64.part-03' | sha256sum -c -
+          echo 'cab10a376c0b0160921049c812baf40d424bb990a1e7fa7cf9c92d6b81e68a21  dccleaner-next-v110/source.b64.part-04' | sha256sum -c -
+          cat dccleaner-next-v110/source.b64.part-* > /tmp/DC-Cleaner-1.1.0-source.tar.gz.b64
+          echo '640c06e384e77763b9146e5119dc6e5330c73fa294c6445e05e3b844a26d27b0  /tmp/DC-Cleaner-1.1.0-source.tar.gz.b64' | sha256sum -c -
+          base64 --decode /tmp/DC-Cleaner-1.1.0-source.tar.gz.b64 > /tmp/DC-Cleaner-1.1.0-source.tar.gz
+          echo '49eccad32b94ad6b4843fe5c1ba204d10c2ca908bc756403fc1d73bef539e07a  /tmp/DC-Cleaner-1.1.0-source.tar.gz' | sha256sum -c -
+          mkdir -p dccleaner-1.1-src
+          tar -xzf /tmp/DC-Cleaner-1.1.0-source.tar.gz -C dccleaner-1.1-src
+          grep -Fq "versionName '1.1.0'" dccleaner-1.1-src/app/build.gradle
+          grep -Fq 'https://msign.dcinside.com/login' dccleaner-1.1-src/app/src/main/java/com/dokpamo/dccleaner/MainActivity.java
+          grep -Fq 'normalized.endsWith(".dcinside.com")' dccleaner-1.1-src/app/src/main/java/com/dokpamo/dccleaner/SafeUrlPolicy.java
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - uses: android-actions/setup-android@v3
+
+      - name: Install pinned Android SDK packages
+        shell: bash
+        run: |
+          yes | sdkmanager --licenses >/dev/null || true
+          sdkmanager 'platforms;android-35' 'build-tools;35.0.0'
+
+      - uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: '8.9'
+
+      - name: Unit tests, lint, and APK build
+        working-directory: dccleaner-1.1-src
+        run: gradle --no-daemon --stacktrace clean testDebugUnitTest lintDebug assembleDebug
+
+      - name: Verify APK permissions, signing, DEX and privacy boundary
+        id: security
+        continue-on-error: true
+        working-directory: dccleaner-1.1-src
+        shell: bash
+        run: |
+          set -o pipefail
+          bash -x scripts/security-check.sh app/build/outputs/apk/debug/app-debug.apk 2>&1 | tee security-check.log
+
+      - name: Record dependency graph
+        if: always()
+        working-directory: dccleaner-1.1-src
+        run: gradle --no-daemon app:dependencies --configuration debugRuntimeClasspath > dependencies.txt
+
+      - name: Stage deliverables
+        if: always()
+        working-directory: dccleaner-1.1-src
+        shell: bash
+        run: |
+          set -euo pipefail
+          rm -rf dist
+          mkdir -p dist
+          cp app/build/outputs/apk/debug/app-debug.apk dist/DC-Cleaner-1.1.0.apk
+          cp /tmp/DC-Cleaner-1.1.0-source.tar.gz dist/
+          cp README.md AUDIT.md LICENSE dist/
+          for report in permissions.txt permissions-raw.txt apk-badging.txt manifest-tree.txt signature.txt dependencies.txt security-check.log app-debug.apk.sha256 dex-files.txt dex-packages.txt; do
+            if [[ -f "$report" ]]; then cp "$report" dist/; fi
+          done
+          curl --fail --location --retry 3 --silent --show-error \
+            https://www.gnu.org/licenses/agpl-3.0.txt \
+            --output dist/LICENSE-AGPL-3.0.txt
+          (cd dist && sha256sum \
+            DC-Cleaner-1.1.0.apk \
+            DC-Cleaner-1.1.0-source.tar.gz \
+            LICENSE-AGPL-3.0.txt > SHA256SUMS.txt)
+
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: dc-cleaner-1.1-apk
+          path: dccleaner-1.1-src/dist/
+          if-no-files-found: error
+          retention-days: 14
+
+      - name: Enforce security gate
+        if: always()
+        shell: bash
+        run: test '${{ steps.security.outcome }}' = 'success'
