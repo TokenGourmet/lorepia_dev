@@ -1,0 +1,112 @@
+name: Build DC Cleaner Safe 0.3 APK
+
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - 'dccleaner-safe-v03-bootstrap/**'
+      - '.github/workflows/dccleaner-safe-v03.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Restore and verify pinned source
+        shell: bash
+        run: |
+          set -euo pipefail
+          echo '2e5523e6f4185c22ca0d9a55b990e5caf600829005b410fe130004657bf23424  dccleaner-safe-v03-bootstrap/source.tar.gz.b64.part-00' | sha256sum -c -
+          echo '2cad70c4bf1522bc69a01aa6c9c6788aac641e4f959d67f273ef3481a4939bd6  dccleaner-safe-v03-bootstrap/source.tar.gz.b64.part-01' | sha256sum -c -
+          echo 'd1ca6784dc3f5635ea98de4b93bf655588010e812145cd859ba38c3a0aa918f1  dccleaner-safe-v03-bootstrap/source.tar.gz.b64.part-02' | sha256sum -c -
+          echo '2aa2fbea75f78ad73d1c3604e6eeb4a7b667cca0e3950d5be48c1e744187ed06  dccleaner-safe-v03-bootstrap/source.tar.gz.b64.part-03' | sha256sum -c -
+          echo '93ee36604c52692e42d8e03eeeb3a8a3a8023645a4ff537d8796d1185c339b2c  dccleaner-safe-v03-bootstrap/source.tar.gz.b64.part-04' | sha256sum -c -
+          echo '878c7bfb9690fec654802003c9c56527e422b0ef0911950891bf7b95072815ff  dccleaner-safe-v03-bootstrap/source.tar.gz.b64.part-05' | sha256sum -c -
+          echo '4149fa52b78827d0b3dc88e965efdb45258742b00c6af4318608e3fa16839c8a  dccleaner-safe-v03-bootstrap/source.tar.gz.b64.part-06' | sha256sum -c -
+          echo '353afc5104f21afac33905a2ceaa3a070555bfe2384e25cd8a73bc236f6fd25d  dccleaner-safe-v03-bootstrap/source.tar.gz.b64.part-07' | sha256sum -c -
+          cat dccleaner-safe-v03-bootstrap/source.tar.gz.b64.part-* > /tmp/dccleaner-safe-v03-source.tar.gz.b64
+          echo 'b139b00556f262c1fe782d1c2798815ad39460344e809000d226760048e763d8  /tmp/dccleaner-safe-v03-source.tar.gz.b64' | sha256sum -c -
+          base64 --decode /tmp/dccleaner-safe-v03-source.tar.gz.b64 > /tmp/DC-Cleaner-Safe-0.3.0-source.tar.gz
+          echo '3a0a129e4e6af0311ad162177250fc8b63a5308b7ba3c6bdda827005b2463f98  /tmp/DC-Cleaner-Safe-0.3.0-source.tar.gz' | sha256sum -c -
+          mkdir -p dccleaner-safe-v03
+          tar -xzf /tmp/DC-Cleaner-Safe-0.3.0-source.tar.gz -C dccleaner-safe-v03
+          grep -Fq "versionName '0.3.0'" dccleaner-safe-v03/app/build.gradle
+          grep -Fq 'class TwoCaptchaClient' dccleaner-safe-v03/app/src/main/java/com/tokengourmet/dccleanersafe/TwoCaptchaClient.java
+          grep -Fq 'class LocalTwoCaptchaVault' dccleaner-safe-v03/app/src/main/java/com/tokengourmet/dccleanersafe/LocalTwoCaptchaVault.java
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - uses: android-actions/setup-android@v3
+
+      - name: Install pinned Android SDK packages
+        shell: bash
+        run: |
+          yes | sdkmanager --licenses >/dev/null || true
+          sdkmanager 'platforms;android-35' 'build-tools;35.0.0'
+
+      - uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: '8.9'
+
+      - name: Unit tests, lint, and APK build
+        working-directory: dccleaner-safe-v03
+        run: gradle --no-daemon --stacktrace clean testDebugUnitTest lintDebug assembleDebug
+
+      - name: Verify APK privacy and attack surface
+        id: security
+        continue-on-error: true
+        working-directory: dccleaner-safe-v03
+        shell: bash
+        run: |
+          set -o pipefail
+          bash -x scripts/security-check.sh app/build/outputs/apk/debug/app-debug.apk 2>&1 | tee security-check.log
+
+      - name: Record dependency graph
+        if: always()
+        working-directory: dccleaner-safe-v03
+        run: gradle --no-daemon app:dependencies --configuration debugRuntimeClasspath > dependencies.txt
+
+      - name: Stage deliverables
+        if: always()
+        working-directory: dccleaner-safe-v03
+        shell: bash
+        run: |
+          set -euo pipefail
+          rm -rf dist
+          mkdir -p dist
+          cp app/build/outputs/apk/debug/app-debug.apk dist/DC-Cleaner-Safe-0.3.0-debug.apk
+          cp README.md AUDIT.md LICENSE dist/
+          cp /tmp/DC-Cleaner-Safe-0.3.0-source.tar.gz dist/
+          for report in permissions.txt apk-badging.txt manifest-tree.txt signature.txt dependencies.txt security-check.log app-debug.apk.sha256 dex-files.txt dex-packages.txt; do
+            if [[ -f "$report" ]]; then cp "$report" dist/; fi
+          done
+          curl --fail --location --retry 3 --silent --show-error \
+            https://www.gnu.org/licenses/agpl-3.0.txt \
+            --output dist/LICENSE-AGPL-3.0.txt
+          (cd dist && sha256sum \
+            DC-Cleaner-Safe-0.3.0-debug.apk \
+            DC-Cleaner-Safe-0.3.0-source.tar.gz \
+            LICENSE-AGPL-3.0.txt > SHA256SUMS.txt)
+
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: dc-cleaner-safe-v0.3-apk
+          path: dccleaner-safe-v03/dist/
+          if-no-files-found: error
+          retention-days: 14
+
+      - name: Enforce security gate
+        if: always()
+        shell: bash
+        run: test '${{ steps.security.outcome }}' = 'success'
