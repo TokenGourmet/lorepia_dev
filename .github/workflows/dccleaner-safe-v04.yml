@@ -65,7 +65,11 @@ jobs:
           echo '1181f97740e91598f0247c353e8519d95b581a5c2cc13c933a6106c4421017ba  /tmp/dccleaner-safe-v04.patch' | sha256sum -c -
           (cd dccleaner-safe-v04 && patch -p2 --batch --forward < /tmp/dccleaner-safe-v04.patch)
 
+          # Keep the launcher label aligned with the package version.
+          sed -i 's/DC Cleaner Safe 0\.3/DC Cleaner Safe 0.4/g' dccleaner-safe-v04/app/src/main/res/values/strings.xml
+
           grep -Fq "versionName '0.4.0'" dccleaner-safe-v04/app/build.gradle
+          grep -Fq 'DC Cleaner Safe 0.4' dccleaner-safe-v04/app/src/main/res/values/strings.xml
           grep -Fq '/index?page=' dccleaner-safe-v04/app/src/main/java/com/tokengourmet/dccleanersafe/DcClient.java
           grep -Fq 'CURRENT_INDEX_PAGE' dccleaner-safe-v04/app/src/main/java/com/tokengourmet/dccleanersafe/DcClient.java
           grep -Fq 'browserUserAgent' dccleaner-safe-v04/app/src/main/java/com/tokengourmet/dccleanersafe/MainActivity.java
@@ -126,13 +130,9 @@ jobs:
           for report in permissions.txt apk-badging.txt manifest-tree.txt signature.txt dependencies.txt security-check.log app-debug.apk.sha256 dex-files.txt dex-packages.txt; do
             if [[ -f "$report" ]]; then cp "$report" dist/; fi
           done
-          curl --fail --location --retry 3 --silent --show-error \
-            https://www.gnu.org/licenses/agpl-3.0.txt \
-            --output dist/LICENSE-AGPL-3.0.txt
           (cd dist && sha256sum \
             DC-Cleaner-Safe-0.4.0-debug.apk \
-            DC-Cleaner-Safe-0.4.0-source.tar.gz \
-            LICENSE-AGPL-3.0.txt > SHA256SUMS.txt)
+            DC-Cleaner-Safe-0.4.0-source.tar.gz > SHA256SUMS.txt)
 
       - uses: actions/upload-artifact@v4
         if: always()
