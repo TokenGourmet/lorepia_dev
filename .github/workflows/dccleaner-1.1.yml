@@ -1,10 +1,11 @@
-name: Build DC Cleaner 1.1 APK
+name: Build DC Cleaner 1.1.1 APK
 
 on:
   pull_request:
     branches: [main]
     paths:
       - 'dccleaner-next-v110-small/**'
+      - 'dccleaner-next-v111/**'
       - '.github/workflows/dccleaner-1.1.yml'
   workflow_dispatch:
 
@@ -66,15 +67,25 @@ jobs:
             dccleaner-next-v110-small/part-18 \
             dccleaner-next-v110-small/part-19 \
             dccleaner-next-v110-small/part-20 \
-            > /tmp/DC-Cleaner-1.1.0-source.tar.gz.b64
-          echo '640c06e384e77763b9146e5119dc6e5330c73fa294c6445e05e3b844a26d27b0  /tmp/DC-Cleaner-1.1.0-source.tar.gz.b64' | sha256sum -c -
-          base64 --decode /tmp/DC-Cleaner-1.1.0-source.tar.gz.b64 > /tmp/DC-Cleaner-1.1.0-source.tar.gz
-          echo '49eccad32b94ad6b4843fe5c1ba204d10c2ca908bc756403fc1d73bef539e07a  /tmp/DC-Cleaner-1.1.0-source.tar.gz' | sha256sum -c -
+            > /tmp/DC-Cleaner-1.1.1-source.tar.gz.b64
+          echo '640c06e384e77763b9146e5119dc6e5330c73fa294c6445e05e3b844a26d27b0  /tmp/DC-Cleaner-1.1.1-source.tar.gz.b64' | sha256sum -c -
+          base64 --decode /tmp/DC-Cleaner-1.1.1-source.tar.gz.b64 > /tmp/DC-Cleaner-1.1.1-source.tar.gz
+          echo '49eccad32b94ad6b4843fe5c1ba204d10c2ca908bc756403fc1d73bef539e07a  /tmp/DC-Cleaner-1.1.1-source.tar.gz' | sha256sum -c -
           mkdir -p dccleaner-1.1-src
-          tar -xzf /tmp/DC-Cleaner-1.1.0-source.tar.gz -C dccleaner-1.1-src
+          tar -xzf /tmp/DC-Cleaner-1.1.1-source.tar.gz -C dccleaner-1.1-src
           grep -Fq "versionName '1.1.0'" dccleaner-1.1-src/app/build.gradle
+          echo '1011ba02da531a40e53f7d29d092ff9f9043a1cdafc64f4504b487cecbd06dc7  dccleaner-next-v111/lint-fix.patch' | sha256sum -c -
+          patch -d dccleaner-1.1-src -p1 --batch --forward < dccleaner-next-v111/lint-fix.patch
+          grep -Fq "versionName '1.1.1'" dccleaner-1.1-src/app/build.gradle
+          grep -Fq '@android.annotation.SuppressLint("UnspecifiedRegisterReceiverFlag")' dccleaner-1.1-src/app/src/main/java/com/dokpamo/dccleaner/MainActivity.java
           grep -Fq 'https://msign.dcinside.com/login' dccleaner-1.1-src/app/src/main/java/com/dokpamo/dccleaner/MainActivity.java
           grep -Fq 'normalized.endsWith(".dcinside.com")' dccleaner-1.1-src/app/src/main/java/com/dokpamo/dccleaner/SafeUrlPolicy.java
+          (
+            cd dccleaner-1.1-src
+            tar --sort=name --mtime='UTC 2026-07-21 00:00:00' --owner=0 --group=0 --numeric-owner \
+              --exclude='./build' --exclude='./app/build' --exclude='./.gradle' --exclude='./dist' \
+              -czf /tmp/DC-Cleaner-1.1.1-source.tar.gz .
+          )
 
       - uses: actions/setup-java@v4
         with:
@@ -149,9 +160,9 @@ jobs:
           rm -rf dist
           mkdir -p dist
           if [[ -f app/build/outputs/apk/debug/app-debug.apk ]]; then
-            cp app/build/outputs/apk/debug/app-debug.apk dist/DC-Cleaner-1.1.0.apk
+            cp app/build/outputs/apk/debug/app-debug.apk dist/DC-Cleaner-1.1.1.apk
           fi
-          cp /tmp/DC-Cleaner-1.1.0-source.tar.gz dist/
+          cp /tmp/DC-Cleaner-1.1.1-source.tar.gz dist/
           cp README.md AUDIT.md LICENSE dist/
           for report in tests.log lint.log assemble.log permissions.txt permissions-raw.txt apk-badging.txt manifest-tree.txt signature.txt dependencies.txt security-check.log app-debug.apk.sha256 dex-files.txt dex-packages.txt; do
             if [[ -f "$report" ]]; then cp "$report" dist/; fi
@@ -161,16 +172,16 @@ jobs:
             --output dist/LICENSE-AGPL-3.0.txt
           (
             cd dist
-            sha256sum DC-Cleaner-1.1.0-source.tar.gz LICENSE-AGPL-3.0.txt > SHA256SUMS.txt
-            if [[ -f DC-Cleaner-1.1.0.apk ]]; then
-              sha256sum DC-Cleaner-1.1.0.apk >> SHA256SUMS.txt
+            sha256sum DC-Cleaner-1.1.1-source.tar.gz LICENSE-AGPL-3.0.txt > SHA256SUMS.txt
+            if [[ -f DC-Cleaner-1.1.1.apk ]]; then
+              sha256sum DC-Cleaner-1.1.1.apk >> SHA256SUMS.txt
             fi
           )
 
       - uses: actions/upload-artifact@v4
         if: always()
         with:
-          name: dc-cleaner-1.1-apk
+          name: dc-cleaner-1.1.1-apk
           path: dccleaner-1.1-src/dist/
           if-no-files-found: error
           retention-days: 14
