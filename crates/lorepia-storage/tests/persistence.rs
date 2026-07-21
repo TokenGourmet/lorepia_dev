@@ -5,7 +5,7 @@ use lorepia_storage::{
     UpdatePreferences,
 };
 
-use common::{begin_turn, checkpoint, create_chat, database, timestamp};
+use common::{begin_turn, checkpoint, create_chat, database, deliver_through, timestamp};
 
 #[test]
 fn persists_chat_turn_usage_and_search_across_reopen() {
@@ -16,7 +16,10 @@ fn persists_chat_turn_usage_and_search_across_reopen() {
     assert_eq!(chat.character_id.as_str(), "character-seraphine");
 
     let started = begin_turn(&store, &chat, "오늘 하늘은 어때?", 120);
-    assert_eq!(started.last_seq, 0);
+    assert_eq!(started.last_delivered_seq, 0);
+    assert_eq!(started.last_durable_seq, 0);
+    assert_eq!(started.last_acked_seq, None);
+    deliver_through(&store, &started, 0, 3, 125);
     let progress = store
         .checkpoint_response(lorepia_storage::ResponseCheckpoint {
             provider_response_id: Some("response-1".to_owned()),
@@ -29,10 +32,11 @@ fn persists_chat_turn_usage_and_search_across_reopen() {
             ..checkpoint(&started, 0, 3, "맑은 하늘", 130)
         })
         .expect("batch checkpoint");
-    assert_eq!(progress.last_seq, 3);
+    assert_eq!(progress.last_durable_seq, 3);
     assert_eq!(progress.text_bytes, "맑은 하늘".len());
     assert_eq!(progress.status, RequestStatus::Running);
 
+    deliver_through(&store, &started, 3, 4, 135);
     let terminal = store
         .complete_turn(lorepia_storage::ResponseCheckpoint {
             usage: Some(TokenUsage {
@@ -65,7 +69,9 @@ fn persists_chat_turn_usage_and_search_across_reopen() {
         .get_request_state(&started.request_state_id)
         .expect("load request");
     assert_eq!(request.status, RequestStatus::Completed);
-    assert_eq!(request.last_seq, 4);
+    assert_eq!(request.last_delivered_seq, 4);
+    assert_eq!(request.last_durable_seq, 4);
+    assert_eq!(request.last_acked_seq, None);
     assert_eq!(request.provider_response_id.as_deref(), Some("response-1"));
     assert_eq!(request.usage.expect("usage").output_tokens, 8);
 
@@ -199,6 +205,7 @@ fn deleting_completed_chat_cascades_but_running_chat_is_protected() {
         }
     ));
 
+    deliver_through(&store, &started, 0, 1, 35);
     store
         .cancel_turn(checkpoint(&started, 0, 1, "partial", 40))
         .expect("cancel turn");

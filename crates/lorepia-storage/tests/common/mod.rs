@@ -3,8 +3,9 @@
 use std::path::PathBuf;
 
 use lorepia_storage::{
-    BeginTurn, CharacterId, Chat, CreateChat, ModelId, ProviderId, ProviderSelection,
-    ResponseCheckpoint, StartedTurn, Store, TimestampMillis,
+    BeginTurn, CharacterId, Chat, CreateChat, DeliveryCheckpoint, ModelId, ProviderId,
+    ProviderSelection, ResponseCheckpoint, StartedTurn, Store, StreamGeneration, StreamOwnerLabel,
+    TimestampMillis,
 };
 use tempfile::TempDir;
 
@@ -40,6 +41,8 @@ pub fn begin_turn(store: &Store, chat: &Chat, text: &str, at_ms: i64) -> Started
         .begin_turn(BeginTurn {
             chat_id: chat.id.clone(),
             selection: selection(),
+            owner_label: StreamOwnerLabel::parse("main").expect("owner label"),
+            stream_generation: StreamGeneration::new(),
             user_text: text.to_owned(),
             started_at_ms: timestamp(at_ms),
         })
@@ -48,18 +51,41 @@ pub fn begin_turn(store: &Store, chat: &Chat, text: &str, at_ms: i64) -> Started
 
 pub fn checkpoint(
     started: &StartedTurn,
-    expected_last_seq: u64,
+    expected_last_durable_seq: u64,
     through_seq: u64,
     text: &str,
     at_ms: i64,
 ) -> ResponseCheckpoint {
     ResponseCheckpoint {
         request_state_id: started.request_state_id.clone(),
-        expected_last_seq,
+        owner_label: started.owner_label.clone(),
+        stream_generation: started.stream_generation.clone(),
+        expected_last_durable_seq,
         through_seq,
         appended_text: text.to_owned(),
         provider_response_id: None,
         usage: None,
         at_ms: timestamp(at_ms),
+    }
+}
+
+pub fn deliver_through(
+    store: &Store,
+    started: &StartedTurn,
+    from_seq: u64,
+    through_seq: u64,
+    at_ms: i64,
+) {
+    for expected in from_seq..through_seq {
+        store
+            .record_response_delivery(DeliveryCheckpoint {
+                request_state_id: started.request_state_id.clone(),
+                owner_label: started.owner_label.clone(),
+                stream_generation: started.stream_generation.clone(),
+                expected_last_delivered_seq: expected,
+                through_seq: expected + 1,
+                at_ms: timestamp(at_ms),
+            })
+            .expect("record contiguous delivery");
     }
 }

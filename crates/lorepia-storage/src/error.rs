@@ -32,6 +32,8 @@ pub enum StorageError {
     SequenceMismatch { expected: u64, actual: u64 },
     #[error("system clock is before the Unix epoch")]
     ClockBeforeEpoch,
+    #[error("online storage snapshot was cancelled")]
+    SnapshotCancelled,
 }
 
 impl From<rusqlite::Error> for StorageError {

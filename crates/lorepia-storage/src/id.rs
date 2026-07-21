@@ -77,6 +77,7 @@ macro_rules! define_id {
 define_id!(ChatId, "chat ID");
 define_id!(MessageId, "message ID");
 define_id!(RequestStateId, "request state ID");
+define_id!(StreamGeneration, "stream generation");
 
 #[derive(Clone, Debug, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize)]
 #[serde(transparent)]
