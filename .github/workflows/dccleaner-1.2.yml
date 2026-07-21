@@ -1,0 +1,177 @@
+name: Build DC Cleaner 1.2.0 APK
+
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - 'dccleaner-next-v120/**'
+      - '.github/workflows/dccleaner-1.2.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Restore verified 1.1.1 source
+        shell: bash
+        run: |
+          set -euo pipefail
+          cat dccleaner-next-v110-small/part-* > /tmp/DC-Cleaner-1.1.1-source.tar.gz.b64
+          echo '640c06e384e77763b9146e5119dc6e5330c73fa294c6445e05e3b844a26d27b0  /tmp/DC-Cleaner-1.1.1-source.tar.gz.b64' | sha256sum -c -
+          base64 --decode /tmp/DC-Cleaner-1.1.1-source.tar.gz.b64 > /tmp/DC-Cleaner-1.1.1-source.tar.gz
+          echo '49eccad32b94ad6b4843fe5c1ba204d10c2ca908bc756403fc1d73bef539e07a  /tmp/DC-Cleaner-1.1.1-source.tar.gz' | sha256sum -c -
+          mkdir -p dccleaner-1.2-src
+          tar -xzf /tmp/DC-Cleaner-1.1.1-source.tar.gz -C dccleaner-1.2-src
+          echo '1011ba02da531a40e53f7d29d092ff9f9043a1cdafc64f4504b487cecbd06dc7  dccleaner-next-v111/lint-fix.patch' | sha256sum -c -
+          patch -d dccleaner-1.2-src -p1 --batch --forward < dccleaner-next-v111/lint-fix.patch
+          grep -Fq "versionName '1.1.1'" dccleaner-1.2-src/app/build.gradle
+
+      - name: Verify and apply cookie/UI repair
+        shell: bash
+        run: |
+          set -euo pipefail
+          echo '0327d4ba74ee25d26d9ee07de6ed11e3726f6e9723521fb8eef24aa0c280c729  dccleaner-next-v120/part-00' | sha256sum -c -
+          echo '4abe938468fa593712c06a1fc0ccc912c419e290dce4dbbeb214eb0782f45d63  dccleaner-next-v120/part-01' | sha256sum -c -
+          echo 'e04a3878197fab612e934a1ddae7d2c748dc8d66544f6fb4edb3e32ae2bb437a  dccleaner-next-v120/part-02' | sha256sum -c -
+          echo 'be0ffe9ab4e65576b57a7c4348bb48216b1edd8e15a76a1b4f67af2f108e0114  dccleaner-next-v120/part-03' | sha256sum -c -
+          echo 'fa517bc237b226acb78331c85a47965159a7407d2fb3fb7a2ba37622ff30d103  dccleaner-next-v120/part-04' | sha256sum -c -
+          echo 'f3c8b6a773e6fe6d55a7f5a7a92a5c803e318842f57e4185cbceaf1a82a053c7  dccleaner-next-v120/part-05' | sha256sum -c -
+          echo '98929d3bef57e755a51b3153efe9c3af83c60249b5c32a8d7e7316aa5b1192e0  dccleaner-next-v120/part-06' | sha256sum -c -
+          echo '160c74c7f6044672abf8499e83582d89138a93711cd9a8d29d595c4e1cdc490d  dccleaner-next-v120/part-07' | sha256sum -c -
+          echo 'e145f751b0c77089bb693b9ac13ba87087cb38c83781aca6c12c437893799999  dccleaner-next-v120/part-08' | sha256sum -c -
+          cat dccleaner-next-v120/part-* > /tmp/DC-Cleaner-1.2.0.patch.gz.b64
+          echo 'a919c4eeff776b90295769f97ee1464d13e0c03de242d356b7b5f2bb5ed537e6  /tmp/DC-Cleaner-1.2.0.patch.gz.b64' | sha256sum -c -
+          base64 --decode /tmp/DC-Cleaner-1.2.0.patch.gz.b64 > /tmp/DC-Cleaner-1.2.0.patch.gz
+          echo '3216662765d4aeed7a5e4907456c7067dc7b65e204566e392d0f7b292faf1755  /tmp/DC-Cleaner-1.2.0.patch.gz' | sha256sum -c -
+          gunzip -c /tmp/DC-Cleaner-1.2.0.patch.gz > /tmp/DC-Cleaner-1.2.0.patch
+          echo 'd53c3a1f38067e197e97d5b325a460c8486dfb0f59c0e693cd3f065a734fd7c0  /tmp/DC-Cleaner-1.2.0.patch' | sha256sum -c -
+          patch -d dccleaner-1.2-src -p1 --batch --forward < /tmp/DC-Cleaner-1.2.0.patch
+          grep -Fq "versionName '1.2.0'" dccleaner-1.2-src/app/build.gradle
+          grep -Fq 'class SessionCookieJar' dccleaner-1.2-src/app/src/main/java/com/dokpamo/dccleaner/SessionCookieJar.java
+          grep -Fq 'CookieUtils.mergeHeaders' dccleaner-1.2-src/app/src/main/java/com/dokpamo/dccleaner/MainActivity.java
+          grep -Fq '정리는 자동으로' dccleaner-1.2-src/app/src/main/java/com/dokpamo/dccleaner/MainActivity.java
+          if grep -R --line-number --fixed-strings 'containsRequiredLoginCookie' dccleaner-1.2-src/app/src/main dccleaner-1.2-src/app/src/test; then
+            echo 'Legacy ci_c-only login predicate remains' >&2
+            exit 1
+          fi
+          (
+            cd dccleaner-1.2-src
+            tar --sort=name --mtime='UTC 2026-07-22 00:00:00' --owner=0 --group=0 --numeric-owner \
+              --exclude='./build' --exclude='./app/build' --exclude='./.gradle' --exclude='./dist' \
+              -czf /tmp/DC-Cleaner-1.2.0-source.tar.gz .
+          )
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - uses: android-actions/setup-android@v3
+
+      - name: Install pinned Android SDK packages
+        shell: bash
+        run: |
+          yes | sdkmanager --licenses >/dev/null || true
+          sdkmanager 'platforms;android-35' 'build-tools;35.0.0'
+
+      - uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: '8.9'
+
+      - name: Unit tests
+        id: tests
+        continue-on-error: true
+        working-directory: dccleaner-1.2-src
+        shell: bash
+        run: |
+          set -o pipefail
+          gradle --no-daemon --stacktrace clean testDebugUnitTest 2>&1 | tee tests.log
+
+      - name: Android lint
+        id: lint
+        continue-on-error: true
+        working-directory: dccleaner-1.2-src
+        shell: bash
+        run: |
+          set -o pipefail
+          gradle --no-daemon --stacktrace lintDebug 2>&1 | tee lint.log
+
+      - name: Assemble APK
+        id: apk
+        continue-on-error: true
+        working-directory: dccleaner-1.2-src
+        shell: bash
+        run: |
+          set -o pipefail
+          gradle --no-daemon --stacktrace assembleDebug 2>&1 | tee assemble.log
+
+      - name: Verify APK permissions, signing, DEX and privacy boundary
+        id: security
+        if: always()
+        continue-on-error: true
+        working-directory: dccleaner-1.2-src
+        shell: bash
+        run: |
+          set -o pipefail
+          if [[ -f app/build/outputs/apk/debug/app-debug.apk ]]; then
+            bash -x scripts/security-check.sh app/build/outputs/apk/debug/app-debug.apk 2>&1 | tee security-check.log
+          else
+            echo 'APK was not produced' | tee security-check.log
+            exit 1
+          fi
+
+      - name: Record dependency graph
+        if: always()
+        working-directory: dccleaner-1.2-src
+        run: gradle --no-daemon app:dependencies --configuration debugRuntimeClasspath > dependencies.txt
+
+      - name: Stage deliverables
+        if: always()
+        working-directory: dccleaner-1.2-src
+        shell: bash
+        run: |
+          set -euo pipefail
+          rm -rf dist
+          mkdir -p dist
+          if [[ -f app/build/outputs/apk/debug/app-debug.apk ]]; then
+            cp app/build/outputs/apk/debug/app-debug.apk dist/DC-Cleaner-1.2.0.apk
+          fi
+          cp /tmp/DC-Cleaner-1.2.0-source.tar.gz dist/
+          cp README.md AUDIT.md LICENSE dist/
+          for report in tests.log lint.log assemble.log permissions.txt permissions-raw.txt apk-badging.txt manifest-tree.txt signature.txt dependencies.txt security-check.log app-debug.apk.sha256 dex-files.txt dex-packages.txt; do
+            if [[ -f "$report" ]]; then cp "$report" dist/; fi
+          done
+          curl --fail --location --retry 3 --silent --show-error \
+            https://www.gnu.org/licenses/agpl-3.0.txt \
+            --output dist/LICENSE-AGPL-3.0.txt
+          (
+            cd dist
+            sha256sum DC-Cleaner-1.2.0-source.tar.gz LICENSE-AGPL-3.0.txt > SHA256SUMS.txt
+            if [[ -f DC-Cleaner-1.2.0.apk ]]; then
+              sha256sum DC-Cleaner-1.2.0.apk >> SHA256SUMS.txt
+            fi
+          )
+
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: dc-cleaner-1.2.0-apk
+          path: dccleaner-1.2-src/dist/
+          if-no-files-found: error
+          retention-days: 14
+
+      - name: Enforce all gates
+        if: always()
+        shell: bash
+        run: |
+          test '${{ steps.tests.outcome }}' = 'success'
+          test '${{ steps.lint.outcome }}' = 'success'
+          test '${{ steps.apk.outcome }}' = 'success'
+          test '${{ steps.security.outcome }}' = 'success'
