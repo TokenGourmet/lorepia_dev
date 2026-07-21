@@ -14,10 +14,11 @@ Transport files, in exact concatenation order:
 2. `source.tar.gz.b64.part-01` — `7a79ca2e8715bb39853a59fd74a13dd454e52abfa6586962c0e17a0e26ce71ac`
 3. `source.tar.gz.b64.part-02` — `1f315b8f4863db8ac12ccd528a2850b669c37d67b188efcf933d97fe89922af3`
 4. `source.tar.gz.b64.part-03-04` — `218bdc148697f87de1e56b408b6647ef2d96ecf28496084ff3445c4dcf57da99`
-5. `source.tar.gz.b64.part-05-06` — `198f003d1a4c3fc3e0184c51296599ebdbeec08cb969bb0fd7ae16aa8859470a`
-6. `source.tar.gz.b64.part-07-08` — `69f578d9baaf3b72161d505e75414a1a14aee2418291523647ae0fe0e0e6333b`
-7. `source.tar.gz.b64.part-09-10` — `159888a2da4e0c530645da3dec28e403af265559ced59dc0632dccd998124181`
-8. `source.tar.gz.b64.part-11-12` — `c5c0b41effa3150e296792a8c11d354937ccdf9a57f8bb62fe974bf5f5bd255d`
+5. `source.tar.gz.b64.part-05` — `800171620cc3b6505d6d4f0d5ad354a3581584a78c439829d795c24d2e90673c`
+6. `source.tar.gz.b64.part-06` — `7049ebf962bb20e271262b54fa19cbfa21b1c33b7fe8dbc6592578a72f521a6f`
+7. `source.tar.gz.b64.part-07-08` — `69f578d9baaf3b72161d505e75414a1a14aee2418291523647ae0fe0e0e6333b`
+8. `source.tar.gz.b64.part-09-10` — `159888a2da4e0c530645da3dec28e403af265559ced59dc0632dccd998124181`
+9. `source.tar.gz.b64.part-11-12` — `c5c0b41effa3150e296792a8c11d354937ccdf9a57f8bb62fe974bf5f5bd255d`
 
 ## Login-cookie correction
 
