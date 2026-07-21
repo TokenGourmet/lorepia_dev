@@ -4,6 +4,9 @@ on:
   push:
     branches:
       - agent/rust-core-deep-review
+  pull_request:
+    branches:
+      - agent/m1-stream-lifecycle-hardening
 
 permissions:
   contents: read
