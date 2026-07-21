@@ -4,7 +4,7 @@ on:
   pull_request:
     branches: [main]
     paths:
-      - 'dccleaner-next-v110/**'
+      - 'dccleaner-next-v110-small/**'
       - '.github/workflows/dccleaner-1.1.yml'
   workflow_dispatch:
 
@@ -23,12 +23,50 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          echo 'c4ea9dfaf7bef364cc9a818aa1153946364a1b3fbf732de1204ff2f60a0ab903  dccleaner-next-v110/source.b64.part-00' | sha256sum -c -
-          echo '1b6d35f7cd2f6461a6c3ed56564f85b42f24ec1a51c1356f425f484359c7448a  dccleaner-next-v110/source.b64.part-01' | sha256sum -c -
-          echo 'bb0804a51408462dd0345dd7c1fd1847c3ebec21c6f8fedf895438aa37bee009  dccleaner-next-v110/source.b64.part-02' | sha256sum -c -
-          echo '58052cd067669bfce5f40131a6c246c133d9e28dd3d1ac768a2e1348731412f8  dccleaner-next-v110/source.b64.part-03' | sha256sum -c -
-          echo 'cab10a376c0b0160921049c812baf40d424bb990a1e7fa7cf9c92d6b81e68a21  dccleaner-next-v110/source.b64.part-04' | sha256sum -c -
-          cat dccleaner-next-v110/source.b64.part-* > /tmp/DC-Cleaner-1.1.0-source.tar.gz.b64
+          echo 'c74cbec195e28f659dff549a78bc9b3491c5bd213d97680bbeaa0ca0e7358181  dccleaner-next-v110-small/part-00' | sha256sum -c -
+          echo '8e8937a5397d9096fee4507bddcaafc7279f599857aa3319651e5289454cab07  dccleaner-next-v110-small/part-01' | sha256sum -c -
+          echo '76d4a2b66ccd0bf4b513a17fd25a6961ecc7ea9e691dd4caca2ef0f9b192d20a  dccleaner-next-v110-small/part-02' | sha256sum -c -
+          echo '31598e330c80f83e47f541a426b80fc749dbc2cbb9f70306185c596fe5c0c527  dccleaner-next-v110-small/part-03' | sha256sum -c -
+          echo 'eabd8b3c2464d842b3994ed583fa17fab5c575ade5143e6123505eba8e61f5e2  dccleaner-next-v110-small/part-04' | sha256sum -c -
+          echo '2f0ac1c67288c2152f5b1a3bcdb4f21548b61ded24ee8e1ca92994807d094413  dccleaner-next-v110-small/part-05' | sha256sum -c -
+          echo '1622f14bf477a295707d4b348c58ad276483d4bac24a6ee0fc5ef44f1f5b4d93  dccleaner-next-v110-small/part-06' | sha256sum -c -
+          echo 'ec3cb7e7022a3ccaa712b8302e8448767dfd363b708a00445f55461b2c59e76b  dccleaner-next-v110-small/part-07' | sha256sum -c -
+          echo '2af89055727e0644d21860a5d465792a090922c16d4420fb807e2b92a32edd04  dccleaner-next-v110-small/part-08' | sha256sum -c -
+          echo '405811ef37793991d26bd49b8ecb2ef69e0f65e06b62cc1fda7f4d657c3f207a  dccleaner-next-v110-small/part-09' | sha256sum -c -
+          echo 'ee63ad9d3b543e1246674db44c7f0c9168da981905a54072161d9968ad1c36ab  dccleaner-next-v110-small/part-10' | sha256sum -c -
+          echo '80042cdaa7d6e4d4a74b4214665213b4e36cd2bf837adb501de318a25de45d26  dccleaner-next-v110-small/part-11' | sha256sum -c -
+          echo '35cd6c23cc2a604632b53da07bf8d7a8a523697ae87c6617dd2f2e3b2fa5521f  dccleaner-next-v110-small/part-12' | sha256sum -c -
+          echo 'a956d170242929eb5b403ae1f57815f23c1b52621be020f7691dd237ae06e0fe  dccleaner-next-v110-small/part-13' | sha256sum -c -
+          echo 'b2aa4a28d6082fb231c26160e0c1313c7a82da55cdbfcd6c4a46e7eb21cb19da  dccleaner-next-v110-small/part-14' | sha256sum -c -
+          echo '46dae1200d5a7e533cb8611f85cb41b6cbc11b001c9ace0d134000fce23b3b82  dccleaner-next-v110-small/part-15' | sha256sum -c -
+          echo 'fb3490ba48acc346ded286052b221aa2456b59802c0a203e9fdb1a3e360ef433  dccleaner-next-v110-small/part-16' | sha256sum -c -
+          echo '4b79657cddf49ef6cff418e23de104f4e110ba0742b7488cc6fcbcd1de05d465  dccleaner-next-v110-small/part-17' | sha256sum -c -
+          echo 'b42c85aa5036b224e092fc9fb865accad95bf5b410fac18b3063252ca0bab536  dccleaner-next-v110-small/part-18' | sha256sum -c -
+          echo '7f0ae2240ef3aaf3b300a88ba040efb32575622ed2e9a30f0bc7ff7d56cae6b3  dccleaner-next-v110-small/part-19' | sha256sum -c -
+          echo 'e058093780f3abce3b6df919eca65c6975e73a9f69c7cde692d95fec7cf1640b  dccleaner-next-v110-small/part-20' | sha256sum -c -
+          cat \
+            dccleaner-next-v110-small/part-00 \
+            dccleaner-next-v110-small/part-01 \
+            dccleaner-next-v110-small/part-02 \
+            dccleaner-next-v110-small/part-03 \
+            dccleaner-next-v110-small/part-04 \
+            dccleaner-next-v110-small/part-05 \
+            dccleaner-next-v110-small/part-06 \
+            dccleaner-next-v110-small/part-07 \
+            dccleaner-next-v110-small/part-08 \
+            dccleaner-next-v110-small/part-09 \
+            dccleaner-next-v110-small/part-10 \
+            dccleaner-next-v110-small/part-11 \
+            dccleaner-next-v110-small/part-12 \
+            dccleaner-next-v110-small/part-13 \
+            dccleaner-next-v110-small/part-14 \
+            dccleaner-next-v110-small/part-15 \
+            dccleaner-next-v110-small/part-16 \
+            dccleaner-next-v110-small/part-17 \
+            dccleaner-next-v110-small/part-18 \
+            dccleaner-next-v110-small/part-19 \
+            dccleaner-next-v110-small/part-20 \
+            > /tmp/DC-Cleaner-1.1.0-source.tar.gz.b64
           echo '640c06e384e77763b9146e5119dc6e5330c73fa294c6445e05e3b844a26d27b0  /tmp/DC-Cleaner-1.1.0-source.tar.gz.b64' | sha256sum -c -
           base64 --decode /tmp/DC-Cleaner-1.1.0-source.tar.gz.b64 > /tmp/DC-Cleaner-1.1.0-source.tar.gz
           echo '49eccad32b94ad6b4843fe5c1ba204d10c2ca908bc756403fc1d73bef539e07a  /tmp/DC-Cleaner-1.1.0-source.tar.gz' | sha256sum -c -
