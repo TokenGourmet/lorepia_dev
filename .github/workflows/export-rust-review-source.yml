@@ -1,40 +1,89 @@
-name: Export Rust review source
+name: Apply Rust sequence-state hardening
 
 on:
   push:
     branches:
       - agent/rust-core-deep-review
-  pull_request:
-    branches:
-      - agent/m1-stream-lifecycle-hardening
 
 permissions:
-  contents: read
+  contents: write
+
+concurrency:
+  group: rust-core-iteration-1
+  cancel-in-progress: false
 
 jobs:
-  export:
+  apply-and-validate:
+    if: github.actor != 'github-actions[bot]'
     runs-on: ubuntu-22.04
-    timeout-minutes: 10
+    timeout-minutes: 45
+    defaults:
+      run:
+        shell: bash
     steps:
-      - name: Check out exact branch head
+      - name: Check out exact review branch
         uses: actions/checkout@v6
         with:
           ref: agent/rust-core-deep-review
           fetch-depth: 0
 
-      - name: Record revision and package source
+      - name: Reassemble and apply reviewed patch
         run: |
-          git rev-parse HEAD > REVIEW_COMMIT.txt
-          tar \
-            --exclude=.git \
-            --exclude='**/target' \
-            --exclude='**/node_modules' \
-            -czf "$RUNNER_TEMP/lorepia-rust-review-source.tar.gz" .
+          cat .review/iteration-1.patch.part-* > "$RUNNER_TEMP/iteration-1.patch"
+          git apply --check "$RUNNER_TEMP/iteration-1.patch"
+          git apply "$RUNNER_TEMP/iteration-1.patch"
+          git diff --check
 
-      - name: Upload source archive
-        uses: actions/upload-artifact@v4
+      - name: Install Linux Tauri dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install --yes \
+            build-essential \
+            libayatana-appindicator3-dev \
+            librsvg2-dev \
+            libssl-dev \
+            libwebkit2gtk-4.1-dev \
+            libxdo-dev
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v6
         with:
-          name: lorepia-rust-review-source
-          path: ${{ runner.temp }}/lorepia-rust-review-source.tar.gz
-          if-no-files-found: error
-          retention-days: 1
+          node-version: 22
+          cache: npm
+          cache-dependency-path: spikes/channel-stream/package-lock.json
+
+      - name: Set up pinned Rust toolchain
+        run: |
+          rustup toolchain install 1.97.1 --profile minimal --component rustfmt --component clippy --no-self-update
+          rustc +1.97.1 --version --verbose
+
+      - name: Validate frontend contract
+        working-directory: spikes/channel-stream
+        run: |
+          npm ci
+          npm test
+          npm run check
+          npm run build
+
+      - name: Format and validate Rust core
+        run: |
+          cargo +1.97.1 fmt --manifest-path spikes/channel-stream/src-tauri/Cargo.toml --all
+          cargo +1.97.1 test --locked --manifest-path spikes/channel-stream/src-tauri/Cargo.toml --all-targets
+          cargo +1.97.1 clippy --locked --manifest-path spikes/channel-stream/src-tauri/Cargo.toml --all-targets -- -D warnings
+          cargo +1.97.1 check --locked --manifest-path spikes/channel-stream/src-tauri/Cargo.toml --all-targets
+          cargo +1.97.1 fmt --manifest-path spikes/channel-stream/src-tauri/Cargo.toml --all -- --check
+
+      - name: Commit only validated source changes
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git rm -r .review .github/workflows/export-rust-review-source.yml
+          git add \
+            spikes/channel-stream/src-tauri/src/lib.rs \
+            spikes/channel-stream/src/lib/stream-contract.test.ts \
+            spikes/channel-stream/src/lib/stream-contract.ts \
+            spikes/channel-stream/src/lib/stream-protocol.ts \
+            spikes/channel-stream/src/routes/+page.svelte
+          git diff --cached --check
+          git commit -m "fix Rust stream sequence state"
+          git push origin HEAD:agent/rust-core-deep-review
