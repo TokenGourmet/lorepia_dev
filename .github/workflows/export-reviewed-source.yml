@@ -1,15 +1,17 @@
 name: Export validated Rust review source
 
 on:
-  push:
+  pull_request:
     branches:
-      - agent/rust-core-source-export
+      - agent/rust-core-deep-review
+    types: [opened, synchronize, reopened]
 
 permissions:
   contents: read
 
 jobs:
   export:
+    if: github.head_ref == 'agent/rust-core-source-export'
     runs-on: ubuntu-22.04
     timeout-minutes: 10
     steps:
