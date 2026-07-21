@@ -1,0 +1,22 @@
+[package]
+name = "lorepia-lorebook"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+authors.workspace = true
+repository.workspace = true
+description = "Bounded deterministic lorebook selection for LorePia"
+
+[dependencies]
+aho-corasick = "=1.1.4"
+regex = "=1.13.1"
+serde.workspace = true
+serde_json.workspace = true
+sha2 = "=0.10.9"
+unicode-normalization = "=0.1.25"
+
+[dev-dependencies]
+lorepia-prompt = { path = "../lorepia-prompt" }
+
+[lints.rust]
+unsafe_code = "forbid"

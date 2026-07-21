@@ -2194,22 +2194,56 @@ name = "lorepia-app"
 version = "0.1.0"
 dependencies = [
  "jni 0.21.1",
+ "lorepia-assets",
  "lorepia-core",
  "lorepia-credential-vault",
  "lorepia-provider-runtime",
  "lorepia-providers",
+ "lorepia-safety",
  "lorepia-storage",
  "ndk-context",
+ "rusqlite",
  "serde",
  "serde_json",
  "subtle",
  "tauri",
  "tauri-build",
+ "tempfile",
  "tokio",
  "tokio-util",
  "url",
  "uuid",
  "zeroize",
+]
+
+[[package]]
+name = "lorepia-assets"
+version = "0.1.0"
+dependencies = [
+ "hex",
+ "rusqlite",
+ "rustix",
+ "sha2",
+ "tempfile",
+ "thiserror 2.0.19",
+ "uuid",
+]
+
+[[package]]
+name = "lorepia-backup"
+version = "0.1.0"
+dependencies = [
+ "fs2",
+ "hex",
+ "lorepia-assets",
+ "lorepia-storage",
+ "rusqlite",
+ "serde",
+ "serde_json",
+ "sha2",
+ "tempfile",
+ "thiserror 2.0.19",
+ "uuid",
 ]
 
 [[package]]
@@ -2233,6 +2267,52 @@ dependencies = [
  "windows-native-keyring-store",
  "zbus-secret-service-keyring-store",
  "zeroize",
+]
+
+[[package]]
+name = "lorepia-import"
+version = "0.1.0"
+dependencies = [
+ "crc32fast",
+ "libc",
+ "lorepia-assets",
+ "png 0.18.1",
+ "serde",
+ "serde_json",
+ "sha2",
+ "tempfile",
+ "thiserror 2.0.19",
+ "unicode-normalization",
+ "uuid",
+ "windows-sys 0.61.2",
+ "zip",
+]
+
+[[package]]
+name = "lorepia-loadgen"
+version = "0.1.0"
+dependencies = [
+ "fs2",
+ "lorepia-assets",
+ "lorepia-storage",
+ "rusqlite",
+ "serde",
+ "serde_json",
+ "sha2",
+ "tempfile",
+]
+
+[[package]]
+name = "lorepia-lorebook"
+version = "0.1.0"
+dependencies = [
+ "aho-corasick",
+ "lorepia-prompt",
+ "regex",
+ "serde",
+ "serde_json",
+ "sha2",
+ "unicode-normalization",
 ]
 
 [[package]]
@@ -2277,6 +2357,7 @@ dependencies = [
  "lorepia-prompt",
  "lorepia-providers",
  "reqwest",
+ "rustls",
  "serde",
  "serde_json",
  "tokio",
@@ -2291,6 +2372,15 @@ version = "0.1.0"
 dependencies = [
  "serde",
  "serde_json",
+]
+
+[[package]]
+name = "lorepia-safety"
+version = "0.1.0"
+dependencies = [
+ "serde",
+ "serde_json",
+ "uuid",
 ]
 
 [[package]]
@@ -3091,7 +3181,7 @@ dependencies = [
  "once_cell",
  "socket2",
  "tracing",
- "windows-sys 0.59.0",
+ "windows-sys 0.61.2",
 ]
 
 [[package]]
@@ -3366,7 +3456,7 @@ dependencies = [
  "security-framework",
  "security-framework-sys",
  "webpki-root-certs",
- "windows-sys 0.59.0",
+ "windows-sys 0.61.2",
 ]
 
 [[package]]
@@ -4602,6 +4692,12 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "e421abadd41a4225275504ea4d6566923418b7f05506fbc9c0fe86ba7396114b"
 
 [[package]]
+name = "typed-path"
+version = "0.12.3"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "8e28f89b80c87b8fb0cf04ab448d5dd0dd0ade2f8891bae878de66a75a28600e"
+
+[[package]]
 name = "typeid"
 version = "1.0.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -4670,6 +4766,15 @@ name = "unicode-ident"
 version = "1.0.24"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "e6e4313cd5fcd3dad5cafa179702e2b244f760991f45397d14d4ebf38247da75"
+
+[[package]]
+name = "unicode-normalization"
+version = "0.1.25"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "5fd4f6878c9cb28d874b009da9e8d183b5abc80117c40bbd187a1fde336be6e8"
+dependencies = [
+ "tinyvec",
+]
 
 [[package]]
 name = "unicode-segmentation"
@@ -5623,6 +5728,19 @@ dependencies = [
  "proc-macro2",
  "quote",
  "syn 2.0.119",
+]
+
+[[package]]
+name = "zip"
+version = "8.6.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "2d04a6b5381502aa6087c94c669499eb1602eb9c5e8198e534de571f7154809b"
+dependencies = [
+ "crc32fast",
+ "flate2",
+ "indexmap 2.14.0",
+ "memchr",
+ "typed-path",
 ]
 
 [[package]]

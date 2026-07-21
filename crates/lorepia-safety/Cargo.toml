@@ -1,0 +1,16 @@
+[package]
+name = "lorepia-safety"
+description = "UI-independent privacy, diagnostics, and AI-output report contracts for LorePia"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+authors.workspace = true
+repository.workspace = true
+
+[dependencies]
+serde.workspace = true
+serde_json.workspace = true
+uuid = { version = "=1.24.0", features = ["v4"] }
+
+[lints.rust]
+unsafe_code = "forbid"
