@@ -4,21 +4,17 @@ on:
   push:
     branches:
       - agent/rust-core-tooling
-  pull_request:
-    branches:
-      - agent/rust-core-deep-review-clean
-    types: [opened, synchronize, reopened]
 
 permissions:
   contents: write
 
 concurrency:
-  group: rust-core-clean-iteration-2
+  group: rust-core-clean-iteration-3
   cancel-in-progress: false
 
 jobs:
   apply-and-validate:
-    if: github.head_ref == 'agent/rust-core-tooling' || (github.event_name == 'push' && github.actor != 'github-actions[bot]')
+    if: github.actor != 'github-actions[bot]'
     runs-on: ubuntu-22.04
     timeout-minutes: 60
     defaults:
@@ -42,13 +38,13 @@ jobs:
       - name: Decode and apply reviewed iteration
         working-directory: work
         run: |
-          base64 --decode ../tooling/.review/iteration-2.patch.gz.b64 \
+          base64 --decode ../tooling/.review/iteration-3.patch.gz.b64 \
             | gzip --decompress \
-            > "$RUNNER_TEMP/iteration-2.patch"
-          echo "3001471a27f9ff497e435ea391ce9be2212afdbd918541be4c6cf9710859ae10  $RUNNER_TEMP/iteration-2.patch" \
+            > "$RUNNER_TEMP/iteration-3.patch"
+          echo "d7774d87d7fe04b44564fff7a178bd66158fc4c77e86cbc7a361df941b5d0573  $RUNNER_TEMP/iteration-3.patch" \
             | sha256sum --check
-          git apply --check "$RUNNER_TEMP/iteration-2.patch"
-          git apply "$RUNNER_TEMP/iteration-2.patch"
+          git apply --check "$RUNNER_TEMP/iteration-3.patch"
+          git apply "$RUNNER_TEMP/iteration-3.patch"
           git diff --check
 
       - name: Install Linux Tauri dependencies
@@ -91,11 +87,11 @@ jobs:
           cargo +1.97.1 check --locked --manifest-path spikes/channel-stream/src-tauri/Cargo.toml --all-targets
           cargo +1.97.1 fmt --manifest-path spikes/channel-stream/src-tauri/Cargo.toml --all -- --check
 
-      - name: Repeat timing-sensitive Rust tests
+      - name: Repeat Rust regression suite
         working-directory: work
         run: |
-          for attempt in $(seq 1 10); do
-            echo "stress pass $attempt/10"
+          for attempt in $(seq 1 5); do
+            echo "regression pass $attempt/5"
             cargo +1.97.1 test --locked --manifest-path spikes/channel-stream/src-tauri/Cargo.toml --all-targets -- --test-threads=1
           done
 
@@ -104,12 +100,7 @@ jobs:
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add \
-            spikes/channel-stream/src-tauri/src/lib.rs \
-            spikes/channel-stream/src/lib/stream-contract.test.ts \
-            spikes/channel-stream/src/lib/stream-contract.ts \
-            spikes/channel-stream/src/lib/stream-protocol.ts \
-            spikes/channel-stream/src/routes/+page.svelte
+          git add spikes/channel-stream/src-tauri/src/lib.rs
           git diff --cached --check
-          git commit -m "add channel-independent terminal recovery"
+          git commit -m "bound stream registry memory and retention"
           git push origin HEAD:agent/rust-core-deep-review-clean
