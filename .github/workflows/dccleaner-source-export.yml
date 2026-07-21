@@ -18,31 +18,37 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: Restore exact source archive
+      - name: Stage source transport and diagnostics
         shell: bash
         run: |
           set -euo pipefail
+          mkdir -p /tmp/dccleaner-source-transport
+          cp dccleaner-background-v05/source.tar.gz.b64.part-* /tmp/dccleaner-source-transport/
+          cp dccleaner-background-v05/source.tar.gz.b64.tail-* /tmp/dccleaner-source-transport/
+          cp dccleaner-background-v05/README.md /tmp/dccleaner-source-transport/
+          sha256sum /tmp/dccleaner-source-transport/source.tar.gz.b64.* > /tmp/dccleaner-source-transport/ACTUAL-SHA256SUMS.txt
           cat \
-            dccleaner-background-v05/source.tar.gz.b64.part-00 \
-            dccleaner-background-v05/source.tar.gz.b64.part-01 \
-            dccleaner-background-v05/source.tar.gz.b64.part-02 \
-            dccleaner-background-v05/source.tar.gz.b64.part-03 \
-            dccleaner-background-v05/source.tar.gz.b64.tail-00 \
-            dccleaner-background-v05/source.tar.gz.b64.tail-01 \
-            dccleaner-background-v05/source.tar.gz.b64.tail-02 \
-            dccleaner-background-v05/source.tar.gz.b64.tail-03 \
-            dccleaner-background-v05/source.tar.gz.b64.tail-04 \
-            dccleaner-background-v05/source.tar.gz.b64.tail-05 \
-            dccleaner-background-v05/source.tar.gz.b64.tail-06 \
-            dccleaner-background-v05/source.tar.gz.b64.tail-07 \
-            > /tmp/source.tar.gz.b64
-          echo '609958c106b1b8d3140e2e768155e9d0f7be9554ae7388f25b7a069bb1a1941e  /tmp/source.tar.gz.b64' | sha256sum -c -
-          base64 --decode /tmp/source.tar.gz.b64 > /tmp/DC-Cleaner-Background-0.5.0-source.tar.gz
-          echo '32b08817a0d50943dfcd2f664f41dd7016068f709a1756d2f4e5b4370b3084d9  /tmp/DC-Cleaner-Background-0.5.0-source.tar.gz' | sha256sum -c -
+            /tmp/dccleaner-source-transport/source.tar.gz.b64.part-00 \
+            /tmp/dccleaner-source-transport/source.tar.gz.b64.part-01 \
+            /tmp/dccleaner-source-transport/source.tar.gz.b64.part-02 \
+            /tmp/dccleaner-source-transport/source.tar.gz.b64.part-03 \
+            /tmp/dccleaner-source-transport/source.tar.gz.b64.tail-00 \
+            /tmp/dccleaner-source-transport/source.tar.gz.b64.tail-01 \
+            /tmp/dccleaner-source-transport/source.tar.gz.b64.tail-02 \
+            /tmp/dccleaner-source-transport/source.tar.gz.b64.tail-03 \
+            /tmp/dccleaner-source-transport/source.tar.gz.b64.tail-04 \
+            /tmp/dccleaner-source-transport/source.tar.gz.b64.tail-05 \
+            /tmp/dccleaner-source-transport/source.tar.gz.b64.tail-06 \
+            /tmp/dccleaner-source-transport/source.tar.gz.b64.tail-07 \
+            > /tmp/dccleaner-source-transport/source.tar.gz.b64
+          sha256sum /tmp/dccleaner-source-transport/source.tar.gz.b64 >> /tmp/dccleaner-source-transport/ACTUAL-SHA256SUMS.txt
+          base64 --decode /tmp/dccleaner-source-transport/source.tar.gz.b64 > /tmp/dccleaner-source-transport/source.tar.gz || true
+          sha256sum /tmp/dccleaner-source-transport/source.tar.gz >> /tmp/dccleaner-source-transport/ACTUAL-SHA256SUMS.txt || true
+          tar -tzf /tmp/dccleaner-source-transport/source.tar.gz > /tmp/dccleaner-source-transport/TAR-CONTENTS.txt 2> /tmp/dccleaner-source-transport/TAR-ERROR.txt || true
 
       - uses: actions/upload-artifact@v4
         with:
-          name: dccleaner-background-source
-          path: /tmp/DC-Cleaner-Background-0.5.0-source.tar.gz
+          name: dccleaner-background-source-transport
+          path: /tmp/dccleaner-source-transport/
           if-no-files-found: error
           retention-days: 2
