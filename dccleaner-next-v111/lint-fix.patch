@@ -1,15 +1,13 @@
-diff -ruN dccleaner_110_src/README.md dccleaner_111_src/README.md
---- dccleaner_110_src/README.md	2026-07-21 00:00:00.000000000 +0000
-+++ dccleaner_111_src/README.md	2026-07-21 15:43:54.615215777 +0000
+--- a/README.md
++++ b/README.md
 @@ -1,4 +1,4 @@
 -# DC Cleaner 1.1.0
 +# DC Cleaner 1.1.1
  
  식별코드와 비밀번호로 디시인사이드 공식 모바일 로그인 페이지에 자동 로그인하고, 사용자가 확정한 오래된 게시글 또는 댓글만 포그라운드 서비스에서 순차 삭제하는 Android 앱입니다.
  
- diff -ruN dccleaner_110_src/app/build.gradle dccleaner_111_src/app/build.gradle
---- dccleaner_110_src/app/build.gradle	2026-07-21 00:00:00.000000000 +0000
-+++ dccleaner_111_src/app/build.gradle	2026-07-21 15:43:54.614098084 +0000
+--- a/app/build.gradle
++++ b/app/build.gradle
 @@ -10,8 +10,8 @@
          applicationId 'com.dokpamo.dccleaner'
          minSdk 26
@@ -21,9 +19,8 @@ diff -ruN dccleaner_110_src/README.md dccleaner_111_src/README.md
          testInstrumentationRunner 'android.test.InstrumentationTestRunner'
      }
  
- diff -ruN dccleaner_110_src/app/src/main/java/com/dokpamo/dccleaner/MainActivity.java dccleaner_111_src/app/src/main/java/com/dokpamo/dccleaner/MainActivity.java
---- dccleaner_110_src/app/src/main/java/com/dokpamo/dccleaner/MainActivity.java	2026-07-21 00:00:00.000000000 +0000
-+++ dccleaner_111_src/app/src/main/java/com/dokpamo/dccleaner/MainActivity.java	2026-07-21 15:43:54.614925645 +0000
+--- a/app/src/main/java/com/dokpamo/dccleaner/MainActivity.java
++++ b/app/src/main/java/com/dokpamo/dccleaner/MainActivity.java
 @@ -673,6 +673,7 @@
          }
      }
