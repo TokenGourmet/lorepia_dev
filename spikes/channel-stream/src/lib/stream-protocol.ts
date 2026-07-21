@@ -73,8 +73,8 @@ export type StreamSnapshotStatus =
 export type StreamSnapshot = {
   requestId: string;
   status: StreamSnapshotStatus;
-  lastSeq: number;
-  lastAckedSeq: number;
+  lastSeq: number | null;
+  lastAckedSeq: number | null;
   inFlight: number;
   text: string;
   error: StreamFailure | null;
