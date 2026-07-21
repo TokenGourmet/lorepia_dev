@@ -1,0 +1,180 @@
+diff --git a/spikes/channel-stream/src-tauri/src/lib.rs b/spikes/channel-stream/src-tauri/src/lib.rs
+index d79d1b7..216aea5 100644
+--- a/spikes/channel-stream/src-tauri/src/lib.rs
++++ b/spikes/channel-stream/src-tauri/src/lib.rs
+@@ -13,10 +13,11 @@ use tokio::sync::{Mutex as AsyncMutex, Notify};
+ const MIN_BATCH_WINDOW_MS: u64 = 16;
+ const MAX_BATCH_WINDOW_MS: u64 = 50;
+ const DEFAULT_BATCH_WINDOW_MS: u64 = 24;
+-const DEFAULT_MAX_IN_FLIGHT: usize = 4;
++const DEFAULT_MAX_IN_FLIGHT: u64 = 4;
+ const DEFAULT_CHUNK_INTERVAL_MS: u64 = 8;
+ const DEFAULT_ACK_TIMEOUT_MS: u64 = 1_000;
+ const MAX_REQUESTS: usize = 128;
++const MAX_SEQUENCE: u64 = 9_007_199_254_740_991;
+ const NO_TERMINAL_SEQ: u64 = u64::MAX;
+ 
+ #[derive(Debug, Clone, Serialize, PartialEq, Eq)]
+@@ -46,7 +47,7 @@ enum StreamEvent {
+         request_id: String,
+         seq: u64,
+         batch_window_ms: u64,
+-        max_in_flight: usize,
++        max_in_flight: u64,
+     },
+     Delta {
+         request_id: String,
+@@ -75,7 +76,7 @@ enum StreamEvent {
+ #[serde(rename_all = "camelCase", deny_unknown_fields)]
+ struct StreamConfig {
+     batch_window_ms: Option<u64>,
+-    max_in_flight: Option<usize>,
++    max_in_flight: Option<u64>,
+     chunk_interval_ms: Option<u64>,
+     chunks: Option<Vec<String>>,
+     fail_after_chunks: Option<usize>,
+@@ -85,7 +86,7 @@ struct StreamConfig {
+ #[derive(Debug, Clone)]
+ struct ValidatedConfig {
+     batch_window_ms: u64,
+-    max_in_flight: usize,
++    max_in_flight: u64,
+     chunk_interval_ms: u64,
+     chunks: Vec<String>,
+     fail_after_chunks: Option<usize>,
+@@ -205,13 +206,13 @@ impl StreamStatus {
+ struct StreamMachine {
+     request_id: String,
+     status: StreamStatus,
+-    last_seq: u64,
+-    last_acked_seq: i64,
++    last_seq: Option<u64>,
++    last_acked_seq: Option<u64>,
+     text: String,
+     error: Option<StreamFailure>,
+     batch_window_ms: u64,
+     effective_batch_window_ms: u64,
+-    max_in_flight: usize,
++    max_in_flight: u64,
+     cancel_requested: bool,
+ }
+ 
+@@ -220,8 +221,8 @@ impl StreamMachine {
+         Self {
+             request_id,
+             status: StreamStatus::Queued,
+-            last_seq: 0,
+-            last_acked_seq: -1,
++            last_seq: None,
++            last_acked_seq: None,
+             text: String::new(),
+             error: None,
+             batch_window_ms: config.batch_window_ms,
+@@ -231,8 +232,10 @@ impl StreamMachine {
+         }
+     }
+ 
+-    fn in_flight(&self) -> usize {
+-        (self.last_seq as i64 - self.last_acked_seq).max(0) as usize
++    fn in_flight(&self) -> u64 {
++        let emitted = self.last_seq.map_or(0, |seq| seq + 1);
++        let acknowledged = self.last_acked_seq.map_or(0, |seq| seq + 1);
++        emitted.saturating_sub(acknowledged)
+     }
+ 
+     fn has_data_capacity(&self) -> bool {
+@@ -245,28 +248,46 @@ impl StreamMachine {
+         self.in_flight() < self.max_in_flight
+     }
+ 
++    fn advance_sequence(&mut self) -> Result<u64, CommandError> {
++        let next = match self.last_seq {
++            Some(last) => last
++                .checked_add(1)
++                .ok_or_else(CommandError::sequence_exhausted)?,
++            None => 0,
++        };
++        if next > MAX_SEQUENCE {
++            return Err(CommandError::sequence_exhausted());
++        }
++        self.last_seq = Some(next);
++        Ok(next)
++    }
++
+     fn start(&mut self) -> Result<StreamEvent, CommandError> {
+         if self.status != StreamStatus::Queued {
+             return Err(CommandError::invalid_state("stream already started"));
+         }
++        let seq = self.advance_sequence()?;
+         self.status = StreamStatus::Streaming;
+         Ok(StreamEvent::Started {
+             request_id: self.request_id.clone(),
+-            seq: 0,
++            seq,
+             batch_window_ms: self.batch_window_ms,
+             max_in_flight: self.max_in_flight,
+         })
+     }
+ 
+-    fn acknowledge(&mut self, seq: u64) -> Result<(), CommandError> {
+-        if seq > self.last_seq {
++    fn acknowledge(&mut self, seq: u64) -> Result<u64, CommandError> {
++        let last_seq = self.last_seq.ok_or_else(|| {
++            CommandError::invalid_ack("cannot acknowledge before the first event is emitted")
++        })?;
++        if seq > last_seq {
+             return Err(CommandError::invalid_ack(format!(
+-                "seq {seq} has not been emitted; last emitted seq is {}",
+-                self.last_seq
++                "seq {seq} has not been emitted; last emitted seq is {last_seq}"
+             )));
+         }
+-        self.last_acked_seq = self.last_acked_seq.max(seq as i64);
+-        Ok(())
++        let acknowledged_through = self.last_acked_seq.map_or(seq, |last| last.max(seq));
++        self.last_acked_seq = Some(acknowledged_through);
++        Ok(acknowledged_through)
+     }
+ 
+     fn apply_pressure(&mut self) {
+@@ -286,11 +307,11 @@ impl StreamMachine {
+         if !self.has_data_capacity() {
+             return Err(CommandError::backpressure());
+         }
+-        self.last_seq += 1;
++        let seq = self.advance_sequence()?;
+         self.text.push_str(&text);
+         Ok(StreamEvent::Delta {
+             request_id: self.request_id.clone(),
+-            seq: self.last_seq,
++            seq,
+             text,
+         })
+     }
+@@ -302,22 +323,22 @@ impl StreamMachine {
+                 "completion is not allowed after cancellation is accepted",
+             ));
+         }
++        let seq = self.advance_sequence()?;
+         self.status = StreamStatus::Completed;
+-        self.last_seq += 1;
+         Ok(StreamEvent::Completed {
+             request_id: self.request_id.clone(),
+-            seq: self.last_seq,
++            seq,
+             text: self.text.clone(),
+         })
+     }
+ 
+     fn cancel(&mut self) -> Result<StreamEvent, CommandError> {
+         self.ensure_terminal_allowed()?;
++        let seq = self.advance_sequence()?;
+         self.status = StreamStatus::Cancelled;
+-        self.last_seq += 1;
+         Ok(StreamEvent::Cancelled {
+             request_id: self.request_id.clone(),
+-            seq: self.last_seq,
++            seq,
+             partial_text: self.text.clone(),
+         })
+     }
