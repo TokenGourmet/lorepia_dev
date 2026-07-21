@@ -4,7 +4,7 @@ on:
   pull_request:
     branches: [main]
     paths:
-      - 'dccleaner-safe-v02-bootstrap/**'
+      - 'dccleaner-safe-v02-overlay/**'
       - '.github/workflows/dccleaner-safe-v02.yml'
   workflow_dispatch:
 
@@ -19,16 +19,30 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: Restore and verify pinned source
+      - name: Verify and apply reviewed v0.2 source overlay
         shell: bash
         run: |
           set -euo pipefail
-          cat dccleaner-safe-v02-bootstrap/source.tar.gz.b64.part-* > /tmp/dccleaner-safe-v02-source.tar.gz.b64
-          echo '2ff53f67fa77c50ae8112d602004034a9752d385fa173d78dd945d61120c2b6d  /tmp/dccleaner-safe-v02-source.tar.gz.b64' | sha256sum -c -
-          base64 --decode /tmp/dccleaner-safe-v02-source.tar.gz.b64 > /tmp/DC-Cleaner-Safe-0.2.0-source.tar.gz
-          echo 'a8860922826addf8eee93eff890826ade76019e6758969c45c062038b86461cd  /tmp/DC-Cleaner-Safe-0.2.0-source.tar.gz' | sha256sum -c -
-          mkdir -p dccleaner-safe-v02
-          tar -xzf /tmp/DC-Cleaner-Safe-0.2.0-source.tar.gz -C dccleaner-safe-v02
+          echo '136f73321af23a481bffff3afdb0ad47ec54de71efe317db4a6fdc40d275bbf8  dccleaner-safe-v02-overlay/part-00' | sha256sum -c -
+          echo '44e3f43964ce7c92c148b5f935380fd6149a13ac66a39b7bd0e42fb47f39f3c1  dccleaner-safe-v02-overlay/part-01' | sha256sum -c -
+          echo '54e2c71dec5937571e43a28a347565ca1ab4efd2f1d772454b530bd7d593215d  dccleaner-safe-v02-overlay/part-02' | sha256sum -c -
+          echo '16a6f14352cc385c38a752ae03bdd14260dd721ed8dc3ae4fb8dc7ca658512fa  dccleaner-safe-v02-overlay/part-03' | sha256sum -c -
+          echo '25c6b49093ffce1211c4d6cb40ff59b12b89c00af4edfe6d0f27d8043321e3c9  dccleaner-safe-v02-overlay/part-04' | sha256sum -c -
+          echo '0260729c191b563ede6502e7b5aeffe885f2855811c47882d3168bcaf2bbe95c  dccleaner-safe-v02-overlay/part-05' | sha256sum -c -
+          echo 'e8f633f0ddcf6f4802f44e03e9db8f2388ab43fea0876aec44f6c77a038055dd  dccleaner-safe-v02-overlay/part-06' | sha256sum -c -
+          cat dccleaner-safe-v02-overlay/part-* > /tmp/DC-Cleaner-Safe-0.2.0-overlay.tar.gz.b64
+          echo '86b847fe9583fb989e0e3126d9335e645703336d11c93a5fc52d0f3e776c1f45  /tmp/DC-Cleaner-Safe-0.2.0-overlay.tar.gz.b64' | sha256sum -c -
+          base64 --decode /tmp/DC-Cleaner-Safe-0.2.0-overlay.tar.gz.b64 > /tmp/DC-Cleaner-Safe-0.2.0-overlay.tar.gz
+          echo 'ec2b31d836b304a2f905442c27c9f45f9520dbe8dccf1abb45026f439e61fd72  /tmp/DC-Cleaner-Safe-0.2.0-overlay.tar.gz' | sha256sum -c -
+          tar -xzf /tmp/DC-Cleaner-Safe-0.2.0-overlay.tar.gz -C dccleaner-safe
+          grep -Fq "versionName '0.2.0'" dccleaner-safe/app/build.gradle
+          grep -Fq 'class LocalCredentialVault' dccleaner-safe/app/src/main/java/com/tokengourmet/dccleanersafe/LocalCredentialVault.java
+          (
+            cd dccleaner-safe
+            tar --sort=name --mtime='UTC 2026-07-21 00:00:00' --owner=0 --group=0 --numeric-owner \
+              --exclude='./build' --exclude='./app/build' --exclude='./.gradle' --exclude='./dist' \
+              -czf /tmp/DC-Cleaner-Safe-0.2.0-source.tar.gz .
+          )
 
       - uses: actions/setup-java@v4
         with:
@@ -48,13 +62,13 @@ jobs:
           gradle-version: '8.9'
 
       - name: Unit tests, lint, and APK build
-        working-directory: dccleaner-safe-v02
+        working-directory: dccleaner-safe
         run: gradle --no-daemon --stacktrace clean testDebugUnitTest lintDebug assembleDebug
 
       - name: Verify APK privacy and attack surface
         id: security
         continue-on-error: true
-        working-directory: dccleaner-safe-v02
+        working-directory: dccleaner-safe
         shell: bash
         run: |
           set -o pipefail
@@ -62,12 +76,12 @@ jobs:
 
       - name: Record dependency graph
         if: always()
-        working-directory: dccleaner-safe-v02
+        working-directory: dccleaner-safe
         run: gradle --no-daemon app:dependencies --configuration debugRuntimeClasspath > dependencies.txt
 
       - name: Stage deliverables
         if: always()
-        working-directory: dccleaner-safe-v02
+        working-directory: dccleaner-safe
         shell: bash
         run: |
           set -euo pipefail
@@ -91,7 +105,7 @@ jobs:
         if: always()
         with:
           name: dc-cleaner-safe-v0.2-apk
-          path: dccleaner-safe-v02/dist/
+          path: dccleaner-safe/dist/
           if-no-files-found: error
           retention-days: 14
 
