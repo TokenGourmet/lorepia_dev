@@ -1,0 +1,37 @@
+name: Export validated Rust review source
+
+on:
+  push:
+    branches:
+      - agent/rust-core-source-export
+
+permissions:
+  contents: read
+
+jobs:
+  export:
+    runs-on: ubuntu-22.04
+    timeout-minutes: 10
+    steps:
+      - name: Check out validated source
+        uses: actions/checkout@v6
+        with:
+          ref: agent/rust-core-source-export
+          fetch-depth: 0
+
+      - name: Package exact source
+        run: |
+          git rev-parse HEAD > REVIEW_COMMIT.txt
+          tar \
+            --exclude=.git \
+            --exclude='**/target' \
+            --exclude='**/node_modules' \
+            -czf "$RUNNER_TEMP/lorepia-rust-reviewed-source.tar.gz" .
+
+      - name: Upload exact source
+        uses: actions/upload-artifact@v4
+        with:
+          name: lorepia-rust-reviewed-source
+          path: ${{ runner.temp }}/lorepia-rust-reviewed-source.tar.gz
+          if-no-files-found: error
+          retention-days: 1
