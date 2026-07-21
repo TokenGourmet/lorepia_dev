@@ -12,6 +12,6 @@ mod token_count;
 
 pub use credential::{CredentialScope, ProviderCredential};
 pub use endpoint::{EndpointSelection, OverrideEndpoint};
-pub use error::{Result, RuntimeError, RuntimeErrorKind};
+pub use error::{Result, RetryDecision, RuntimeError, RuntimeErrorKind};
 pub use event::{CompletionReason, ProviderRunOutcome, ProviderStreamEvent, TokenUsage};
 pub use runner::{ProviderRuntime, RuntimeLimits};

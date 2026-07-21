@@ -2,8 +2,8 @@ use std::time::Duration;
 
 use lorepia_providers::{AuthScheme, CompiledProviderRequest, ProviderId, StreamProtocol};
 use reqwest::{
-    Client, Request,
-    header::{ACCEPT, AUTHORIZATION, HeaderMap, HeaderName, HeaderValue},
+    Client, ClientBuilder, Request,
+    header::{ACCEPT, ACCEPT_ENCODING, AUTHORIZATION, HeaderMap, HeaderName, HeaderValue},
 };
 use zeroize::Zeroizing;
 
@@ -68,6 +68,9 @@ pub(crate) fn build_http_request(
             StreamProtocol::Ndjson => "application/x-ndjson",
         }),
     );
+    // Compression is intentionally unsupported for streaming responses. This
+    // avoids a decompression-allocation boundary before LorePia's frame limit.
+    headers.insert(ACCEPT_ENCODING, HeaderValue::from_static("identity"));
     attach_credential(&mut headers, compiled.auth_scheme(), credential.secret())?;
 
     let request = client
@@ -90,15 +93,7 @@ pub(crate) fn build_secure_client(
     connect_timeout: Duration,
     read_timeout: Duration,
 ) -> Result<Client> {
-    let mut builder = reqwest::Client::builder()
-        .https_only(true)
-        .redirect(reqwest::redirect::Policy::none())
-        .no_proxy()
-        .referer(false)
-        .connect_timeout(connect_timeout)
-        .read_timeout(read_timeout)
-        .pool_max_idle_per_host(0)
-        .user_agent("LorePia/0.1");
+    let mut builder = bounded_client_builder(connect_timeout, read_timeout).https_only(true);
     builder = builder.resolve_to_addrs(&endpoint.host, &endpoint.pinned_addresses);
     builder.build().map_err(|_| {
         RuntimeError::new(
@@ -107,6 +102,32 @@ pub(crate) fn build_secure_client(
             "secure HTTP client could not be initialized",
         )
     })
+}
+
+fn bounded_client_builder(connect_timeout: Duration, read_timeout: Duration) -> ClientBuilder {
+    reqwest::Client::builder()
+        .redirect(reqwest::redirect::Policy::none())
+        // reqwest otherwise retries a small class of protocol failures. A
+        // streaming POST must never be replayed below the product's explicit
+        // request lifecycle.
+        .retry(reqwest::retry::never())
+        .no_proxy()
+        .referer(false)
+        .connect_timeout(connect_timeout)
+        .read_timeout(read_timeout)
+        .pool_max_idle_per_host(0)
+        .http2_max_header_list_size(16 * 1024)
+        .user_agent("LorePia/0.1")
+}
+
+#[cfg(test)]
+pub(crate) fn build_loopback_test_client(
+    connect_timeout: Duration,
+    read_timeout: Duration,
+) -> Client {
+    bounded_client_builder(connect_timeout, read_timeout)
+        .build()
+        .expect("bounded loopback test client")
 }
 
 pub(crate) fn validate_credential_scope(

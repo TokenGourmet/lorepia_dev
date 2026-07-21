@@ -1,5 +1,7 @@
 use std::{
     collections::{BTreeMap, BTreeSet},
+    future::Future,
+    io,
     net::{IpAddr, SocketAddr},
     time::Duration,
 };
@@ -86,24 +88,7 @@ pub(crate) async fn resolve_endpoint(
         .port_or_known_default()
         .ok_or_else(|| invalid_endpoint("endpoint must use the HTTPS default port"))?;
 
-    let resolved = tokio::time::timeout(dns_timeout, lookup_host((host.as_str(), port)))
-        .await
-        .map_err(|_| {
-            RuntimeError::new(
-                RuntimeErrorKind::Timeout,
-                "DNS_TIMEOUT",
-                "endpoint DNS resolution timed out",
-            )
-            .retriable(true)
-        })?
-        .map_err(|_| {
-            RuntimeError::new(
-                RuntimeErrorKind::DnsResolution,
-                "DNS_RESOLUTION_FAILED",
-                "endpoint DNS resolution failed",
-            )
-            .retriable(true)
-        })?;
+    let resolved = resolve_addresses(lookup_host((host.as_str(), port)), dns_timeout).await?;
 
     let mut addresses = BTreeSet::new();
     for address in resolved {
@@ -130,6 +115,32 @@ pub(crate) async fn resolve_endpoint(
         pinned_addresses: addresses.into_iter().collect(),
         is_override,
     })
+}
+
+async fn resolve_addresses<F, I>(future: F, dns_timeout: Duration) -> Result<Vec<SocketAddr>>
+where
+    F: Future<Output = io::Result<I>>,
+    I: IntoIterator<Item = SocketAddr>,
+{
+    tokio::time::timeout(dns_timeout, future)
+        .await
+        .map_err(|_| {
+            RuntimeError::new(
+                RuntimeErrorKind::Timeout,
+                "DNS_TIMEOUT",
+                "endpoint DNS resolution timed out",
+            )
+            .retriable(true)
+        })?
+        .map(|addresses| addresses.into_iter().collect())
+        .map_err(|_| {
+            RuntimeError::new(
+                RuntimeErrorKind::DnsResolution,
+                "DNS_RESOLUTION_FAILED",
+                "endpoint DNS resolution failed",
+            )
+            .retriable(true)
+        })
 }
 
 fn validate_override_url(value: &str) -> Result<Url> {
@@ -397,5 +408,15 @@ mod tests {
         assert!(is_public_ip(
             "2606:4700:4700::1111".parse().expect("public IPv6")
         ));
+    }
+
+    #[tokio::test]
+    async fn dns_deadline_is_independent_of_the_system_resolver() {
+        let pending = std::future::pending::<io::Result<Vec<SocketAddr>>>();
+        let error = resolve_addresses(pending, Duration::from_millis(1))
+            .await
+            .expect_err("pending DNS must hit the configured deadline");
+        assert_eq!(error.kind(), RuntimeErrorKind::Timeout);
+        assert_eq!(error.code(), "DNS_TIMEOUT");
     }
 }

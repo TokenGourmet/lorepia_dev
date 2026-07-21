@@ -1,4 +1,30 @@
-use std::fmt;
+use std::{fmt, time::Duration};
+
+/// A typed hint for a *new*, caller-authorized request.
+///
+/// The provider runtime never replays a streaming POST automatically. In
+/// particular, callers must not interpret this as permission to resume or
+/// duplicate a stream which has already emitted events.
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub enum RetryDecision {
+    Never,
+    RetryAfter {
+        delay: Duration,
+    },
+    ExponentialBackoff {
+        initial_delay: Duration,
+        maximum_delay: Duration,
+    },
+}
+
+impl RetryDecision {
+    pub(crate) const fn exponential() -> Self {
+        Self::ExponentialBackoff {
+            initial_delay: Duration::from_secs(1),
+            maximum_delay: Duration::from_secs(30),
+        }
+    }
+}
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub enum RuntimeErrorKind {
@@ -25,7 +51,7 @@ pub struct RuntimeError {
     code: String,
     message: String,
     http_status: Option<u16>,
-    retriable: bool,
+    retry_decision: RetryDecision,
 }
 
 impl RuntimeError {
@@ -39,7 +65,7 @@ impl RuntimeError {
             code: truncate_utf8(code.into(), 64),
             message: truncate_utf8(message.into(), 512),
             http_status: None,
-            retriable: false,
+            retry_decision: RetryDecision::Never,
         }
     }
 
@@ -49,7 +75,16 @@ impl RuntimeError {
     }
 
     pub(crate) fn retriable(mut self, retriable: bool) -> Self {
-        self.retriable = retriable;
+        self.retry_decision = if retriable {
+            RetryDecision::exponential()
+        } else {
+            RetryDecision::Never
+        };
+        self
+    }
+
+    pub(crate) fn with_retry_decision(mut self, retry_decision: RetryDecision) -> Self {
+        self.retry_decision = retry_decision;
         self
     }
 
@@ -75,7 +110,12 @@ impl RuntimeError {
 
     #[must_use]
     pub const fn is_retriable(&self) -> bool {
-        self.retriable
+        !matches!(self.retry_decision, RetryDecision::Never)
+    }
+
+    #[must_use]
+    pub const fn retry_decision(&self) -> RetryDecision {
+        self.retry_decision
     }
 }
 

@@ -8,14 +8,17 @@ use lorepia_prompt::{
 use lorepia_providers::{
     CompiledProviderRequest, ProviderId, ProviderRequest, StreamProtocol, compile_request,
 };
-use reqwest::{Response, StatusCode, header::CONTENT_TYPE};
+use reqwest::{
+    Response, StatusCode,
+    header::{CONTENT_ENCODING, CONTENT_TYPE, HeaderMap, RETRY_AFTER},
+};
 use tokio::{sync::mpsc, time::Instant};
 use tokio_util::sync::CancellationToken;
 use zeroize::Zeroizing;
 
 use crate::{
     EndpointSelection, ProviderCredential, ProviderRunOutcome, ProviderStreamEvent, Result,
-    RuntimeError, RuntimeErrorKind,
+    RetryDecision, RuntimeError, RuntimeErrorKind,
     client::build_http_request,
     decode::{DecodedFrame, ProviderDecoder},
     endpoint::resolve_endpoint,
@@ -29,6 +32,8 @@ pub struct RuntimeLimits {
     pub max_stream_frame_bytes: usize,
     pub max_http_error_body_bytes: usize,
     pub max_token_count_response_bytes: usize,
+    pub max_response_header_count: usize,
+    pub max_response_header_bytes: usize,
     pub dns_timeout: Duration,
     pub connect_timeout: Duration,
     pub response_header_timeout: Duration,
@@ -44,6 +49,8 @@ impl Default for RuntimeLimits {
             max_stream_frame_bytes: 256 * 1024,
             max_http_error_body_bytes: 64 * 1024,
             max_token_count_response_bytes: 64 * 1024,
+            max_response_header_count: 64,
+            max_response_header_bytes: 16 * 1024,
             dns_timeout: Duration::from_secs(10),
             connect_timeout: Duration::from_secs(10),
             response_header_timeout: Duration::from_secs(60),
@@ -201,6 +208,12 @@ impl ProviderRuntime {
         };
         let deadline = started_at + self.limits.overall_timeout;
 
+        validate_response_metadata(
+            &response,
+            self.limits.max_response_header_count,
+            self.limits.max_response_header_bytes,
+        )?;
+
         if !response.status().is_success() {
             let error = read_http_error(
                 response,
@@ -337,6 +350,10 @@ impl Default for ProviderRuntime {
     }
 }
 
+#[cfg(test)]
+#[path = "network_fault_tests.rs"]
+mod network_fault_tests;
+
 async fn deliver_decoded(
     decoded: DecodedFrame,
     events: &mpsc::Sender<ProviderStreamEvent>,
@@ -416,6 +433,7 @@ async fn read_http_error(
     deadline: Instant,
 ) -> RuntimeError {
     let status = response.status();
+    let retry_decision = retry_decision_for_status(status, response.headers());
     let mut body = response.bytes_stream();
     // The body is deliberately never parsed or reflected to the caller. Some
     // providers/proxies echo request material in error payloads. Zeroize the
@@ -434,14 +452,14 @@ async fn read_http_error(
                 "provider returned an oversized HTTP error body",
             )
             .with_http_status(status.as_u16())
-            .retriable(is_retriable_status(status));
+            .with_retry_decision(retry_decision);
         }
         bytes.extend_from_slice(&chunk);
     }
     let (code, message) = stable_http_error(provider);
     RuntimeError::new(RuntimeErrorKind::HttpStatus, code, message)
         .with_http_status(status.as_u16())
-        .retriable(is_retriable_status(status))
+        .with_retry_decision(retry_decision)
 }
 
 fn stable_http_error(provider: ProviderId) -> (&'static str, &'static str) {
@@ -474,8 +492,69 @@ fn timeout_error(code: &'static str) -> RuntimeError {
     .retriable(true)
 }
 
-fn is_retriable_status(status: StatusCode) -> bool {
-    matches!(status.as_u16(), 408 | 425 | 429 | 500 | 502 | 503 | 504)
+fn retry_decision_for_status(status: StatusCode, headers: &HeaderMap) -> RetryDecision {
+    if status == StatusCode::TOO_MANY_REQUESTS
+        && let Some(delay) = parse_retry_after(headers)
+    {
+        return RetryDecision::RetryAfter { delay };
+    }
+    if matches!(status.as_u16(), 408 | 425 | 429 | 500 | 502 | 503 | 504) {
+        RetryDecision::exponential()
+    } else {
+        RetryDecision::Never
+    }
+}
+
+fn parse_retry_after(headers: &HeaderMap) -> Option<Duration> {
+    // Delta-seconds is deterministic and dependency-free. HTTP-date remains a
+    // caller-visible exponential-backoff decision rather than relying on wall
+    // clock parsing. Clamp hostile values to the product retry ceiling.
+    headers
+        .get(RETRY_AFTER)?
+        .to_str()
+        .ok()?
+        .parse::<u64>()
+        .ok()
+        .map(|seconds| Duration::from_secs(seconds.min(5 * 60)))
+}
+
+pub(crate) fn validate_response_metadata(
+    response: &Response,
+    maximum_header_count: usize,
+    maximum_header_bytes: usize,
+) -> Result<()> {
+    let mut count = 0usize;
+    let mut bytes = 0usize;
+    for (name, value) in response.headers() {
+        count = count.saturating_add(1);
+        bytes = bytes
+            .saturating_add(name.as_str().len())
+            .saturating_add(value.as_bytes().len())
+            .saturating_add(4);
+        if count > maximum_header_count || bytes > maximum_header_bytes {
+            return Err(RuntimeError::new(
+                RuntimeErrorKind::Http,
+                "RESPONSE_HEADERS_TOO_LARGE",
+                "provider response headers exceeded the runtime limit",
+            ));
+        }
+    }
+
+    for value in response.headers().get_all(CONTENT_ENCODING) {
+        let valid_identity = value.to_str().ok().is_some_and(|value| {
+            value
+                .split(',')
+                .all(|encoding| encoding.trim().eq_ignore_ascii_case("identity"))
+        });
+        if !valid_identity {
+            return Err(RuntimeError::new(
+                RuntimeErrorKind::Http,
+                "UNSUPPORTED_CONTENT_ENCODING",
+                "compressed provider responses are not accepted",
+            ));
+        }
+    }
+    Ok(())
 }
 
 fn validate_limits(limits: &RuntimeLimits) -> Result<()> {
@@ -483,6 +562,8 @@ fn validate_limits(limits: &RuntimeLimits) -> Result<()> {
     const MAX_STREAM_FRAME_BYTES: usize = 256 * 1024;
     const MAX_HTTP_ERROR_BODY_BYTES: usize = 64 * 1024;
     const MAX_TOKEN_COUNT_RESPONSE_BYTES: usize = 64 * 1024;
+    const MAX_RESPONSE_HEADER_COUNT: usize = 128;
+    const MAX_RESPONSE_HEADER_BYTES: usize = 64 * 1024;
     if !(1024..=MAX_REQUEST_BODY_BYTES).contains(&limits.max_request_body_bytes)
         || limits.max_stream_frame_bytes < 1024
         || limits.max_stream_frame_bytes > MAX_STREAM_FRAME_BYTES
@@ -490,6 +571,8 @@ fn validate_limits(limits: &RuntimeLimits) -> Result<()> {
         || limits.max_http_error_body_bytes > MAX_HTTP_ERROR_BODY_BYTES
         || limits.max_token_count_response_bytes < 1024
         || limits.max_token_count_response_bytes > MAX_TOKEN_COUNT_RESPONSE_BYTES
+        || !(8..=MAX_RESPONSE_HEADER_COUNT).contains(&limits.max_response_header_count)
+        || !(1024..=MAX_RESPONSE_HEADER_BYTES).contains(&limits.max_response_header_bytes)
         || limits.dns_timeout.is_zero()
         || limits.dns_timeout > Duration::from_secs(60)
         || limits.connect_timeout.is_zero()

@@ -6,7 +6,7 @@ use lorepia_prompt::{
     ExactTokenResult,
 };
 use lorepia_providers::{CompiledProviderRequest, ProviderId, ProviderOptions, ProviderRequest};
-use reqwest::header::{ACCEPT, CONTENT_TYPE, HeaderMap, HeaderName, HeaderValue};
+use reqwest::header::{ACCEPT, ACCEPT_ENCODING, CONTENT_TYPE, HeaderMap, HeaderName, HeaderValue};
 use serde::Deserialize;
 use serde_json::{Map, Value};
 use tokio_util::sync::CancellationToken;
@@ -15,6 +15,7 @@ use crate::{
     EndpointSelection, ProviderCredential, RuntimeError, RuntimeErrorKind, RuntimeLimits,
     client::{attach_credential, build_secure_client, validate_credential_scope},
     endpoint::resolve_endpoint,
+    runner::validate_response_metadata,
 };
 
 const JSON_CONTENT_TYPE: &str = "application/json";
@@ -102,6 +103,7 @@ impl<'a> ProviderExactTokenCounter<'a> {
         .map_err(map_runtime_error)?;
         let mut headers = HeaderMap::new();
         headers.insert(ACCEPT, HeaderValue::from_static(JSON_CONTENT_TYPE));
+        headers.insert(ACCEPT_ENCODING, HeaderValue::from_static("identity"));
         headers.insert(CONTENT_TYPE, HeaderValue::from_static(JSON_CONTENT_TYPE));
         for (name, value) in compiled.static_headers() {
             let name = HeaderName::from_bytes(name.as_bytes()).map_err(|_| {
@@ -144,6 +146,12 @@ impl<'a> ProviderExactTokenCounter<'a> {
             )
             .retriable(true)
         })?;
+        validate_response_metadata(
+            &response,
+            self.limits.max_response_header_count,
+            self.limits.max_response_header_bytes,
+        )
+        .map_err(map_runtime_error)?;
         if !response.status().is_success() {
             let status = response.status();
             return Err(ExactTokenCountError::new(
