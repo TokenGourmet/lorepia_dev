@@ -12,6 +12,7 @@ Svelte 5 static product screen
      -> write-only credential commands -> five-OS OS credential store
      -> provider stream commands -> native HTTPS/SSE/NDJSON runtime
      -> typed storage commands -> app-local SQLite v1
+     -> get_asset_store_status -> lazy bounded app-local asset status
 ```
 
 The internal bootstrap response is intentionally exact and small:
@@ -28,7 +29,10 @@ It records a JavaScript payload's byte length and SHA-256 identity as immutable
 field, and imported or stale settings cannot change the fixed disabled policy.
 
 The application still exposes no general filesystem, shell, dialog, plugin,
-audio, import, Lua, raw-SQL, or imported-code command. The production CSP blocks
+audio, import, Lua, raw-SQL, or imported-code command. Its one
+[`asset-store status command`](product-assets.md) accepts no input and exposes
+only bounded aggregate metadata; it exposes no object read or mutation operation.
+The production CSP blocks
 remote browser networking. The trusted main WebView has narrow credential,
 provider-stream, and typed product-storage command surfaces; provider traffic
 leaves through the Rust HTTP client, not browser `fetch`. See the
