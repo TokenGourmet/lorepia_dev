@@ -1,0 +1,13 @@
+diff --git a/spikes/channel-stream/src/lib/stream-contract.test.ts b/spikes/channel-stream/src/lib/stream-contract.test.ts
+index 9a709fe..1efd3be 100644
+--- a/spikes/channel-stream/src/lib/stream-contract.test.ts
++++ b/spikes/channel-stream/src/lib/stream-contract.test.ts
+@@ -249,7 +249,7 @@ describe("terminal snapshot contract", () => {
+         requestId: "request-2",
+         status: "failed",
+         lastSeq: 4,
+-        lastAckedSeq: 2,
++        lastAckedSeq: 3,
+         inFlight: 1,
+         text: "다름",
+         error: { code: "MOCK_FAILURE", message: "failed" },
