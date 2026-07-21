@@ -26,12 +26,25 @@ jobs:
           echo '2e5523e6f4185c22ca0d9a55b990e5caf600829005b410fe130004657bf23424  dccleaner-safe-v03-bootstrap/source.tar.gz.b64.part-00' | sha256sum -c -
           echo '2cad70c4bf1522bc69a01aa6c9c6788aac641e4f959d67f273ef3481a4939bd6  dccleaner-safe-v03-bootstrap/source.tar.gz.b64.part-01' | sha256sum -c -
           echo 'd1ca6784dc3f5635ea98de4b93bf655588010e812145cd859ba38c3a0aa918f1  dccleaner-safe-v03-bootstrap/source.tar.gz.b64.part-02' | sha256sum -c -
-          echo '2aa2fbea75f78ad73d1c3604e6eeb4a7b667cca0e3950d5be48c1e744187ed06  dccleaner-safe-v03-bootstrap/source.tar.gz.b64.part-03' | sha256sum -c -
+          echo 'f3069db715b93685be5564980e7c855281e5426115facef24ff863770c99e6ee  dccleaner-safe-v03-bootstrap/source.tar.gz.b64.part-03a' | sha256sum -c -
+          echo 'b05b68b8d56823196b901a12b119e7d1f4f3ef01e580e3f523dcf190064fb043  dccleaner-safe-v03-bootstrap/source.tar.gz.b64.part-03b' | sha256sum -c -
+          echo '5a39135d7a01a01432b14a508d18246423a46215132a1b742dc99ac89dd2a995  dccleaner-safe-v03-bootstrap/source.tar.gz.b64.part-03c' | sha256sum -c -
           echo '93ee36604c52692e42d8e03eeeb3a8a3a8023645a4ff537d8796d1185c339b2c  dccleaner-safe-v03-bootstrap/source.tar.gz.b64.part-04' | sha256sum -c -
           echo '878c7bfb9690fec654802003c9c56527e422b0ef0911950891bf7b95072815ff  dccleaner-safe-v03-bootstrap/source.tar.gz.b64.part-05' | sha256sum -c -
           echo '4149fa52b78827d0b3dc88e965efdb45258742b00c6af4318608e3fa16839c8a  dccleaner-safe-v03-bootstrap/source.tar.gz.b64.part-06' | sha256sum -c -
           echo '353afc5104f21afac33905a2ceaa3a070555bfe2384e25cd8a73bc236f6fd25d  dccleaner-safe-v03-bootstrap/source.tar.gz.b64.part-07' | sha256sum -c -
-          cat dccleaner-safe-v03-bootstrap/source.tar.gz.b64.part-* > /tmp/dccleaner-safe-v03-source.tar.gz.b64
+          cat \
+            dccleaner-safe-v03-bootstrap/source.tar.gz.b64.part-00 \
+            dccleaner-safe-v03-bootstrap/source.tar.gz.b64.part-01 \
+            dccleaner-safe-v03-bootstrap/source.tar.gz.b64.part-02 \
+            dccleaner-safe-v03-bootstrap/source.tar.gz.b64.part-03a \
+            dccleaner-safe-v03-bootstrap/source.tar.gz.b64.part-03b \
+            dccleaner-safe-v03-bootstrap/source.tar.gz.b64.part-03c \
+            dccleaner-safe-v03-bootstrap/source.tar.gz.b64.part-04 \
+            dccleaner-safe-v03-bootstrap/source.tar.gz.b64.part-05 \
+            dccleaner-safe-v03-bootstrap/source.tar.gz.b64.part-06 \
+            dccleaner-safe-v03-bootstrap/source.tar.gz.b64.part-07 \
+            > /tmp/dccleaner-safe-v03-source.tar.gz.b64
           echo 'b139b00556f262c1fe782d1c2798815ad39460344e809000d226760048e763d8  /tmp/dccleaner-safe-v03-source.tar.gz.b64' | sha256sum -c -
           base64 --decode /tmp/dccleaner-safe-v03-source.tar.gz.b64 > /tmp/DC-Cleaner-Safe-0.3.0-source.tar.gz
           echo '3a0a129e4e6af0311ad162177250fc8b63a5308b7ba3c6bdda827005b2463f98  /tmp/DC-Cleaner-Safe-0.3.0-source.tar.gz' | sha256sum -c -
