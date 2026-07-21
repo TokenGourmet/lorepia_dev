@@ -164,9 +164,9 @@ are in [`docs/m1/script-runner.md`](docs/m1/script-runner.md).
 Start with [`docs/m1/README.md`](docs/m1/README.md). A green desktop CI job proves source formatting, tests, type checking, and compilation on that runner only. An Android APK build or iOS simulator build is compile evidence only. Neither is physical-device smoke evidence.
 
 The latest indexed implementation subject is `d56388e`: its
-[Product workflow](https://github.com/TokenGourmet/lorepia_dev/actions/runs/29671504268)
+[Product workflow](https://github.com/Dokpamo/lorepia_dev/actions/runs/29671504268)
 passed 6/6 jobs and its
-[M-1 workflow](https://github.com/TokenGourmet/lorepia_dev/actions/runs/29671504249)
+[M-1 workflow](https://github.com/Dokpamo/lorepia_dev/actions/runs/29671504249)
 passed 30/30 jobs. Exact job links and runtime limitations are in the
 [verification matrix](docs/m1/verification-matrix.md).
 

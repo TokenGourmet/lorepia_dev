@@ -5,7 +5,7 @@ description = "Five-OS native credential vault for LorePia provider authenticati
 edition = "2024"
 license = "Apache-2.0"
 authors = ["LorePia contributors"]
-repository = "https://github.com/TokenGourmet/lorepia_dev"
+repository = "https://github.com/Dokpamo/lorepia_dev"
 
 [dependencies]
 keyring-core = "=1.0.0"

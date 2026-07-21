@@ -162,9 +162,9 @@ source and hosted-CI evidence receives its own exact-commit record.
 
 Implementation subject `d56388e` has a separate reproducible
 [`local and hosted receipt`](evidence/2026-07-19-hardening-d56388e.md).
-Its [Product run](https://github.com/TokenGourmet/lorepia_dev/actions/runs/29671504268)
+Its [Product run](https://github.com/Dokpamo/lorepia_dev/actions/runs/29671504268)
 passed all six quality/desktop/mobile-compile jobs, and its
-[M-1 run](https://github.com/TokenGourmet/lorepia_dev/actions/runs/29671504249)
+[M-1 run](https://github.com/Dokpamo/lorepia_dev/actions/runs/29671504249)
 passed all 30 spike jobs. This closes the hosted compile/check failures for that
 exact subject only. It does not establish a physical-device or packaged
 Windows/Linux runtime pass.

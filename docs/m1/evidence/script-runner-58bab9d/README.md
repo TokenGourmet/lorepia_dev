@@ -57,15 +57,15 @@ results:
 
 | Target | Result | Evidence | Runtime limitation |
 |---|---|---|---|
-| Windows desktop | **PASS** | [compile/test job](https://github.com/TokenGourmet/lorepia_dev/actions/runs/29674968473/job/88160626055) | No packaged WebView2 launch |
-| macOS desktop | **PASS** | [compile/test job](https://github.com/TokenGourmet/lorepia_dev/actions/runs/29674968473/job/88160626132) | Hosted checks do not replace the packaged-host run below |
-| Linux desktop | **PASS** | [compile/test job](https://github.com/TokenGourmet/lorepia_dev/actions/runs/29674968473/job/88160626121) | No packaged WebKitGTK launch |
-| Android ARM64 | **PASS (compile only)** | [APK job](https://github.com/TokenGourmet/lorepia_dev/actions/runs/29674968473/job/88160626025) | No install or WebView launch in CI |
-| iOS ARM64 simulator | **PASS (compile only)** | [simulator-app job](https://github.com/TokenGourmet/lorepia_dev/actions/runs/29674968473/job/88160626033) | No launch, signing, or physical device in CI |
+| Windows desktop | **PASS** | [compile/test job](https://github.com/Dokpamo/lorepia_dev/actions/runs/29674968473/job/88160626055) | No packaged WebView2 launch |
+| macOS desktop | **PASS** | [compile/test job](https://github.com/Dokpamo/lorepia_dev/actions/runs/29674968473/job/88160626132) | Hosted checks do not replace the packaged-host run below |
+| Linux desktop | **PASS** | [compile/test job](https://github.com/Dokpamo/lorepia_dev/actions/runs/29674968473/job/88160626121) | No packaged WebKitGTK launch |
+| Android ARM64 | **PASS (compile only)** | [APK job](https://github.com/Dokpamo/lorepia_dev/actions/runs/29674968473/job/88160626025) | No install or WebView launch in CI |
+| iOS ARM64 simulator | **PASS (compile only)** | [simulator-app job](https://github.com/Dokpamo/lorepia_dev/actions/runs/29674968473/job/88160626033) | No launch, signing, or physical device in CI |
 
 The complete replacement M-1 matrix finished with all 35 jobs successful.
 The exact-implementation
-[product scaffold run](https://github.com/TokenGourmet/lorepia_dev/actions/runs/29674867356)
+[product scaffold run](https://github.com/Dokpamo/lorepia_dev/actions/runs/29674867356)
 also passed all six product jobs, preserving the product execution lockout.
 
 ## macOS packaged Tauri WKWebView
@@ -192,16 +192,16 @@ failure.
   screenshot is committed. The Android UI hierarchy and local artifact hash
   manifest were inspected during the exact-commit rerun.
 - The first exact-implementation
-  [M-1 run](https://github.com/TokenGourmet/lorepia_dev/actions/runs/29674866736)
+  [M-1 run](https://github.com/Dokpamo/lorepia_dev/actions/runs/29674866736)
   exposed a Windows checkout failure: Git converted the LF-pinned fixture to
   CRLF, changing `allowed.js` from 84 to 88 bytes. Commit `2ab7672` fixes only
   checkout portability by enforcing LF for the hash-pinned fixture directory;
   it does not change fixture or runtime source bytes. All five script-runner
   jobs passed in the replacement
-  [M-1 run](https://github.com/TokenGourmet/lorepia_dev/actions/runs/29674968473),
+  [M-1 run](https://github.com/Dokpamo/lorepia_dev/actions/runs/29674968473),
   whose complete matrix passed all 35 jobs,
   and the exact-implementation
-  [product scaffold run](https://github.com/TokenGourmet/lorepia_dev/actions/runs/29674867356)
+  [product scaffold run](https://github.com/Dokpamo/lorepia_dev/actions/runs/29674867356)
   passed all six jobs.
 - The Android result is emulator evidence, not a physical-device result.
 - No Windows or Linux runtime is recorded.

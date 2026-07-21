@@ -195,10 +195,10 @@ cargo check --locked --manifest-path src-tauri/Cargo.toml --all-targets
 Desktop CI runs those source, contract, frontend, and Rust checks. Android CI
 cross-compiles a debug ARM64 APK, and iOS CI compiles a debug ARM64 simulator
 app. All five script-runner jobs passed in the exact-candidate
-[M-1 run](https://github.com/TokenGourmet/lorepia_dev/actions/runs/29674968473),
+[M-1 run](https://github.com/Dokpamo/lorepia_dev/actions/runs/29674968473),
 whose complete matrix passed all 35 jobs,
 and the exact-implementation
-[product scaffold run](https://github.com/TokenGourmet/lorepia_dev/actions/runs/29674867356)
+[product scaffold run](https://github.com/Dokpamo/lorepia_dev/actions/runs/29674867356)
 passed all six jobs. Hosted compilation does not launch a WebView and cannot
 replace the local runtime observations or future physical-device evidence.
 

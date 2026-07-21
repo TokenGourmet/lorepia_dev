@@ -27,41 +27,41 @@ These rows are deliberately separate from the runtime matrix.
 
 | Target / vertical | Evidence level | Current state | Evidence |
 |---|---|---|---|
-| Windows / Channel | Hosted native compile/test | PASS | [`d56388e` job](https://github.com/TokenGourmet/lorepia_dev/actions/runs/29671504249/job/88151282418); no packaged WebView runtime |
-| Windows / keychain | Hosted native compile/test | PASS | [`d56388e` job](https://github.com/TokenGourmet/lorepia_dev/actions/runs/29671504249/job/88151282405); no credential-service runtime |
-| Windows / SQLite/FTS5 | Hosted native compile/test | PASS | [`d56388e` job](https://github.com/TokenGourmet/lorepia_dev/actions/runs/29671504249/job/88151282427); no file-locking/search runtime |
-| Windows / import hardening | Hosted native compile/test | PASS | [`d56388e` job](https://github.com/TokenGourmet/lorepia_dev/actions/runs/29671504249/job/88151282400); no system picker/runtime import |
-| Windows / Lua limits | Hosted native compile/test | PASS | [`d56388e` job](https://github.com/TokenGourmet/lorepia_dev/actions/runs/29671504249/job/88151282423); fixed diagnostic corpus only |
-| Windows / Audio playback | Hosted native compile/test and emitted-fixture identity check | PASS | [`d56388e` job](https://github.com/TokenGourmet/lorepia_dev/actions/runs/29671504249/job/88151282406); no audio device or lifecycle exercised |
-| Windows / Script runner | Hosted native compile/test and emitted Worker/WASM boundary check | PASS | [`2ab7672` job](https://github.com/TokenGourmet/lorepia_dev/actions/runs/29674968473/job/88160626055); LF-pinned fixtures passed, no packaged WebView2 runtime |
-| macOS / Channel | Hosted native compile/test | PASS | [`d56388e` job](https://github.com/TokenGourmet/lorepia_dev/actions/runs/29671504249/job/88151282403); hosted checks only |
-| macOS / keychain | Hosted native compile/test | PASS | [`d56388e` job](https://github.com/TokenGourmet/lorepia_dev/actions/runs/29671504249/job/88151282401); no Keychain runtime |
-| macOS / SQLite/FTS5 | Hosted native compile/test | PASS | [`d56388e` job](https://github.com/TokenGourmet/lorepia_dev/actions/runs/29671504249/job/88151282425); separate physical-host record remains below |
-| macOS / import hardening | Hosted native compile/test | PASS | [`d56388e` job](https://github.com/TokenGourmet/lorepia_dev/actions/runs/29671504249/job/88151282433); no system picker/runtime import |
-| macOS / Lua limits | Hosted native compile/test | PASS | [`d56388e` job](https://github.com/TokenGourmet/lorepia_dev/actions/runs/29671504249/job/88151282428); fixed diagnostic corpus only |
-| macOS / Audio playback | Hosted native compile/test and emitted-fixture identity check | PASS | [`d56388e` job](https://github.com/TokenGourmet/lorepia_dev/actions/runs/29671504249/job/88151282417); no audio device or lifecycle exercised |
-| macOS / Script runner | Hosted native compile/test and emitted Worker/WASM boundary check | PASS | [`2ab7672` job](https://github.com/TokenGourmet/lorepia_dev/actions/runs/29674968473/job/88160626132); separate packaged-host runtime record remains below |
-| Linux / Channel | Hosted native compile/test | PASS | [`d56388e` job](https://github.com/TokenGourmet/lorepia_dev/actions/runs/29671504249/job/88151282389); no packaged WebView runtime |
-| Linux / keychain | Hosted native compile/test | PASS | [`d56388e` job](https://github.com/TokenGourmet/lorepia_dev/actions/runs/29671504249/job/88151282424); no Secret Service runtime |
-| Linux / SQLite/FTS5 | Hosted native compile/test | PASS | [`d56388e` job](https://github.com/TokenGourmet/lorepia_dev/actions/runs/29671504249/job/88151282338); no file-locking/search runtime |
-| Linux / import hardening | Hosted native compile/test | PASS | [`d56388e` job](https://github.com/TokenGourmet/lorepia_dev/actions/runs/29671504249/job/88151282415); no system picker/runtime import |
-| Linux / Lua limits | Hosted native compile/test | PASS | [`d56388e` job](https://github.com/TokenGourmet/lorepia_dev/actions/runs/29671504249/job/88151282351); fixed diagnostic corpus only |
-| Linux / Audio playback | Hosted native compile/test and emitted-fixture identity check | PASS | [`d56388e` job](https://github.com/TokenGourmet/lorepia_dev/actions/runs/29671504249/job/88151282361); no audio device or lifecycle exercised |
-| Linux / Script runner | Hosted native compile/test and emitted Worker/WASM boundary check | PASS | [`2ab7672` job](https://github.com/TokenGourmet/lorepia_dev/actions/runs/29674968473/job/88160626121); no packaged WebKitGTK runtime |
-| Android ARM64 / Channel | Hosted cross-compile to debug APK | PASS (compile only) | [`d56388e` job](https://github.com/TokenGourmet/lorepia_dev/actions/runs/29671504249/job/88151282337); APK existence/hash checked, no install/runtime |
-| Android ARM64 / keychain | Hosted cross-compile to debug APK | PASS (compile only) | [`d56388e` job](https://github.com/TokenGourmet/lorepia_dev/actions/runs/29671504249/job/88151282318); APK existence/hash checked, no Keystore runtime |
-| Android ARM64 / SQLite/FTS5 | Hosted cross-compile to debug APK | PASS (compile only) | [`d56388e` job](https://github.com/TokenGourmet/lorepia_dev/actions/runs/29671504249/job/88151282326); APK existence/hash checked, no database runtime |
-| Android ARM64 / import hardening | Hosted cross-compile to debug APK | PASS (compile only) | [`d56388e` job](https://github.com/TokenGourmet/lorepia_dev/actions/runs/29671504249/job/88151282328); APK existence/hash checked, no picker/import runtime |
-| Android ARM64 / Lua limits | Hosted cross-compile to debug APK | PASS (compile only) | [`d56388e` job](https://github.com/TokenGourmet/lorepia_dev/actions/runs/29671504249/job/88151282324); APK existence/hash checked, no Lua runtime |
-| Android ARM64 / Audio playback | Hosted cross-compile to debug APK and emitted-fixture identity check | PASS (compile only) | [`d56388e` job](https://github.com/TokenGourmet/lorepia_dev/actions/runs/29671504249/job/88151282344); install, output, lifecycle, and release remain `NOT RUN` |
-| Android ARM64 / Script runner | Hosted cross-compile to debug APK and emitted Worker/WASM boundary check | PASS (compile only) | [`2ab7672` job](https://github.com/TokenGourmet/lorepia_dev/actions/runs/29674968473/job/88160626025); no install or WebView runtime in CI |
-| iOS ARM64 / Channel | Hosted simulator compile | PASS (compile only) | [`d56388e` job](https://github.com/TokenGourmet/lorepia_dev/actions/runs/29671504249/job/88151282305); `.app`/Info.plist checked, no launch |
-| iOS ARM64 / keychain | Hosted simulator compile | PASS (compile only) | [`d56388e` job](https://github.com/TokenGourmet/lorepia_dev/actions/runs/29671504249/job/88151282316); `.app`/Info.plist checked, no signed Keychain runtime |
-| iOS ARM64 / SQLite/FTS5 | Hosted simulator compile | PASS (compile only) | [`d56388e` job](https://github.com/TokenGourmet/lorepia_dev/actions/runs/29671504249/job/88151282327); `.app`/Info.plist checked, no database runtime |
-| iOS ARM64 / import hardening | Hosted simulator compile | PASS (compile only) | [`d56388e` job](https://github.com/TokenGourmet/lorepia_dev/actions/runs/29671504249/job/88151282342); `.app`/Info.plist checked, no picker/import runtime |
-| iOS ARM64 / Lua limits | Hosted simulator compile | PASS (compile only) | [`d56388e` job](https://github.com/TokenGourmet/lorepia_dev/actions/runs/29671504249/job/88151282304); `.app`/Info.plist and vendored symbols checked, no Lua runtime |
-| iOS ARM64 / Audio playback | Hosted simulator compile and emitted-fixture identity check | PASS (compile only) | [`d56388e` job](https://github.com/TokenGourmet/lorepia_dev/actions/runs/29671504249/job/88151282311); launch, output, lifecycle, and release remain `NOT RUN` |
-| iOS ARM64 / Script runner | Hosted simulator compile and emitted Worker/WASM boundary check | PASS (compile only) | [`2ab7672` job](https://github.com/TokenGourmet/lorepia_dev/actions/runs/29674968473/job/88160626033); `.app` verified, no launch or signed-device runtime in CI |
+| Windows / Channel | Hosted native compile/test | PASS | [`d56388e` job](https://github.com/Dokpamo/lorepia_dev/actions/runs/29671504249/job/88151282418); no packaged WebView runtime |
+| Windows / keychain | Hosted native compile/test | PASS | [`d56388e` job](https://github.com/Dokpamo/lorepia_dev/actions/runs/29671504249/job/88151282405); no credential-service runtime |
+| Windows / SQLite/FTS5 | Hosted native compile/test | PASS | [`d56388e` job](https://github.com/Dokpamo/lorepia_dev/actions/runs/29671504249/job/88151282427); no file-locking/search runtime |
+| Windows / import hardening | Hosted native compile/test | PASS | [`d56388e` job](https://github.com/Dokpamo/lorepia_dev/actions/runs/29671504249/job/88151282400); no system picker/runtime import |
+| Windows / Lua limits | Hosted native compile/test | PASS | [`d56388e` job](https://github.com/Dokpamo/lorepia_dev/actions/runs/29671504249/job/88151282423); fixed diagnostic corpus only |
+| Windows / Audio playback | Hosted native compile/test and emitted-fixture identity check | PASS | [`d56388e` job](https://github.com/Dokpamo/lorepia_dev/actions/runs/29671504249/job/88151282406); no audio device or lifecycle exercised |
+| Windows / Script runner | Hosted native compile/test and emitted Worker/WASM boundary check | PASS | [`2ab7672` job](https://github.com/Dokpamo/lorepia_dev/actions/runs/29674968473/job/88160626055); LF-pinned fixtures passed, no packaged WebView2 runtime |
+| macOS / Channel | Hosted native compile/test | PASS | [`d56388e` job](https://github.com/Dokpamo/lorepia_dev/actions/runs/29671504249/job/88151282403); hosted checks only |
+| macOS / keychain | Hosted native compile/test | PASS | [`d56388e` job](https://github.com/Dokpamo/lorepia_dev/actions/runs/29671504249/job/88151282401); no Keychain runtime |
+| macOS / SQLite/FTS5 | Hosted native compile/test | PASS | [`d56388e` job](https://github.com/Dokpamo/lorepia_dev/actions/runs/29671504249/job/88151282425); separate physical-host record remains below |
+| macOS / import hardening | Hosted native compile/test | PASS | [`d56388e` job](https://github.com/Dokpamo/lorepia_dev/actions/runs/29671504249/job/88151282433); no system picker/runtime import |
+| macOS / Lua limits | Hosted native compile/test | PASS | [`d56388e` job](https://github.com/Dokpamo/lorepia_dev/actions/runs/29671504249/job/88151282428); fixed diagnostic corpus only |
+| macOS / Audio playback | Hosted native compile/test and emitted-fixture identity check | PASS | [`d56388e` job](https://github.com/Dokpamo/lorepia_dev/actions/runs/29671504249/job/88151282417); no audio device or lifecycle exercised |
+| macOS / Script runner | Hosted native compile/test and emitted Worker/WASM boundary check | PASS | [`2ab7672` job](https://github.com/Dokpamo/lorepia_dev/actions/runs/29674968473/job/88160626132); separate packaged-host runtime record remains below |
+| Linux / Channel | Hosted native compile/test | PASS | [`d56388e` job](https://github.com/Dokpamo/lorepia_dev/actions/runs/29671504249/job/88151282389); no packaged WebView runtime |
+| Linux / keychain | Hosted native compile/test | PASS | [`d56388e` job](https://github.com/Dokpamo/lorepia_dev/actions/runs/29671504249/job/88151282424); no Secret Service runtime |
+| Linux / SQLite/FTS5 | Hosted native compile/test | PASS | [`d56388e` job](https://github.com/Dokpamo/lorepia_dev/actions/runs/29671504249/job/88151282338); no file-locking/search runtime |
+| Linux / import hardening | Hosted native compile/test | PASS | [`d56388e` job](https://github.com/Dokpamo/lorepia_dev/actions/runs/29671504249/job/88151282415); no system picker/runtime import |
+| Linux / Lua limits | Hosted native compile/test | PASS | [`d56388e` job](https://github.com/Dokpamo/lorepia_dev/actions/runs/29671504249/job/88151282351); fixed diagnostic corpus only |
+| Linux / Audio playback | Hosted native compile/test and emitted-fixture identity check | PASS | [`d56388e` job](https://github.com/Dokpamo/lorepia_dev/actions/runs/29671504249/job/88151282361); no audio device or lifecycle exercised |
+| Linux / Script runner | Hosted native compile/test and emitted Worker/WASM boundary check | PASS | [`2ab7672` job](https://github.com/Dokpamo/lorepia_dev/actions/runs/29674968473/job/88160626121); no packaged WebKitGTK runtime |
+| Android ARM64 / Channel | Hosted cross-compile to debug APK | PASS (compile only) | [`d56388e` job](https://github.com/Dokpamo/lorepia_dev/actions/runs/29671504249/job/88151282337); APK existence/hash checked, no install/runtime |
+| Android ARM64 / keychain | Hosted cross-compile to debug APK | PASS (compile only) | [`d56388e` job](https://github.com/Dokpamo/lorepia_dev/actions/runs/29671504249/job/88151282318); APK existence/hash checked, no Keystore runtime |
+| Android ARM64 / SQLite/FTS5 | Hosted cross-compile to debug APK | PASS (compile only) | [`d56388e` job](https://github.com/Dokpamo/lorepia_dev/actions/runs/29671504249/job/88151282326); APK existence/hash checked, no database runtime |
+| Android ARM64 / import hardening | Hosted cross-compile to debug APK | PASS (compile only) | [`d56388e` job](https://github.com/Dokpamo/lorepia_dev/actions/runs/29671504249/job/88151282328); APK existence/hash checked, no picker/import runtime |
+| Android ARM64 / Lua limits | Hosted cross-compile to debug APK | PASS (compile only) | [`d56388e` job](https://github.com/Dokpamo/lorepia_dev/actions/runs/29671504249/job/88151282324); APK existence/hash checked, no Lua runtime |
+| Android ARM64 / Audio playback | Hosted cross-compile to debug APK and emitted-fixture identity check | PASS (compile only) | [`d56388e` job](https://github.com/Dokpamo/lorepia_dev/actions/runs/29671504249/job/88151282344); install, output, lifecycle, and release remain `NOT RUN` |
+| Android ARM64 / Script runner | Hosted cross-compile to debug APK and emitted Worker/WASM boundary check | PASS (compile only) | [`2ab7672` job](https://github.com/Dokpamo/lorepia_dev/actions/runs/29674968473/job/88160626025); no install or WebView runtime in CI |
+| iOS ARM64 / Channel | Hosted simulator compile | PASS (compile only) | [`d56388e` job](https://github.com/Dokpamo/lorepia_dev/actions/runs/29671504249/job/88151282305); `.app`/Info.plist checked, no launch |
+| iOS ARM64 / keychain | Hosted simulator compile | PASS (compile only) | [`d56388e` job](https://github.com/Dokpamo/lorepia_dev/actions/runs/29671504249/job/88151282316); `.app`/Info.plist checked, no signed Keychain runtime |
+| iOS ARM64 / SQLite/FTS5 | Hosted simulator compile | PASS (compile only) | [`d56388e` job](https://github.com/Dokpamo/lorepia_dev/actions/runs/29671504249/job/88151282327); `.app`/Info.plist checked, no database runtime |
+| iOS ARM64 / import hardening | Hosted simulator compile | PASS (compile only) | [`d56388e` job](https://github.com/Dokpamo/lorepia_dev/actions/runs/29671504249/job/88151282342); `.app`/Info.plist checked, no picker/import runtime |
+| iOS ARM64 / Lua limits | Hosted simulator compile | PASS (compile only) | [`d56388e` job](https://github.com/Dokpamo/lorepia_dev/actions/runs/29671504249/job/88151282304); `.app`/Info.plist and vendored symbols checked, no Lua runtime |
+| iOS ARM64 / Audio playback | Hosted simulator compile and emitted-fixture identity check | PASS (compile only) | [`d56388e` job](https://github.com/Dokpamo/lorepia_dev/actions/runs/29671504249/job/88151282311); launch, output, lifecycle, and release remain `NOT RUN` |
+| iOS ARM64 / Script runner | Hosted simulator compile and emitted Worker/WASM boundary check | PASS (compile only) | [`2ab7672` job](https://github.com/Dokpamo/lorepia_dev/actions/runs/29674968473/job/88160626033); `.app` verified, no launch or signed-device runtime in CI |
 | macOS arm64 / SQLite/FTS5 exact candidate | Local packaged debug `.app` build and physical-host runtime | PASS | [source `39dfef0` record](evidence/sqlite-macos-39dfef0/) |
 | macOS arm64 / import-hardening exact candidate | Local packaged debug `.app` build and physical-host synthetic-core runtime | PASS twice (`26/26` each) | [source `46af753` record](evidence/import-hardening-macos-46af753/); no picker or external file was used, so File import and Archive/import hardening cells remain `NOT RUN` |
 | Android ARM64 / import-hardening exact candidate | Local cross-compile to debug APK, no device | PASS (compile only) | [source `46af753` record](evidence/import-hardening-mobile-compile-46af753/); APK metadata and debug signature were inspected, but install/runtime/import remain `NOT RUN` |
@@ -75,22 +75,22 @@ These rows are deliberately separate from the runtime matrix.
 ### Hosted CI repair history
 
 - The first complete run at `e4c1c65` preserved five Windows failures in
-  [run `29669864571`](https://github.com/TokenGourmet/lorepia_dev/actions/runs/29669864571):
+  [run `29669864571`](https://github.com/Dokpamo/lorepia_dev/actions/runs/29669864571):
   Channel CSP/Cargo-lock checks and the import/Lua/SQLite fixture checks saw
   checkout CRLF bytes, while Keychain failed Windows-only Clippy. Windows audio
   passed. The fix pins byte-identity inputs to LF and removes the needless
   Windows `return`; expected hashes were not rewritten to accept changed bytes.
 - A later exact Windows Lua job preserved a second CRLF assumption in a Rust
   manifest/lockfile string assertion
-  ([failed job](https://github.com/TokenGourmet/lorepia_dev/actions/runs/29671131767/job/88150205416)).
+  ([failed job](https://github.com/Dokpamo/lorepia_dev/actions/runs/29671131767/job/88150205416)).
   Semantic config checks now normalize CRLF before matching.
 - The first 1 MiB Channel rerun preserved a hosted-Windows scheduling timeout
-  ([failed job](https://github.com/TokenGourmet/lorepia_dev/actions/runs/29671321654/job/88150759252)).
+  ([failed job](https://github.com/Dokpamo/lorepia_dev/actions/runs/29671321654/job/88150759252)).
   The integrity test still proves exact bytes, sequence, terminal state, and
   sub-4096-byte events, but uses a bounded 30-second CI-tolerant deadline; it is
   not treated as a five-second performance gate.
 - Final implementation subject `d56388e` passed all
-  [30 M-1 jobs](https://github.com/TokenGourmet/lorepia_dev/actions/runs/29671504249).
+  [30 M-1 jobs](https://github.com/Dokpamo/lorepia_dev/actions/runs/29671504249).
   These repairs do not alter the physical-runtime matrix above.
 
 ## Isolation baseline observations (not physical-device evidence)
