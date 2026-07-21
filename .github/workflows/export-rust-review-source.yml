@@ -29,12 +29,12 @@ jobs:
             --exclude=.git \
             --exclude='**/target' \
             --exclude='**/node_modules' \
-            -czf lorepia-rust-review-source.tar.gz .
+            -czf "$RUNNER_TEMP/lorepia-rust-review-source.tar.gz" .
 
       - name: Upload source archive
         uses: actions/upload-artifact@v4
         with:
           name: lorepia-rust-review-source
-          path: lorepia-rust-review-source.tar.gz
+          path: ${{ runner.temp }}/lorepia-rust-review-source.tar.gz
           if-no-files-found: error
           retention-days: 1
