@@ -1,0 +1,148 @@
+name: Build DC Cleaner Safe 0.4 APK
+
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - 'dccleaner-safe-v04-bootstrap/**'
+      - '.github/workflows/dccleaner-safe-v04.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Restore audited 0.3 source and apply verified 0.4 fix
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          # Restore the exact source used for the verified 0.3 build.
+          echo '2e5523e6f4185c22ca0d9a55b990e5caf600829005b410fe130004657bf23424  dccleaner-safe-v03-bootstrap/source.tar.gz.b64.part-00' | sha256sum -c -
+          echo '2cad70c4bf1522bc69a01aa6c9c6788aac641e4f959d67f273ef3481a4939bd6  dccleaner-safe-v03-bootstrap/source.tar.gz.b64.part-01' | sha256sum -c -
+          echo 'd1ca6784dc3f5635ea98de4b93bf655588010e812145cd859ba38c3a0aa918f1  dccleaner-safe-v03-bootstrap/source.tar.gz.b64.part-02' | sha256sum -c -
+          echo 'f3069db715b93685be5564980e7c855281e5426115facef24ff863770c99e6ee  dccleaner-safe-v03-bootstrap/source.tar.gz.b64.part-03a' | sha256sum -c -
+          echo 'b05b68b8d56823196b901a12b119e7d1f4f3ef01e580e3f523dcf190064fb043  dccleaner-safe-v03-bootstrap/source.tar.gz.b64.part-03b' | sha256sum -c -
+          echo '5a39135d7a01a01432b14a508d18246423a46215132a1b742dc99ac89dd2a995  dccleaner-safe-v03-bootstrap/source.tar.gz.b64.part-03c' | sha256sum -c -
+          echo '93ee36604c52692e42d8e03eeeb3a8a3a8023645a4ff537d8796d1185c339b2c  dccleaner-safe-v03-bootstrap/source.tar.gz.b64.part-04' | sha256sum -c -
+          echo '878c7bfb9690fec654802003c9c56527e422b0ef0911950891bf7b95072815ff  dccleaner-safe-v03-bootstrap/source.tar.gz.b64.part-05' | sha256sum -c -
+          echo '4149fa52b78827d0b3dc88e965efdb45258742b00c6af4318608e3fa16839c8a  dccleaner-safe-v03-bootstrap/source.tar.gz.b64.part-06' | sha256sum -c -
+          echo '353afc5104f21afac33905a2ceaa3a070555bfe2384e25cd8a73bc236f6fd25d  dccleaner-safe-v03-bootstrap/source.tar.gz.b64.part-07' | sha256sum -c -
+          cat \
+            dccleaner-safe-v03-bootstrap/source.tar.gz.b64.part-00 \
+            dccleaner-safe-v03-bootstrap/source.tar.gz.b64.part-01 \
+            dccleaner-safe-v03-bootstrap/source.tar.gz.b64.part-02 \
+            dccleaner-safe-v03-bootstrap/source.tar.gz.b64.part-03a \
+            dccleaner-safe-v03-bootstrap/source.tar.gz.b64.part-03b \
+            dccleaner-safe-v03-bootstrap/source.tar.gz.b64.part-03c \
+            dccleaner-safe-v03-bootstrap/source.tar.gz.b64.part-04 \
+            dccleaner-safe-v03-bootstrap/source.tar.gz.b64.part-05 \
+            dccleaner-safe-v03-bootstrap/source.tar.gz.b64.part-06 \
+            dccleaner-safe-v03-bootstrap/source.tar.gz.b64.part-07 \
+            > /tmp/dccleaner-safe-v03-source.tar.gz.b64
+          echo 'b139b00556f262c1fe782d1c2798815ad39460344e809000d226760048e763d8  /tmp/dccleaner-safe-v03-source.tar.gz.b64' | sha256sum -c -
+          base64 --decode /tmp/dccleaner-safe-v03-source.tar.gz.b64 > /tmp/DC-Cleaner-Safe-0.3.0-source.tar.gz
+          echo '3a0a129e4e6af0311ad162177250fc8b63a5308b7ba3c6bdda827005b2463f98  /tmp/DC-Cleaner-Safe-0.3.0-source.tar.gz' | sha256sum -c -
+          mkdir -p dccleaner-safe-v04
+          tar -xzf /tmp/DC-Cleaner-Safe-0.3.0-source.tar.gz -C dccleaner-safe-v04
+
+          # Verify and apply only the reviewed gallog compatibility patch.
+          echo 'd183caaaeb1bfb6eb1d8d02f55a30090b1901baab408f8298bccaf81dee462fc  dccleaner-safe-v04-bootstrap/v04-patch.b64.part-00' | sha256sum -c -
+          echo '4b442ad915b0e1059b3b55d751ea4ae04a2c746a48677e3061010ff74b51583d  dccleaner-safe-v04-bootstrap/v04-patch.b64.part-01' | sha256sum -c -
+          echo '1616df598c8f797c03b3b773eec9ed5a7c6285cad3a16d9bc5e581da841b3ae9  dccleaner-safe-v04-bootstrap/v04-patch.b64.part-02' | sha256sum -c -
+          echo 'e6441cfd65d4e63c2ab52a4f3af5cce37a7c28514da2987f9b4e814ecc15a1b6  dccleaner-safe-v04-bootstrap/v04-patch.b64.part-03' | sha256sum -c -
+          echo '09f376fc24e83ac7a933559dcc40483f14bf45b6980f56e5178fc58c19dc6ab9  dccleaner-safe-v04-bootstrap/v04-patch.b64.part-04' | sha256sum -c -
+          cat dccleaner-safe-v04-bootstrap/v04-patch.b64.part-* > /tmp/dccleaner-safe-v04.patch.b64
+          echo 'c5b27ea836393e4139ba2e905211a41b01cadf6ef9dcde14d95ff3c4b1e70153  /tmp/dccleaner-safe-v04.patch.b64' | sha256sum -c -
+          base64 --decode /tmp/dccleaner-safe-v04.patch.b64 > /tmp/dccleaner-safe-v04.patch
+          echo '1181f97740e91598f0247c353e8519d95b581a5c2cc13c933a6106c4421017ba  /tmp/dccleaner-safe-v04.patch' | sha256sum -c -
+          (cd dccleaner-safe-v04 && patch -p2 --batch --forward < /tmp/dccleaner-safe-v04.patch)
+
+          grep -Fq "versionName '0.4.0'" dccleaner-safe-v04/app/build.gradle
+          grep -Fq '/index?page=' dccleaner-safe-v04/app/src/main/java/com/tokengourmet/dccleanersafe/DcClient.java
+          grep -Fq 'CURRENT_INDEX_PAGE' dccleaner-safe-v04/app/src/main/java/com/tokengourmet/dccleanersafe/DcClient.java
+          grep -Fq 'browserUserAgent' dccleaner-safe-v04/app/src/main/java/com/tokengourmet/dccleanersafe/MainActivity.java
+
+          (
+            cd dccleaner-safe-v04
+            tar --sort=name --mtime='UTC 2026-07-21 00:00:00' --owner=0 --group=0 --numeric-owner \
+              --exclude='./build' --exclude='./app/build' --exclude='./.gradle' --exclude='./dist' \
+              -czf /tmp/DC-Cleaner-Safe-0.4.0-source.tar.gz .
+          )
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - uses: android-actions/setup-android@v3
+
+      - name: Install pinned Android SDK packages
+        shell: bash
+        run: |
+          yes | sdkmanager --licenses >/dev/null || true
+          sdkmanager 'platforms;android-35' 'build-tools;35.0.0'
+
+      - uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: '8.9'
+
+      - name: Unit tests, lint, and APK build
+        working-directory: dccleaner-safe-v04
+        run: gradle --no-daemon --stacktrace clean testDebugUnitTest lintDebug assembleDebug
+
+      - name: Verify APK privacy and attack surface
+        id: security
+        continue-on-error: true
+        working-directory: dccleaner-safe-v04
+        shell: bash
+        run: |
+          set -o pipefail
+          bash -x scripts/security-check.sh app/build/outputs/apk/debug/app-debug.apk 2>&1 | tee security-check.log
+
+      - name: Record dependency graph
+        if: always()
+        working-directory: dccleaner-safe-v04
+        run: gradle --no-daemon app:dependencies --configuration debugRuntimeClasspath > dependencies.txt
+
+      - name: Stage deliverables
+        if: always()
+        working-directory: dccleaner-safe-v04
+        shell: bash
+        run: |
+          set -euo pipefail
+          rm -rf dist
+          mkdir -p dist
+          cp app/build/outputs/apk/debug/app-debug.apk dist/DC-Cleaner-Safe-0.4.0-debug.apk
+          cp README.md AUDIT.md LICENSE dist/
+          cp /tmp/DC-Cleaner-Safe-0.4.0-source.tar.gz dist/
+          for report in permissions.txt apk-badging.txt manifest-tree.txt signature.txt dependencies.txt security-check.log app-debug.apk.sha256 dex-files.txt dex-packages.txt; do
+            if [[ -f "$report" ]]; then cp "$report" dist/; fi
+          done
+          curl --fail --location --retry 3 --silent --show-error \
+            https://www.gnu.org/licenses/agpl-3.0.txt \
+            --output dist/LICENSE-AGPL-3.0.txt
+          (cd dist && sha256sum \
+            DC-Cleaner-Safe-0.4.0-debug.apk \
+            DC-Cleaner-Safe-0.4.0-source.tar.gz \
+            LICENSE-AGPL-3.0.txt > SHA256SUMS.txt)
+
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: dc-cleaner-safe-v0.4-apk
+          path: dccleaner-safe-v04/dist/
+          if-no-files-found: error
+          retention-days: 14
+
+      - name: Enforce security gate
+        if: always()
+        shell: bash
+        run: test '${{ steps.security.outcome }}' = 'success'
