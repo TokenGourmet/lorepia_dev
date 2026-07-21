@@ -1,0 +1,297 @@
+{
+  "$schema": "./schema.json",
+  "schemaVersion": 1,
+  "project": "LorePia",
+  "asOf": {
+    "date": "2026-07-20",
+    "commit": "b8243f386a44e495229183051a0519c6843e34f8",
+    "branch": "agent/m1-product-script-contract"
+  },
+  "sources": {
+    "extremePlan": {
+      "name": "LorePia_Extreme_Test_Plan_2026-07-20.md",
+      "sha256": "3e3c58b280034c6865a9dff100fafef1bf308575b0e242aafbd4dfcf87f03589"
+    },
+    "launchAudit": {
+      "name": "LorePia_Launch_Audit_2026-07-20.md",
+      "sha256": "f42c95d19ca7c56823ab6f0fc710491ceb8725c9fb3ad88db3b77f9c00cf581c"
+    }
+  },
+  "extremeChecks": {
+    "defaultTracking": {
+      "status": "not_run",
+      "evidence": [],
+      "commit": null,
+      "commands": []
+    },
+    "ranges": [
+      { "prefix": "CHAT", "start": 1, "end": 40 },
+      { "prefix": "STREAM", "start": 1, "end": 30 },
+      { "prefix": "NET", "start": 1, "end": 25 },
+      { "prefix": "DB", "start": 1, "end": 40 },
+      { "prefix": "BACKUP", "start": 1, "end": 20 },
+      { "prefix": "ASSET", "start": 1, "end": 40 },
+      { "prefix": "LORE", "start": 1, "end": 25 },
+      { "prefix": "SCRIPT", "start": 1, "end": 30 },
+      { "prefix": "SECRET", "start": 1, "end": 25 },
+      { "prefix": "LIFE", "start": 1, "end": 25 },
+      { "prefix": "SEC", "start": 1, "end": 30 },
+      { "prefix": "SOAK", "start": 1, "end": 15 },
+      { "prefix": "REL", "start": 1, "end": 20 }
+    ],
+    "overrides": {}
+  },
+  "launchAudit": {
+    "findings": [
+      {
+        "id": "P0-1",
+        "severity": "P0",
+        "title": "제품이 아직 없다",
+        "status": "in_progress",
+        "evidence": [
+          { "kind": "commit", "value": "601b3bf", "note": "native provider stream wired to the chat product path" },
+          { "kind": "commit", "value": "b8243f3", "note": "first-chat SQLite persistence and restart recovery landed" },
+          { "kind": "path", "value": "apps/desktop-mobile/src/routes/chat/+page.svelte", "note": "product chat surface consumes the native stream" }
+        ],
+        "commit": "b8243f386a44e495229183051a0519c6843e34f8",
+        "commands": [
+          "cargo test --locked --workspace",
+          "npm --prefix apps/desktop-mobile test"
+        ],
+        "remaining": "A first-chat vertical slice exists, but import, assets, backup, release operation, and broad product workflows are not launch-complete."
+      },
+      {
+        "id": "P0-2",
+        "severity": "P0",
+        "title": "출시 후보가 Draft PR 스택에만 있다",
+        "status": "open",
+        "evidence": [
+          { "kind": "git", "value": "main@4898333", "note": "current work is still on agent/m1-product-script-contract rather than the default branch" }
+        ],
+        "commit": "b8243f386a44e495229183051a0519c6843e34f8",
+        "commands": [
+          "git branch --show-current",
+          "git rev-parse main HEAD"
+        ],
+        "remaining": "Review, merge to the protected default branch, and establish a signed release tag."
+      },
+      {
+        "id": "P0-3",
+        "severity": "P0",
+        "title": "실기기·성능 증거가 거의 없다",
+        "status": "open",
+        "evidence": [
+          { "kind": "path", "value": "docs/m1/verification-matrix.md", "note": "the repository matrix distinguishes compile, simulator, emulator, and physical-device evidence" }
+        ],
+        "commit": "b8243f386a44e495229183051a0519c6843e34f8",
+        "commands": [],
+        "remaining": "Collect physical five-OS evidence and raw p50/p95/p99 resource measurements."
+      },
+      {
+        "id": "P0-4",
+        "severity": "P0",
+        "title": "Channel ACK가 영원히 오지 않으면 영구 정지한다",
+        "status": "in_progress",
+        "evidence": [
+          { "kind": "path", "value": "apps/desktop-mobile/src-tauri/src/provider_stream.rs", "note": "30-second ACK timeout, 128-request admission, and five-minute terminal retention are now explicit" },
+          { "kind": "commit", "value": "601b3bf", "note": "product-native ACK, cancel, terminal snapshot, and cleanup path landed" }
+        ],
+        "commit": "b8243f386a44e495229183051a0519c6843e34f8",
+        "commands": [
+          "cargo test --locked -p lorepia-app provider_stream"
+        ],
+        "remaining": "Owner-window cleanup, total in-flight byte accounting, and 128-dead-request then 129th-request chaos evidence remain."
+      },
+      {
+        "id": "P0-5",
+        "severity": "P0",
+        "title": "제품 데이터 내구성 경로가 없다",
+        "status": "in_progress",
+        "evidence": [
+          { "kind": "commit", "value": "b8243f3", "note": "chat, message, request state, checkpoint, terminal transition, and restart interruption recovery landed" },
+          { "kind": "path", "value": "crates/lorepia-storage/migrations/0001_chat_persistence.sql", "note": "strict v1 product schema and FTS are present" },
+          { "kind": "path", "value": "crates/lorepia-storage/tests/streaming.rs", "note": "stream checkpoint and terminal transition tests are present" }
+        ],
+        "commit": "b8243f386a44e495229183051a0519c6843e34f8",
+        "commands": [
+          "cargo test --locked -p lorepia-storage"
+        ],
+        "remaining": "Disk-full, WAL damage, migration chains, backup/restore, and asset transaction durability remain."
+      },
+      {
+        "id": "P0-6",
+        "severity": "P0",
+        "title": "릴리스 파이프라인이 없다",
+        "status": "open",
+        "evidence": [
+          { "kind": "path", "value": ".github/workflows/product.yml", "note": "verification and compile CI exists, but this is not a signed release-candidate pipeline" }
+        ],
+        "commit": "b8243f386a44e495229183051a0519c6843e34f8",
+        "commands": [],
+        "remaining": "Signing, notarization, AAB/archive/export, SBOM, provenance, update, and rollback workflows."
+      },
+      {
+        "id": "P0-7",
+        "severity": "P0",
+        "title": "스토어·개인정보 기능이 미구현이다",
+        "status": "open",
+        "evidence": [
+          { "kind": "path", "value": "docs/m0/imported-executable-quarantine.md", "note": "imported executable content remains fail-closed" }
+        ],
+        "commit": "b8243f386a44e495229183051a0519c6843e34f8",
+        "commands": [],
+        "remaining": "In-app disclosure, privacy/support URLs, AI-output reporting, redacted diagnostics, and review notes."
+      },
+      {
+        "id": "P1-1",
+        "severity": "P1",
+        "title": "Android FileProvider 범위가 지나치게 넓다",
+        "status": "open",
+        "evidence": [
+          { "kind": "path", "value": "apps/desktop-mobile/src-tauri/gen/android/app/src/main/res/xml/file_paths.xml", "note": "external-path and cache-path still map path dot" }
+        ],
+        "commit": "b8243f386a44e495229183051a0519c6843e34f8",
+        "commands": [],
+        "remaining": "Limit mappings to app-owned import/share subdirectories or remove unused provider exposure."
+      },
+      {
+        "id": "P1-2",
+        "severity": "P1",
+        "title": "Android TV 런처가 의도치 않게 켜져 있다",
+        "status": "open",
+        "evidence": [
+          { "kind": "path", "value": "apps/desktop-mobile/src-tauri/gen/android/app/src/main/AndroidManifest.xml", "note": "LEANBACK_LAUNCHER remains present" }
+        ],
+        "commit": "b8243f386a44e495229183051a0519c6843e34f8",
+        "commands": [],
+        "remaining": "Remove the TV launcher and leanback feature unless TV becomes an explicit target."
+      },
+      {
+        "id": "P1-3",
+        "severity": "P1",
+        "title": "스트림 처리 중 전체 문자열 복사가 반복된다",
+        "status": "open",
+        "evidence": [
+          { "kind": "path", "value": "apps/desktop-mobile/src/lib/providers/stream.ts", "note": "performance and allocation limits lack large-response benchmark evidence" }
+        ],
+        "commit": "b8243f386a44e495229183051a0519c6843e34f8",
+        "commands": [],
+        "remaining": "Incremental hashing, chunked frontend accumulation, frame-batched rendering, and large-message benchmarks."
+      },
+      {
+        "id": "P1-4",
+        "severity": "P1",
+        "title": "IPC 전송 중 async mutex를 잡고 있다",
+        "status": "open",
+        "evidence": [
+          { "kind": "path", "value": "apps/desktop-mobile/src-tauri/src/provider_stream.rs", "note": "send_non_terminal currently invokes send_direct while the request machine mutex is held" }
+        ],
+        "commit": "b8243f386a44e495229183051a0519c6843e34f8",
+        "commands": [],
+        "remaining": "Reserve sequence under lock, release it before IPC send, then reconcile the result or move to a request actor."
+      },
+      {
+        "id": "P1-5",
+        "severity": "P1",
+        "title": "Delta 분할이 할당·직렬화를 반복한다",
+        "status": "open",
+        "evidence": [
+          { "kind": "path", "value": "apps/desktop-mobile/src-tauri/src/provider_stream.rs", "note": "split_utf8 returns owned String fragments" }
+        ],
+        "commit": "b8243f386a44e495229183051a0519c6843e34f8",
+        "commands": [],
+        "remaining": "Linear byte-boundary splitting and one final serialization check with benchmark coverage."
+      },
+      {
+        "id": "P1-6",
+        "severity": "P1",
+        "title": "임포트 스파이크는 대형 카드용 구현이 아니다",
+        "status": "open",
+        "evidence": [
+          { "kind": "path", "value": "spikes/import-hardening", "note": "bounded safety spike exists outside the product workspace" }
+        ],
+        "commit": "b8243f386a44e495229183051a0519c6843e34f8",
+        "commands": [],
+        "remaining": "Streaming Content URI/file importer, staging object store, quota, free-space, and cancellation product path."
+      },
+      {
+        "id": "P1-7",
+        "severity": "P1",
+        "title": "제품 DB 스키마가 10GB·수백만 턴을 위한 형태가 아니다",
+        "status": "open",
+        "evidence": [
+          { "kind": "path", "value": "crates/lorepia-storage/migrations/0001_chat_persistence.sql", "note": "v1 supports linear first chat, not branch paths, render-cache separation, or 10GB proof" }
+        ],
+        "commit": "b8243f386a44e495229183051a0519c6843e34f8",
+        "commands": [],
+        "remaining": "Branch schema, keyset path loading, evictable render cache, completion-only FTS indexing, and large-data plan tests."
+      },
+      {
+        "id": "P1-8",
+        "severity": "P1",
+        "title": "WAL checkpoint starvation 대책이 제품에 없다",
+        "status": "open",
+        "evidence": [
+          { "kind": "path", "value": "crates/lorepia-storage/src/store.rs", "note": "single-process lease exists, but WAL thresholds and reader-age observability do not" }
+        ],
+        "commit": "b8243f386a44e495229183051a0519c6843e34f8",
+        "commands": [],
+        "remaining": "Short read transactions, checkpoint policy, byte thresholds, reader-age telemetry, and starvation tests."
+      },
+      {
+        "id": "P1-9",
+        "severity": "P1",
+        "title": "“DB + assets 단일 zip” 백업은 10GB에서 위험하다",
+        "status": "open",
+        "evidence": [],
+        "commit": "b8243f386a44e495229183051a0519c6843e34f8",
+        "commands": [],
+        "remaining": "No product backup path exists; implement an online DB snapshot plus streaming asset package and atomic publish."
+      },
+      {
+        "id": "P1-10",
+        "severity": "P1",
+        "title": "QuickJS 후보는 고정 corpus 증거이지 제품 성능 증거가 아니다",
+        "status": "open",
+        "evidence": [
+          { "kind": "commit", "value": "58bab9d", "note": "terminable Worker plus QuickJS candidate passed only its fixed corpus" },
+          { "kind": "path", "value": "docs/decisions/0001-imported-code-execution.md", "note": "product admission remains disabled by policy" }
+        ],
+        "commit": "b8243f386a44e495229183051a0519c6843e34f8",
+        "commands": [],
+        "remaining": "Keep Store-Safe off; physical, desktop, arbitrary-source, store-policy, and performance gates remain before any Advanced profile."
+      },
+      {
+        "id": "P1-11",
+        "severity": "P1",
+        "title": "Lua 50ms는 hard deadline이 아니다",
+        "status": "open",
+        "evidence": [
+          { "kind": "path", "value": "docs/m1/lua-limits.md", "note": "the limitation belongs to a spike and is not a product hard-real-time guarantee" }
+        ],
+        "commit": "b8243f386a44e495229183051a0519c6843e34f8",
+        "commands": [],
+        "remaining": "Retain the no-host-callback restriction or use a separately terminable process if Lua is ever admitted."
+      }
+    ],
+    "goConditions": [
+      { "id": "GO-001", "title": "제품 코드가 기본 브랜치에 병합되고 Draft 상태가 아님", "status": "fail", "evidence": [{ "kind": "git", "value": "agent/m1-product-script-contract@b8243f3", "note": "not the default branch" }], "commit": "b8243f386a44e495229183051a0519c6843e34f8", "commands": ["git branch --show-current", "git rev-parse main HEAD"] },
+      { "id": "GO-002", "title": "실제 채팅 수직 경로와 최소 2개 provider가 동작", "status": "in_progress", "evidence": [{ "kind": "commit", "value": "601b3bf", "note": "native provider stream product path exists; live-provider launch evidence is not recorded" }], "commit": "b8243f386a44e495229183051a0519c6843e34f8", "commands": ["cargo test --locked -p lorepia-provider-runtime", "npm --prefix apps/desktop-mobile test"] },
+      { "id": "GO-003", "title": "앱 재시작·WebView 재로드·네트워크 중단 후 partial 복구", "status": "in_progress", "evidence": [{ "kind": "path", "value": "crates/lorepia-storage/tests/concurrency.rs", "note": "restart interruption recovery exists; reload and network-disconnect recovery are not proven" }], "commit": "b8243f386a44e495229183051a0519c6843e34f8", "commands": ["cargo test --locked -p lorepia-storage"] },
+      { "id": "GO-004", "title": "ACK 미수신 요청이 TTL 뒤 정리되고 129번째 요청에서 정상 backpressure", "status": "in_progress", "evidence": [{ "kind": "path", "value": "apps/desktop-mobile/src-tauri/src/provider_stream.rs", "note": "ACK timeout and 128 admission cap exist; exact 129-request chaos proof remains" }], "commit": "b8243f386a44e495229183051a0519c6843e34f8", "commands": ["cargo test --locked -p lorepia-app provider_stream"] },
+      { "id": "GO-005", "title": "1M 메시지/10GB DB에서 일반 조작이 총 row 수에 비례해 느려지지 않음", "status": "not_run", "evidence": [], "commit": null, "commands": [] },
+      { "id": "GO-006", "title": "10GB backup/restore가 일관되고 취소·재시작 가능", "status": "not_run", "evidence": [], "commit": null, "commands": [] },
+      { "id": "GO-007", "title": "100k~1M asset에서 시작 시 전체 directory scan 없음", "status": "not_run", "evidence": [], "commit": null, "commands": [] },
+      { "id": "GO-008", "title": "디스크 부족·전원 차단·DB/WAL 손상 시 데이터 유실 규칙이 명확", "status": "not_run", "evidence": [], "commit": null, "commands": [] },
+      { "id": "GO-009", "title": "모든 지원 OS 물리 기기 기능 셀에 증거 존재", "status": "blocked", "evidence": [{ "kind": "path", "value": "docs/m1/verification-matrix.md", "note": "physical-device matrix is incomplete" }], "commit": "b8243f386a44e495229183051a0519c6843e34f8", "commands": [] },
+      { "id": "GO-010", "title": "기준기 p95/p99와 메모리·프레임 예산 통과", "status": "not_run", "evidence": [], "commit": null, "commands": [] },
+      { "id": "GO-011", "title": "imported JS/Lua OFF가 release binary에서 검증됨", "status": "in_progress", "evidence": [{ "kind": "path", "value": "apps/desktop-mobile/scripts/verify-built-executable-boundary.mjs", "note": "built-boundary verifier exists; signed release artifact evidence does not" }], "commit": "b8243f386a44e495229183051a0519c6843e34f8", "commands": ["npm --prefix apps/desktop-mobile run verify:built-boundary"] },
+      { "id": "GO-012", "title": "비밀값이 DB·로그·export·crash report·IPC에 없음", "status": "in_progress", "evidence": [{ "kind": "commit", "value": "01bc834", "note": "native credential vault boundary landed; full sentinel artifact scan remains" }], "commit": "b8243f386a44e495229183051a0519c6843e34f8", "commands": ["cargo test --locked -p lorepia-credential-vault"] },
+      { "id": "GO-013", "title": "Android FileProvider 범위 축소, 불필요한 TV 런처 제거", "status": "fail", "evidence": [{ "kind": "path", "value": "apps/desktop-mobile/src-tauri/gen/android/app/src/main/res/xml/file_paths.xml", "note": "root mapping remains" }, { "kind": "path", "value": "apps/desktop-mobile/src-tauri/gen/android/app/src/main/AndroidManifest.xml", "note": "LEANBACK_LAUNCHER remains" }], "commit": "b8243f386a44e495229183051a0519c6843e34f8", "commands": [] },
+      { "id": "GO-014", "title": "릴리스 서명·notarization·업데이트·롤백 검증", "status": "not_run", "evidence": [], "commit": null, "commands": [] },
+      { "id": "GO-015", "title": "개인정보처리방침·지원 URL·AI 출력 신고 기능·심사 노트 준비", "status": "not_run", "evidence": [], "commit": null, "commands": [] },
+      { "id": "GO-016", "title": "72시간 soak에서 메모리·WAL·FD·worker 수의 지속 증가 없음", "status": "not_run", "evidence": [], "commit": null, "commands": [] },
+      { "id": "GO-017", "title": "P0/P1 결함 0개", "status": "fail", "evidence": [{ "kind": "manifest", "value": "launchAudit.findings", "note": "no finding is currently marked verified" }], "commit": "b8243f386a44e495229183051a0519c6843e34f8", "commands": ["node tools/extreme-test-tracker/tracker.mjs summary"] }
+    ]
+  }
+}

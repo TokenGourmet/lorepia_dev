@@ -27,7 +27,9 @@ jobs:
         working-directory: apps/desktop-mobile
     steps:
       - name: Check out repository
-        uses: actions/checkout@v6
+        uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6
+        with:
+          persist-credentials: false
 
       - name: Install Linux Tauri dependencies
         run: |
@@ -41,22 +43,47 @@ jobs:
             libxdo-dev
 
       - name: Set up Node.js
-        uses: actions/setup-node@v6
+        uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6
         with:
           node-version: 22
           cache: npm
           cache-dependency-path: apps/desktop-mobile/package-lock.json
+
+      - name: Verify immutable workflow actions and checkout isolation
+        run: |
+          node --test ../../.github/scripts/verify-workflow-security.test.mjs
+          node ../../.github/scripts/verify-workflow-security.mjs
+
+      - name: Verify launch and extreme-test tracking contracts
+        run: |
+          node --test ../../tools/extreme-test-tracker/test/tracker.test.mjs
+          node ../../tools/extreme-test-tracker/tracker.mjs validate
+          node --test ../../tools/release-evidence/release-evidence.test.mjs
+          node --test ../../tools/secret-sentinel-scan/scan.test.mjs
 
       - name: Set up pinned Rust toolchain
         run: |
           rustup toolchain install 1.97.1 --profile minimal --component rustfmt --component clippy --no-self-update
           rustc --version --verbose
 
+      - name: Verify reviewed dependency licenses
+        run: |
+          cargo metadata --locked --format-version 1 > "$RUNNER_TEMP/cargo-metadata.json"
+          node ../../tools/release-evidence/verify-dependency-policy.mjs \
+            "$RUNNER_TEMP/cargo-metadata.json" \
+            package-lock.json \
+            ../../tools/release-evidence/dependency-policy.json
+
       - name: Install locked JavaScript dependencies
         run: npm ci
 
       - name: Run frontend contract tests
         run: npm test
+
+      - name: Verify native command, capability, and release CSP boundary
+        run: |
+          npm run verify:native-security-boundary
+          npm run verify:native-product-dependency-boundary
 
       - name: Audit JavaScript dependencies at moderate severity
         run: npm audit --audit-level=moderate
@@ -101,7 +128,9 @@ jobs:
         working-directory: apps/desktop-mobile
     steps:
       - name: Check out repository
-        uses: actions/checkout@v6
+        uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6
+        with:
+          persist-credentials: false
 
       - name: Install Linux Tauri dependencies
         if: runner.os == 'Linux'
@@ -116,7 +145,7 @@ jobs:
             libxdo-dev
 
       - name: Set up Node.js
-        uses: actions/setup-node@v6
+        uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6
         with:
           node-version: 22
           cache: npm
@@ -134,6 +163,16 @@ jobs:
       - name: Compile debug desktop executable without bundling
         run: npm run tauri build -- --debug --no-bundle --ci
 
+      - name: Verify final desktop native artifact has no imported-code runtime
+        shell: bash
+        run: |
+          artifact="../../target/debug/lorepia-app"
+          if [[ "$RUNNER_OS" == "Windows" ]]; then
+            artifact="${artifact}.exe"
+          fi
+          test -f "$artifact"
+          npm run verify:release-artifact-boundary -- "$artifact"
+
       - name: Verify product inputs stayed stable
         shell: bash
         run: git diff --exit-code -- ../../Cargo.lock package-lock.json src-tauri/permissions src-tauri/gen
@@ -148,26 +187,28 @@ jobs:
         working-directory: apps/desktop-mobile
     steps:
       - name: Check out repository
-        uses: actions/checkout@v6
+        uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6
+        with:
+          persist-credentials: false
 
       - name: Validate committed Gradle Wrapper JARs
-        uses: gradle/actions/wrapper-validation@v6
+        uses: gradle/actions/wrapper-validation@3f131e8634966bd73d06cc69884922b02e6faf92 # v6
 
       - name: Set up Node.js
-        uses: actions/setup-node@v6
+        uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6
         with:
           node-version: 22
           cache: npm
           cache-dependency-path: apps/desktop-mobile/package-lock.json
 
       - name: Set up Java 21
-        uses: actions/setup-java@v5
+        uses: actions/setup-java@03ad4de0992f5dab5e18fcb136590ce7c4a0ac95 # v5
         with:
           distribution: temurin
           java-version: "21"
 
       - name: Set up Android SDK command-line tools
-        uses: android-actions/setup-android@v4
+        uses: android-actions/setup-android@40fd30fb8d7440372e1316f5d1809ec01dcd3699 # v4
         with:
           cmdline-tools-version: "14742923"
           packages: ""
@@ -193,11 +234,27 @@ jobs:
           test -f src-tauri/gen/android/gradle/wrapper/gradle-wrapper.jar
           test -f src-tauri/gen/android/app/src/main/java/dev/lorepia/client/MainActivity.kt
 
-      - name: Compile debug ARM64 APK
-        run: npm run tauri android build -- --debug --target aarch64 --apk --ci
+      - name: Verify committed Android wrapper security boundary
+        run: npm run verify:android-wrapper-security
 
-      - name: Verify APK exists
-        run: test -n "$(find src-tauri/gen/android/app/build/outputs -type f -name '*.apk' -print -quit)"
+      - name: Compile debug ARM64 APK and AAB
+        run: npm run tauri android build -- --debug --target aarch64 --apk --aab --ci
+
+      - name: Re-verify Android wrapper security boundary after Tauri build
+        run: npm run verify:android-wrapper-security
+
+      - name: Verify APK and AAB exist
+        run: |
+          test -n "$(find src-tauri/gen/android/app/build/outputs -type f -name '*.apk' -print -quit)"
+          test -n "$(find src-tauri/gen/android/app/build/outputs -type f -name '*.aab' -print -quit)"
+
+      - name: Verify APK and AAB native libraries and resources have no imported-code runtime
+        run: |
+          apk_path="$(find src-tauri/gen/android/app/build/outputs -type f -name '*.apk' -print -quit)"
+          aab_path="$(find src-tauri/gen/android/app/build/outputs -type f -name '*.aab' -print -quit)"
+          test -n "$apk_path"
+          test -n "$aab_path"
+          npm run verify:release-artifact-boundary -- "$apk_path" "$aab_path"
 
       - name: Verify product inputs and wrapper stayed stable
         run: git diff --exit-code -- ../../Cargo.lock package-lock.json src-tauri/permissions src-tauri/gen/android
@@ -207,7 +264,7 @@ jobs:
           {
             echo "### Android evidence scope"
             echo ""
-            echo "The committed wrapper produced an ARM64 debug APK. No emulator or physical device was launched."
+            echo "The committed wrapper produced ARM64 debug APK and AAB artifacts, and both passed the GO-011 artifact boundary. No emulator or physical device was launched."
           } >> "$GITHUB_STEP_SUMMARY"
 
   ios-simulator-compile:
@@ -220,10 +277,12 @@ jobs:
         working-directory: apps/desktop-mobile
     steps:
       - name: Check out repository
-        uses: actions/checkout@v6
+        uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6
+        with:
+          persist-credentials: false
 
       - name: Set up Node.js
-        uses: actions/setup-node@v6
+        uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6
         with:
           node-version: 22
           cache: npm
@@ -253,6 +312,12 @@ jobs:
 
       - name: Verify simulator app exists
         run: test -n "$(find src-tauri/gen/apple/build/arm64-sim -maxdepth 1 -type d -name '*.app' -print -quit)"
+
+      - name: Verify iOS app native executable and resources have no imported-code runtime
+        run: |
+          app_path="$(find src-tauri/gen/apple/build/arm64-sim -maxdepth 1 -type d -name '*.app' -print -quit)"
+          test -n "$app_path"
+          npm run verify:release-artifact-boundary -- "$app_path"
 
       - name: Verify product inputs and wrapper stayed stable
         run: git diff --exit-code -- ../../Cargo.lock package-lock.json src-tauri/permissions src-tauri/gen/apple

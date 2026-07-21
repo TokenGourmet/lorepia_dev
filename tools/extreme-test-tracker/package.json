@@ -1,0 +1,14 @@
+{
+  "name": "@lorepia/extreme-test-tracker",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "test": "node --test",
+    "validate": "node tracker.mjs validate",
+    "summary": "node tracker.mjs summary"
+  },
+  "engines": {
+    "node": ">=20"
+  }
+}

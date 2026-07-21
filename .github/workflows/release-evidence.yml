@@ -1,0 +1,127 @@
+name: Unsigned release evidence
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: release-evidence-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  source-evidence:
+    name: Source manifest and SBOMs
+    runs-on: ubuntu-22.04
+    timeout-minutes: 45
+    permissions:
+      contents: read
+      id-token: write
+      attestations: write
+    steps:
+      - name: Check out exact source
+        uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6
+        with:
+          persist-credentials: false
+
+      - name: Install Linux Tauri dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install --yes \
+            build-essential \
+            libayatana-appindicator3-dev \
+            librsvg2-dev \
+            libssl-dev \
+            libwebkit2gtk-4.1-dev \
+            libxdo-dev
+
+      - name: Set up Node.js
+        uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: apps/desktop-mobile/package-lock.json
+
+      - name: Set up pinned Rust toolchain
+        run: |
+          rustup toolchain install 1.97.1 --profile minimal --no-self-update
+          rustc --version --verbose
+
+      - name: Install locked JavaScript dependencies
+        working-directory: apps/desktop-mobile
+        run: npm ci
+
+      - name: Verify source quality at the candidate commit
+        run: |
+          node --test .github/scripts/verify-workflow-security.test.mjs
+          node .github/scripts/verify-workflow-security.mjs
+          node --test tools/extreme-test-tracker/test/tracker.test.mjs
+          node tools/extreme-test-tracker/tracker.mjs validate
+          node --test tools/release-evidence/release-evidence.test.mjs
+          cargo test --locked --workspace --all-targets
+          cargo clippy --locked --workspace --all-targets -- -D warnings
+          npm --prefix apps/desktop-mobile test
+          npm --prefix apps/desktop-mobile run verify:native-security-boundary
+          npm --prefix apps/desktop-mobile run verify:native-product-dependency-boundary
+          npm --prefix apps/desktop-mobile run check
+          npm --prefix apps/desktop-mobile run build
+
+      - name: Generate source manifest and dependency SBOMs
+        run: |
+          mkdir -p artifacts/release-evidence
+          git ls-files -z > "$RUNNER_TEMP/tracked-files.z"
+          npm --prefix apps/desktop-mobile sbom --sbom-format cyclonedx > artifacts/release-evidence/npm.cdx.json
+          cargo metadata --locked --format-version 1 > "$RUNNER_TEMP/cargo-metadata.json"
+          node tools/release-evidence/verify-dependency-policy.mjs \
+            "$RUNNER_TEMP/cargo-metadata.json" \
+            apps/desktop-mobile/package-lock.json \
+            tools/release-evidence/dependency-policy.json
+          node tools/release-evidence/cargo-metadata-to-cyclonedx.mjs \
+            "$RUNNER_TEMP/cargo-metadata.json" \
+            > artifacts/release-evidence/cargo.cdx.json
+          node tools/release-evidence/generate-hash-manifest.mjs \
+            --base . \
+            --output artifacts/release-evidence/source-manifest.json \
+            --label lorepia-source \
+            --commit "${GITHUB_SHA}" \
+            --input-list0 "$RUNNER_TEMP/tracked-files.z"
+
+      - name: Create byte-stable evidence archive
+        run: |
+          tar \
+            --sort=name \
+            --mtime='UTC 1970-01-01' \
+            --owner=0 \
+            --group=0 \
+            --numeric-owner \
+            -cf - \
+            -C artifacts/release-evidence . \
+            | gzip -n > artifacts/lorepia-release-evidence.tar.gz
+          sha256sum artifacts/lorepia-release-evidence.tar.gz \
+            > artifacts/lorepia-release-evidence.tar.gz.sha256
+
+      - name: Attest evidence archive provenance
+        uses: actions/attest@a1948c3f048ba23858d222213b7c278aabede763 # v4.1.1
+        with:
+          subject-path: artifacts/lorepia-release-evidence.tar.gz
+
+      - name: Upload unsigned evidence bundle
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: unsigned-release-evidence-${{ github.sha }}
+          path: |
+            artifacts/release-evidence
+            artifacts/lorepia-release-evidence.tar.gz
+            artifacts/lorepia-release-evidence.tar.gz.sha256
+          if-no-files-found: error
+          retention-days: 30
+
+      - name: Record strict scope
+        run: |
+          {
+            echo "### Evidence scope"
+            echo ""
+            echo "This workflow records source hashes and dependency SBOMs only."
+            echo "It does not sign, notarize, publish, or prove a store release."
+          } >> "$GITHUB_STEP_SUMMARY"

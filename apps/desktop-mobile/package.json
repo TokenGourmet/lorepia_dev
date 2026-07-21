@@ -14,8 +14,12 @@
     "build": "npm run build:web && npm run verify:built-boundary",
     "build:web": "vite build",
     "verify:built-boundary": "node scripts/verify-built-executable-boundary.mjs",
+    "verify:android-wrapper-security": "node scripts/verify-android-wrapper-security.mjs",
+    "verify:native-security-boundary": "node scripts/verify-native-security-boundary.mjs",
+    "verify:native-product-dependency-boundary": "node scripts/verify-native-product-dependency-boundary.mjs",
+    "verify:release-artifact-boundary": "node scripts/verify-release-artifact-boundary.mjs",
     "preview": "vite preview",
-    "test": "vitest run",
+    "test": "vitest run && node --test scripts/strict-csp-svelte-preprocess.node-test.mjs scripts/verify-android-wrapper-security.node-test.mjs scripts/verify-native-product-dependency-boundary.node-test.mjs scripts/verify-native-security-boundary.node-test.mjs scripts/verify-release-artifact-boundary.node-test.mjs",
     "check": "svelte-kit sync && svelte-check --tsconfig ./tsconfig.json",
     "check:watch": "svelte-kit sync && svelte-check --tsconfig ./tsconfig.json --watch",
     "tauri": "tauri"
