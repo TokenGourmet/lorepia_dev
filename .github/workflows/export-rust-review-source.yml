@@ -1,0 +1,37 @@
+name: Export Rust review source
+
+on:
+  push:
+    branches:
+      - agent/rust-core-deep-review
+
+permissions:
+  contents: read
+
+jobs:
+  export:
+    runs-on: ubuntu-22.04
+    timeout-minutes: 10
+    steps:
+      - name: Check out exact branch head
+        uses: actions/checkout@v6
+        with:
+          ref: agent/rust-core-deep-review
+          fetch-depth: 0
+
+      - name: Record revision and package source
+        run: |
+          git rev-parse HEAD > REVIEW_COMMIT.txt
+          tar \
+            --exclude=.git \
+            --exclude='**/target' \
+            --exclude='**/node_modules' \
+            -czf lorepia-rust-review-source.tar.gz .
+
+      - name: Upload source archive
+        uses: actions/upload-artifact@v4
+        with:
+          name: lorepia-rust-review-source
+          path: lorepia-rust-review-source.tar.gz
+          if-no-files-found: error
+          retention-days: 1
