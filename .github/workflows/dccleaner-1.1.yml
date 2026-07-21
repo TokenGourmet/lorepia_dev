@@ -93,18 +93,47 @@ jobs:
         with:
           gradle-version: '8.9'
 
-      - name: Unit tests, lint, and APK build
-        working-directory: dccleaner-1.1-src
-        run: gradle --no-daemon --stacktrace clean testDebugUnitTest lintDebug assembleDebug
-
-      - name: Verify APK permissions, signing, DEX and privacy boundary
-        id: security
+      - name: Unit tests
+        id: tests
         continue-on-error: true
         working-directory: dccleaner-1.1-src
         shell: bash
         run: |
           set -o pipefail
-          bash -x scripts/security-check.sh app/build/outputs/apk/debug/app-debug.apk 2>&1 | tee security-check.log
+          gradle --no-daemon --stacktrace clean testDebugUnitTest 2>&1 | tee tests.log
+
+      - name: Android lint
+        id: lint
+        continue-on-error: true
+        working-directory: dccleaner-1.1-src
+        shell: bash
+        run: |
+          set -o pipefail
+          gradle --no-daemon --stacktrace lintDebug 2>&1 | tee lint.log
+
+      - name: Assemble APK
+        id: apk
+        continue-on-error: true
+        working-directory: dccleaner-1.1-src
+        shell: bash
+        run: |
+          set -o pipefail
+          gradle --no-daemon --stacktrace assembleDebug 2>&1 | tee assemble.log
+
+      - name: Verify APK permissions, signing, DEX and privacy boundary
+        id: security
+        if: always()
+        continue-on-error: true
+        working-directory: dccleaner-1.1-src
+        shell: bash
+        run: |
+          set -o pipefail
+          if [[ -f app/build/outputs/apk/debug/app-debug.apk ]]; then
+            bash -x scripts/security-check.sh app/build/outputs/apk/debug/app-debug.apk 2>&1 | tee security-check.log
+          else
+            echo 'APK was not produced' | tee security-check.log
+            exit 1
+          fi
 
       - name: Record dependency graph
         if: always()
@@ -119,19 +148,24 @@ jobs:
           set -euo pipefail
           rm -rf dist
           mkdir -p dist
-          cp app/build/outputs/apk/debug/app-debug.apk dist/DC-Cleaner-1.1.0.apk
+          if [[ -f app/build/outputs/apk/debug/app-debug.apk ]]; then
+            cp app/build/outputs/apk/debug/app-debug.apk dist/DC-Cleaner-1.1.0.apk
+          fi
           cp /tmp/DC-Cleaner-1.1.0-source.tar.gz dist/
           cp README.md AUDIT.md LICENSE dist/
-          for report in permissions.txt permissions-raw.txt apk-badging.txt manifest-tree.txt signature.txt dependencies.txt security-check.log app-debug.apk.sha256 dex-files.txt dex-packages.txt; do
+          for report in tests.log lint.log assemble.log permissions.txt permissions-raw.txt apk-badging.txt manifest-tree.txt signature.txt dependencies.txt security-check.log app-debug.apk.sha256 dex-files.txt dex-packages.txt; do
             if [[ -f "$report" ]]; then cp "$report" dist/; fi
           done
           curl --fail --location --retry 3 --silent --show-error \
             https://www.gnu.org/licenses/agpl-3.0.txt \
             --output dist/LICENSE-AGPL-3.0.txt
-          (cd dist && sha256sum \
-            DC-Cleaner-1.1.0.apk \
-            DC-Cleaner-1.1.0-source.tar.gz \
-            LICENSE-AGPL-3.0.txt > SHA256SUMS.txt)
+          (
+            cd dist
+            sha256sum DC-Cleaner-1.1.0-source.tar.gz LICENSE-AGPL-3.0.txt > SHA256SUMS.txt
+            if [[ -f DC-Cleaner-1.1.0.apk ]]; then
+              sha256sum DC-Cleaner-1.1.0.apk >> SHA256SUMS.txt
+            fi
+          )
 
       - uses: actions/upload-artifact@v4
         if: always()
@@ -141,7 +175,11 @@ jobs:
           if-no-files-found: error
           retention-days: 14
 
-      - name: Enforce security gate
+      - name: Enforce all gates
         if: always()
         shell: bash
-        run: test '${{ steps.security.outcome }}' = 'success'
+        run: |
+          test '${{ steps.tests.outcome }}' = 'success'
+          test '${{ steps.lint.outcome }}' = 'success'
+          test '${{ steps.apk.outcome }}' = 'success'
+          test '${{ steps.security.outcome }}' = 'success'
