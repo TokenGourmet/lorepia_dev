@@ -1,0 +1,48 @@
+name: Export DC Cleaner Background source
+
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - 'dccleaner-background-v05/**'
+      - '.github/workflows/dccleaner-source-export.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  export:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Restore exact source archive
+        shell: bash
+        run: |
+          set -euo pipefail
+          cat \
+            dccleaner-background-v05/source.tar.gz.b64.part-00 \
+            dccleaner-background-v05/source.tar.gz.b64.part-01 \
+            dccleaner-background-v05/source.tar.gz.b64.part-02 \
+            dccleaner-background-v05/source.tar.gz.b64.part-03 \
+            dccleaner-background-v05/source.tar.gz.b64.tail-00 \
+            dccleaner-background-v05/source.tar.gz.b64.tail-01 \
+            dccleaner-background-v05/source.tar.gz.b64.tail-02 \
+            dccleaner-background-v05/source.tar.gz.b64.tail-03 \
+            dccleaner-background-v05/source.tar.gz.b64.tail-04 \
+            dccleaner-background-v05/source.tar.gz.b64.tail-05 \
+            dccleaner-background-v05/source.tar.gz.b64.tail-06 \
+            dccleaner-background-v05/source.tar.gz.b64.tail-07 \
+            > /tmp/source.tar.gz.b64
+          echo '609958c106b1b8d3140e2e768155e9d0f7be9554ae7388f25b7a069bb1a1941e  /tmp/source.tar.gz.b64' | sha256sum -c -
+          base64 --decode /tmp/source.tar.gz.b64 > /tmp/DC-Cleaner-Background-0.5.0-source.tar.gz
+          echo '32b08817a0d50943dfcd2f664f41dd7016068f709a1756d2f4e5b4370b3084d9  /tmp/DC-Cleaner-Background-0.5.0-source.tar.gz' | sha256sum -c -
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: dccleaner-background-source
+          path: /tmp/DC-Cleaner-Background-0.5.0-source.tar.gz
+          if-no-files-found: error
+          retention-days: 2
