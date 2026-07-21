@@ -1,0 +1,101 @@
+name: Build DC Cleaner Safe 0.2 APK
+
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - 'dccleaner-safe-v02-bootstrap/**'
+      - '.github/workflows/dccleaner-safe-v02.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Restore and verify pinned source
+        shell: bash
+        run: |
+          set -euo pipefail
+          cat dccleaner-safe-v02-bootstrap/source.tar.gz.b64.part-* > /tmp/dccleaner-safe-v02-source.tar.gz.b64
+          echo '2ff53f67fa77c50ae8112d602004034a9752d385fa173d78dd945d61120c2b6d  /tmp/dccleaner-safe-v02-source.tar.gz.b64' | sha256sum -c -
+          base64 --decode /tmp/dccleaner-safe-v02-source.tar.gz.b64 > /tmp/DC-Cleaner-Safe-0.2.0-source.tar.gz
+          echo 'a8860922826addf8eee93eff890826ade76019e6758969c45c062038b86461cd  /tmp/DC-Cleaner-Safe-0.2.0-source.tar.gz' | sha256sum -c -
+          mkdir -p dccleaner-safe-v02
+          tar -xzf /tmp/DC-Cleaner-Safe-0.2.0-source.tar.gz -C dccleaner-safe-v02
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - uses: android-actions/setup-android@v3
+
+      - name: Install pinned Android SDK packages
+        shell: bash
+        run: |
+          yes | sdkmanager --licenses >/dev/null || true
+          sdkmanager 'platforms;android-35' 'build-tools;35.0.0'
+
+      - uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: '8.9'
+
+      - name: Unit tests, lint, and APK build
+        working-directory: dccleaner-safe-v02
+        run: gradle --no-daemon --stacktrace clean testDebugUnitTest lintDebug assembleDebug
+
+      - name: Verify APK privacy and attack surface
+        id: security
+        continue-on-error: true
+        working-directory: dccleaner-safe-v02
+        shell: bash
+        run: |
+          set -o pipefail
+          bash -x scripts/security-check.sh app/build/outputs/apk/debug/app-debug.apk 2>&1 | tee security-check.log
+
+      - name: Record dependency graph
+        if: always()
+        working-directory: dccleaner-safe-v02
+        run: gradle --no-daemon app:dependencies --configuration debugRuntimeClasspath > dependencies.txt
+
+      - name: Stage deliverables
+        if: always()
+        working-directory: dccleaner-safe-v02
+        shell: bash
+        run: |
+          set -euo pipefail
+          rm -rf dist
+          mkdir -p dist
+          cp app/build/outputs/apk/debug/app-debug.apk dist/DC-Cleaner-Safe-0.2.0-debug.apk
+          cp README.md AUDIT.md LICENSE dist/
+          cp /tmp/DC-Cleaner-Safe-0.2.0-source.tar.gz dist/
+          for report in permissions.txt apk-badging.txt manifest-tree.txt signature.txt dependencies.txt security-check.log app-debug.apk.sha256 dex-files.txt dex-packages.txt; do
+            if [[ -f "$report" ]]; then cp "$report" dist/; fi
+          done
+          curl --fail --location --retry 3 --silent --show-error \
+            https://www.gnu.org/licenses/agpl-3.0.txt \
+            --output dist/LICENSE-AGPL-3.0.txt
+          (cd dist && sha256sum \
+            DC-Cleaner-Safe-0.2.0-debug.apk \
+            DC-Cleaner-Safe-0.2.0-source.tar.gz \
+            LICENSE-AGPL-3.0.txt > SHA256SUMS.txt)
+
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: dc-cleaner-safe-v0.2-apk
+          path: dccleaner-safe-v02/dist/
+          if-no-files-found: error
+          retention-days: 14
+
+      - name: Enforce security gate
+        if: always()
+        shell: bash
+        run: test '${{ steps.security.outcome }}' = 'success'
