@@ -1,0 +1,37 @@
+name: Export DC Cleaner 1.1 source chunks
+
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - 'dccleaner-next-v110-small/**'
+      - '.github/workflows/dccleaner-small-export.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  export:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - name: Stage stored chunks
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p /tmp/dccleaner-small
+          cp dccleaner-next-v110-small/part-* /tmp/dccleaner-small/
+          (cd /tmp/dccleaner-small && sha256sum part-* > ACTUAL-SHA256SUMS.txt)
+          cat /tmp/dccleaner-small/part-* > /tmp/dccleaner-small/combined.b64
+          sha256sum /tmp/dccleaner-small/combined.b64 >> /tmp/dccleaner-small/ACTUAL-SHA256SUMS.txt
+          base64 --decode /tmp/dccleaner-small/combined.b64 > /tmp/dccleaner-small/source.tar.gz || true
+          sha256sum /tmp/dccleaner-small/source.tar.gz >> /tmp/dccleaner-small/ACTUAL-SHA256SUMS.txt || true
+          tar -tzf /tmp/dccleaner-small/source.tar.gz > /tmp/dccleaner-small/TAR-CONTENTS.txt 2> /tmp/dccleaner-small/TAR-ERROR.txt || true
+      - uses: actions/upload-artifact@v4
+        with:
+          name: dccleaner-1.1-stored-chunks
+          path: /tmp/dccleaner-small/
+          if-no-files-found: error
+          retention-days: 2
