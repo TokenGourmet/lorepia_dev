@@ -5,6 +5,7 @@ on:
     branches: [main]
     paths:
       - 'dccleaner-next-v110-small/**'
+      - 'dccleaner-next-v110/**'
       - '.github/workflows/dccleaner-small-export.yml'
   workflow_dispatch:
 
@@ -21,17 +22,22 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          mkdir -p /tmp/dccleaner-small
-          cp dccleaner-next-v110-small/part-* /tmp/dccleaner-small/
-          (cd /tmp/dccleaner-small && sha256sum part-* > ACTUAL-SHA256SUMS.txt)
-          cat /tmp/dccleaner-small/part-* > /tmp/dccleaner-small/combined.b64
-          sha256sum /tmp/dccleaner-small/combined.b64 >> /tmp/dccleaner-small/ACTUAL-SHA256SUMS.txt
-          base64 --decode /tmp/dccleaner-small/combined.b64 > /tmp/dccleaner-small/source.tar.gz || true
-          sha256sum /tmp/dccleaner-small/source.tar.gz >> /tmp/dccleaner-small/ACTUAL-SHA256SUMS.txt || true
-          tar -tzf /tmp/dccleaner-small/source.tar.gz > /tmp/dccleaner-small/TAR-CONTENTS.txt 2> /tmp/dccleaner-small/TAR-ERROR.txt || true
+          mkdir -p /tmp/dccleaner-export/small /tmp/dccleaner-export/large
+          cp dccleaner-next-v110-small/part-* /tmp/dccleaner-export/small/
+          cp dccleaner-next-v110/source.b64.part-* /tmp/dccleaner-export/large/
+          (cd /tmp/dccleaner-export/small && sha256sum part-* > ACTUAL-SHA256SUMS.txt)
+          (cd /tmp/dccleaner-export/large && sha256sum source.b64.part-* > ACTUAL-SHA256SUMS.txt)
+          cat /tmp/dccleaner-export/small/part-* > /tmp/dccleaner-export/small/combined.b64
+          cat /tmp/dccleaner-export/large/source.b64.part-* > /tmp/dccleaner-export/large/combined.b64
+          sha256sum /tmp/dccleaner-export/small/combined.b64 >> /tmp/dccleaner-export/small/ACTUAL-SHA256SUMS.txt
+          sha256sum /tmp/dccleaner-export/large/combined.b64 >> /tmp/dccleaner-export/large/ACTUAL-SHA256SUMS.txt
+          base64 --decode /tmp/dccleaner-export/small/combined.b64 > /tmp/dccleaner-export/small/source.tar.gz || true
+          base64 --decode /tmp/dccleaner-export/large/combined.b64 > /tmp/dccleaner-export/large/source.tar.gz || true
+          sha256sum /tmp/dccleaner-export/small/source.tar.gz >> /tmp/dccleaner-export/small/ACTUAL-SHA256SUMS.txt || true
+          sha256sum /tmp/dccleaner-export/large/source.tar.gz >> /tmp/dccleaner-export/large/ACTUAL-SHA256SUMS.txt || true
       - uses: actions/upload-artifact@v4
         with:
-          name: dccleaner-1.1-stored-chunks
-          path: /tmp/dccleaner-small/
+          name: dccleaner-1.1-source-recovery
+          path: /tmp/dccleaner-export/
           if-no-files-found: error
           retention-days: 2
