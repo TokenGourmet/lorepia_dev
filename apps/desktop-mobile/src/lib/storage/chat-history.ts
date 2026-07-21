@@ -3,9 +3,11 @@ import type { ChatMessage } from "$lib/chat/types";
 import {
   storageClient,
   type ChatCursor,
+  type MessageCursor,
   type StoredChat,
   type StoredMessage,
 } from "./client";
+import { createBoundedHistoryWindow } from "./bounded-history-window";
 
 export const FIRST_CHAT_CHARACTER_ID = "seraphine";
 const FIRST_CHAT_TITLE = "세라핀과의 대화";
@@ -20,6 +22,8 @@ type ChatStorageClient = Pick<
 export type LoadedChatHistory = Readonly<{
   chat: StoredChat;
   messages: readonly ChatMessage[];
+  hasMore: boolean;
+  olderCursor: MessageCursor | null;
 }>;
 
 function restoredAssistantText(message: StoredMessage): string {
@@ -28,7 +32,7 @@ function restoredAssistantText(message: StoredMessage): string {
     return "제공자가 빈 응답을 반환했습니다.";
   }
   if (message.state === "partial") {
-    return "이전 응답이 중단되었습니다.";
+    return "표시할 수 있는 응답 내용이 없습니다.";
   }
   return "응답을 완료하지 못했습니다.";
 }
@@ -42,13 +46,18 @@ export function toChatMessage(message: StoredMessage): ChatMessage {
         ? restoredAssistantText(message)
         : message.text,
     sentAt: new Date(message.createdAtMs),
+    deliveryState: message.state,
   };
 }
 
-function cursorIsStrictlyOlder(cursor: ChatCursor, previous: ChatCursor): boolean {
+function cursorIsStrictlyOlder(
+  cursor: ChatCursor,
+  previous: ChatCursor,
+): boolean {
   return (
     cursor.updatedAtMs < previous.updatedAtMs ||
-    (cursor.updatedAtMs === previous.updatedAtMs && cursor.chatId < previous.chatId)
+    (cursor.updatedAtMs === previous.updatedAtMs &&
+      cursor.chatId < previous.chatId)
   );
 }
 
@@ -97,8 +106,11 @@ export async function loadOrCreateFirstChat(
     chat = await client.createChat(FIRST_CHAT_CHARACTER_ID, FIRST_CHAT_TITLE);
   }
   const page = await client.loadChatMessages(chat.id);
+  const window = createBoundedHistoryWindow(page);
   return Object.freeze({
     chat,
-    messages: Object.freeze(page.items.map(toChatMessage)),
+    messages: Object.freeze(window.items.map(toChatMessage)),
+    hasMore: window.hasMore,
+    olderCursor: window.olderCursor,
   });
 }

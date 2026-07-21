@@ -59,6 +59,14 @@
   --safe-bottom: env(safe-area-inset-bottom, 0px);
 }
 
+/* Android's committed wrapper owns system-bar insets through WebView padding.
+   Zero the CSS env contribution there so a WebView that also exposes
+   safe-area-inset-* cannot apply the same physical inset twice. */
+:root[data-native-inset-owner="android-view-padding"] {
+  --safe-top: 0px;
+  --safe-bottom: 0px;
+}
+
 html,
 body {
   margin: 0;

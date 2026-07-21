@@ -23,20 +23,14 @@ class MainActivity : TauriActivity() {
     webView.isVerticalScrollBarEnabled = false
     webView.isHorizontalScrollBarEnabled = false
 
-    ViewCompat.setOnApplyWindowInsetsListener(webView) { _, insets ->
+    ViewCompat.setOnApplyWindowInsetsListener(webView) { view, insets ->
       val bars = insets.getInsets(
         WindowInsetsCompat.Type.systemBars() or
           WindowInsetsCompat.Type.displayCutout(),
       )
-      val density = resources.displayMetrics.density
-      val top = (bars.top / density).toInt()
-      val bottom = (bars.bottom / density).toInt()
-      webView.evaluateJavascript(
-        "document.documentElement.style.setProperty('--safe-top','${top}px');" +
-          "document.documentElement.style.setProperty('--safe-bottom','${bottom}px');",
-        null,
-      )
+      view.setPadding(0, bars.top, 0, bars.bottom)
       insets
     }
+    ViewCompat.requestApplyInsets(webView)
   }
 }

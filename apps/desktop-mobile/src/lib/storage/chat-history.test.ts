@@ -32,6 +32,7 @@ describe("persistent first chat history", () => {
           },
         ],
         hasMore: false,
+        olderCursor: null,
       })),
     });
 
@@ -47,7 +48,11 @@ describe("persistent first chat history", () => {
     await loadOrCreateFirstChat({
       createChat,
       listChats: vi.fn(async () => ({ items: [], nextCursor: null })),
-      loadChatMessages: vi.fn(async () => ({ items: [], hasMore: false })),
+      loadChatMessages: vi.fn(async () => ({
+        items: [],
+        hasMore: false,
+        olderCursor: null,
+      })),
     });
 
     expect(createChat).toHaveBeenCalledWith("seraphine", "세라핀과의 대화");
@@ -65,16 +70,21 @@ describe("persistent first chat history", () => {
       chatId: olderChats.at(-1)!.id,
     };
     const createChat = vi.fn();
-    const listChats = vi.fn(async (_limit: number, before: typeof cursor | null) =>
-      before === null
-        ? { items: olderChats, nextCursor: cursor }
-        : { items: [chat], nextCursor: null },
+    const listChats = vi.fn(
+      async (_limit: number, before: typeof cursor | null) =>
+        before === null
+          ? { items: olderChats, nextCursor: cursor }
+          : { items: [chat], nextCursor: null },
     );
 
     const result = await loadOrCreateFirstChat({
       createChat,
       listChats,
-      loadChatMessages: vi.fn(async () => ({ items: [], hasMore: false })),
+      loadChatMessages: vi.fn(async () => ({
+        items: [],
+        hasMore: false,
+        olderCursor: null,
+      })),
     });
 
     expect(result.chat).toEqual(chat);
@@ -129,7 +139,26 @@ describe("persistent first chat history", () => {
       }),
     ).toMatchObject({
       role: "character",
-      text: "이전 응답이 중단되었습니다.",
+      text: "표시할 수 있는 응답 내용이 없습니다.",
+      deliveryState: "partial",
+    });
+  });
+
+  it("preserves partial and failed state when durable text is non-empty", () => {
+    expect(
+      toChatMessage({
+        id: "c".repeat(32),
+        chatId: chat.id,
+        ordinal: 2,
+        role: "assistant",
+        text: "복구된 일부",
+        state: "failed",
+        createdAtMs: 20,
+        updatedAtMs: 21,
+      }),
+    ).toMatchObject({
+      text: "복구된 일부",
+      deliveryState: "failed",
     });
   });
 });

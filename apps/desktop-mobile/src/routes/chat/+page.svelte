@@ -5,11 +5,16 @@
   import "$lib/design/tokens.css";
 
   import Composer from "$lib/chat/Composer.svelte";
+  import {
+    createFrameChunkBuffer,
+    type FrameChunkBuffer,
+  } from "$lib/chat/frame-chunk-buffer";
   import MessageThread from "$lib/chat/MessageThread.svelte";
   import type { ChatMessage, ThreadMode } from "$lib/chat/types";
   import { keyboardInset } from "$lib/design/keyboard-inset.svelte";
   import { activeProviderProfile } from "$lib/providers/active-profile.svelte";
   import {
+    resetProviderStreamOwner,
     startFirstChatStream,
     type FirstChatStreamHandle,
   } from "$lib/providers/stream";
@@ -18,6 +23,7 @@
     loadOrCreateFirstChat,
     toChatMessage,
   } from "$lib/storage/chat-history";
+  import { boundedTailById } from "$lib/storage/bounded-history-window";
   import { appPreferences } from "$lib/storage/app-preferences.svelte";
   import { storageClient } from "$lib/storage/client";
   import Avatar from "$lib/ui/Avatar.svelte";
@@ -25,6 +31,7 @@
 
   const characterName = "세라핀";
   const characterInitial = "세";
+  const STREAM_TEXT_BLOCK_CHARACTERS = 8_192;
 
   let mode = $state<ThreadMode>("chat");
   let scrollRegion = $state<HTMLDivElement | null>(null);
@@ -33,8 +40,8 @@
   let panelOpen = $state(false);
   let panelShift = $state(0);
   let backDrag = $state(0);
-  let dragging = $state(false);
   let activeStream = $state<FirstChatStreamHandle | null>(null);
+  let activeDeltaBuffer: FrameChunkBuffer | null = null;
   let chatId = $state<string | null>(null);
   let storageUnavailable = $state(false);
   let historyEpoch = 0;
@@ -45,12 +52,16 @@
   async function initializeHistory(): Promise<void> {
     const epoch = ++historyEpoch;
     try {
+      // A hard WebView reload loses the old JS control token while the native
+      // request may still be alive. Reset this injected window owner first,
+      // wait for durable terminal state, then read canonical SQLite history.
+      await resetProviderStreamOwner();
       await appPreferences.hydrate();
       const loaded = await loadOrCreateFirstChat();
       if (disposed || epoch !== historyEpoch) return;
       mode = appPreferences.current.defaultMode;
       chatId = loaded.chat.id;
-      messages = [...loaded.messages];
+      messages = [...boundedTailById(loaded.messages)];
       storageUnavailable = false;
     } catch {
       if (disposed || epoch !== historyEpoch) return;
@@ -61,11 +72,14 @@
   }
 
   async function reloadHistory(targetChatId: string): Promise<void> {
+    cancelPendingDeltaRender();
     const epoch = ++historyEpoch;
     try {
       const loaded = await storageClient.loadChatMessages(targetChatId);
       if (disposed || epoch !== historyEpoch || chatId !== targetChatId) return;
-      messages = loaded.items.map(toChatMessage);
+      messages = [
+        ...boundedTailById(loaded.items.map(toChatMessage)),
+      ];
     } catch {
       if (!disposed && epoch === historyEpoch) {
         storageUnavailable = true;
@@ -92,7 +106,6 @@
   }
 
   function handleSwipeMove(dx: number): void {
-    dragging = true;
     if (panelOpen) {
       panelShift = clamp(panelWidth() - dx, 0, panelWidth());
       return;
@@ -107,7 +120,6 @@
   }
 
   function handleSwipeEnd(commit: SwipeCommit): void {
-    dragging = false;
     if (panelOpen) {
       if (commit === "right") {
         closePanel();
@@ -140,6 +152,42 @@
     );
   }
 
+  function appendStreamingChunk(
+    message: ChatMessage,
+    chunk: string,
+  ): ChatMessage {
+    if (chunk.length === 0) return message;
+    const chunks = message.streamingChunks ?? [];
+    const tailIndex = chunks.length - 1;
+    const tail = chunks[tailIndex];
+    if (
+      tail !== undefined &&
+      tail.length + chunk.length <= STREAM_TEXT_BLOCK_CHARACTERS
+    ) {
+      chunks[tailIndex] = `${tail}${chunk}`;
+    } else {
+      chunks.push(chunk);
+    }
+    return {
+      ...message,
+      streamingChunks: chunks,
+    };
+  }
+
+  function materializeStreamingText(
+    message: ChatMessage,
+    trailing = "",
+  ): string {
+    return [message.text, ...(message.streamingChunks ?? []), trailing].join("");
+  }
+
+  function cancelPendingDeltaRender(): void {
+    const buffer = activeDeltaBuffer;
+    if (buffer === null) return;
+    buffer.cancel();
+    activeDeltaBuffer = null;
+  }
+
   function handleSend(text: string): void {
     const profile = activeProviderProfile.current;
     const targetChatId = chatId;
@@ -151,57 +199,89 @@
     const nonce = `${Date.now()}-${crypto.randomUUID()}`;
     const assistantId = `assistant-${nonce}`;
     messages = [
-      ...messages,
-      {
-        id: `user-${nonce}`,
-        role: "user",
-        text,
-        sentAt: new Date(),
-      },
-      {
-        id: assistantId,
-        role: "character",
-        text: "",
-        sentAt: new Date(),
-        streaming: true,
-      },
+      ...boundedTailById([
+        ...messages,
+        {
+          id: `user-${nonce}`,
+          role: "user" as const,
+          text,
+          sentAt: new Date(),
+        },
+        {
+          id: assistantId,
+          role: "character" as const,
+          text: "",
+          streamingChunks: [],
+          sentAt: new Date(),
+          streaming: true,
+        },
+      ]),
     ];
 
     let failureShown = false;
+    let nativeTurnStarted = false;
+    const deltaBuffer = createFrameChunkBuffer((delta) => {
+      replaceMessage(assistantId, (message) =>
+        appendStreamingChunk(message, delta),
+      );
+    });
+    cancelPendingDeltaRender();
+    activeDeltaBuffer = deltaBuffer;
+
     try {
       const handle = startFirstChatStream(profile, targetChatId, text, {
+        onStarted() {
+          nativeTurnStarted = true;
+        },
         onDelta(delta) {
-          replaceMessage(assistantId, (message) => ({
-            ...message,
-            text: `${message.text}${delta}`,
-          }));
+          deltaBuffer.append(delta);
         },
         onError(message) {
           failureShown = true;
-          replaceMessage(assistantId, (current) => ({
-            ...current,
-            text:
-              current.text.length === 0
-                ? message
-                : `${current.text}\n\n${message}`,
-          }));
+          const pendingText = deltaBuffer.drain();
+          replaceMessage(assistantId, (current) => {
+            const hasVisibleText =
+              current.text.length > 0 ||
+              (current.streamingChunks?.length ?? 0) > 0 ||
+              pendingText.length > 0;
+            let next = appendStreamingChunk(current, pendingText);
+            next = appendStreamingChunk(
+              next,
+              hasVisibleText ? `\n\n${message}` : message,
+            );
+            return next;
+          });
         },
         onTerminal(terminal) {
-          replaceMessage(assistantId, (message) => ({
-            ...message,
-            text:
-              message.text.length > 0
-                ? message.text
+          const pendingText = deltaBuffer.close();
+          if (activeDeltaBuffer === deltaBuffer) {
+            activeDeltaBuffer = null;
+          }
+          replaceMessage(assistantId, (message) => {
+            const streamed = materializeStreamingText(message, pendingText);
+            const text =
+              streamed.length > 0
+                ? streamed
                 : terminal === "cancelled"
                   ? "응답을 중지했습니다."
                   : terminal === "completed"
                     ? "제공자가 빈 응답을 반환했습니다."
                     : failureShown
                       ? message.text
-                      : "응답을 완료하지 못했습니다.",
-            streaming: false,
-          }));
-          void reloadHistory(targetChatId);
+                      : "응답을 완료하지 못했습니다.";
+            return {
+              ...message,
+              text,
+              streamingChunks: undefined,
+              streaming: false,
+            };
+          });
+          // A rejected start command has no durable turn yet. Keep the
+          // optimistic user bubble and error visible instead of replacing it
+          // with an older DB snapshot and losing the submitted text.
+          if (nativeTurnStarted) {
+            void reloadHistory(targetChatId);
+          }
         },
       });
       activeStream = handle;
@@ -211,27 +291,41 @@
         }
       });
     } catch {
-      replaceMessage(assistantId, (message) => ({
-        ...message,
-        text: "메시지를 전송할 수 없습니다. 입력 내용을 확인해 주세요.",
-        streaming: false,
-      }));
+      const pendingText = deltaBuffer.close();
+      if (activeDeltaBuffer === deltaBuffer) {
+        activeDeltaBuffer = null;
+      }
+      replaceMessage(assistantId, (message) => {
+        const streamed = materializeStreamingText(message, pendingText);
+        return {
+          ...message,
+          text:
+            streamed.length > 0
+              ? `${streamed}\n\n메시지를 전송할 수 없습니다. 입력 내용을 확인해 주세요.`
+              : "메시지를 전송할 수 없습니다. 입력 내용을 확인해 주세요.",
+          streamingChunks: undefined,
+          streaming: false,
+        };
+      });
     }
   }
 
   function handleCancel(): void {
     const handle = activeStream;
     if (handle !== null) {
+      activeDeltaBuffer?.flush();
       void handle.cancel().catch(() => undefined);
     }
   }
 
   onMount(() => {
-    keyboardInset.start();
+    const stopKeyboardInset = keyboardInset.start();
     void initializeHistory();
+    return stopKeyboardInset;
   });
   onDestroy(() => {
     disposed = true;
+    cancelPendingDeltaRender();
     const handle = activeStream;
     if (handle !== null) {
       void handle.cancel().catch(() => undefined);
@@ -256,8 +350,6 @@
 
 <div
   class="screen"
-  class:animate={!dragging}
-  style:transform={`translateX(${backDrag}px)`}
   use:horizontalSwipe={{ onMove: handleSwipeMove, onEnd: handleSwipeEnd }}
 >
   <header class="top">
@@ -290,7 +382,7 @@
     <MessageThread {messages} {mode} {characterName} {characterInitial} />
   </div>
 
-  <div class="composer-slot" style:padding-bottom={`${keyboardInset.value}px`}>
+  <div class="composer-slot">
     <Composer
       onSend={handleSend}
       onCancel={handleCancel}
@@ -305,25 +397,28 @@
         ? "설정에서 API 키와 모델을 준비하세요"
         : "메시지 보내기"}
     />
+    <svg
+      class="keyboard-spacer"
+      width="1"
+      height={keyboardInset.value}
+      aria-hidden="true"
+    ></svg>
   </div>
 
   <button
     class="scrim"
-    class:animate={!dragging}
+    class:open={panelOpen}
     type="button"
     aria-label="방 설정 닫기"
-    aria-hidden={panelShift === 0}
-    tabindex={panelShift === 0 ? -1 : 0}
-    style:opacity={panelShift / panelWidth()}
-    style:visibility={panelShift === 0 ? "hidden" : "visible"}
+    aria-hidden={!panelOpen}
+    tabindex={panelOpen ? 0 : -1}
     onclick={closePanel}
   ></button>
 
   <aside
     class="panel"
-    class:animate={!dragging}
+    class:open={panelOpen}
     bind:this={panelElement}
-    style:transform={`translateX(calc(100% - ${panelShift}px))`}
     aria-label="방 설정"
   >
     <div class="panel-hero">
@@ -365,10 +460,6 @@
     position: relative;
     overflow: hidden;
     touch-action: pan-y;
-  }
-
-  .screen.animate {
-    transition: transform var(--dur-base) var(--ease-out);
   }
 
   .top {
@@ -445,7 +536,13 @@
 
   .composer-slot {
     background: var(--surface-page);
-    transition: padding-bottom var(--dur-base) var(--ease-out);
+  }
+
+  .keyboard-spacer {
+    display: block;
+    width: 1px;
+    max-width: 1px;
+    flex: none;
   }
 
   .scrim {
@@ -455,12 +552,16 @@
     padding: 0;
     background: rgba(0, 0, 0, 0.35);
     cursor: pointer;
-  }
-
-  .scrim.animate {
+    opacity: 0;
+    visibility: hidden;
     transition:
       opacity var(--dur-base) var(--ease-out),
       visibility var(--dur-base) var(--ease-out);
+  }
+
+  .scrim.open {
+    opacity: 1;
+    visibility: visible;
   }
 
   .panel {
@@ -477,10 +578,12 @@
     flex-direction: column;
     gap: var(--sp-3);
     box-sizing: border-box;
+    transform: translateX(100%);
+    transition: transform var(--dur-base) var(--ease-out);
   }
 
-  .panel.animate {
-    transition: transform var(--dur-base) var(--ease-out);
+  .panel.open {
+    transform: translateX(0);
   }
 
   .panel-hero {
@@ -556,10 +659,8 @@
   }
 
   @media (prefers-reduced-motion: reduce) {
-    .screen.animate,
-    .scrim.animate,
-    .panel.animate,
-    .composer-slot {
+    .scrim,
+    .panel {
       transition: none;
     }
 

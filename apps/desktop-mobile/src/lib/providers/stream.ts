@@ -19,6 +19,7 @@ export type FirstChatTerminal = "completed" | "cancelled" | "failed";
 export type FirstChatDeltaKind = "text" | "refusal";
 
 export interface FirstChatStreamCallbacks {
+  onStarted?(): void;
   onDelta(text: string, kind: FirstChatDeltaKind): void;
   onTerminal(terminal: FirstChatTerminal): void;
   onError(message: string): void;
@@ -27,6 +28,11 @@ export interface FirstChatStreamCallbacks {
 export interface FirstChatStreamHandle {
   readonly done: Promise<FirstChatTerminal>;
   cancel(): Promise<void>;
+}
+
+export interface ProviderStreamOwnerReset {
+  cancelled: number;
+  terminalized: number;
 }
 
 export type CommandInvoker = (
@@ -176,6 +182,34 @@ function parseStartResponse(value: unknown): StreamAuthorization {
     requestId: value.requestId,
     controlToken: value.controlToken,
   };
+}
+
+function parseOwnerResetResponse(value: unknown): ProviderStreamOwnerReset {
+  if (
+    !isRecord(value) ||
+    !hasExactKeys(value, ["cancelled", "terminalized"]) ||
+    !isSafeSequence(value.cancelled) ||
+    !isSafeSequence(value.terminalized) ||
+    value.cancelled > 128 ||
+    value.terminalized > 128
+  ) {
+    throw new Error("INVALID_STREAM_OWNER_RESET_RESPONSE");
+  }
+  return {
+    cancelled: value.cancelled,
+    terminalized: value.terminalized,
+  };
+}
+
+export async function resetProviderStreamOwner(
+  dependencies: Pick<FirstChatStreamDependencies, "invokeCommand"> =
+    defaultDependencies,
+): Promise<ProviderStreamOwnerReset> {
+  const value = await dependencies.invokeCommand(
+    "reset_provider_stream_owner",
+    {},
+  );
+  return parseOwnerResetResponse(value);
 }
 
 function parseBaseEvent(
@@ -684,6 +718,14 @@ export function startFirstChatStream(
     }
     if (event.type !== "started" && event.seq === 0) {
       throw new Error("STREAM_EVENT_SEQUENCE_MISMATCH");
+    }
+
+    if (event.type === "started") {
+      try {
+        callbacks.onStarted?.();
+      } catch {
+        // Native persistence and ACK ownership do not depend on UI callbacks.
+      }
     }
 
     unseenSnapshotCount = 0;

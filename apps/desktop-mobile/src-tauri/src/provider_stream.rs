@@ -1,13 +1,16 @@
 use std::{
     collections::{BTreeMap, HashMap},
-    sync::{Arc, Mutex},
+    sync::{
+        Arc, Mutex,
+        atomic::{AtomicBool, Ordering},
+    },
     time::Duration,
 };
 
 use lorepia_credential_vault::{CredentialVaultError, CredentialVaultErrorCode};
 use lorepia_provider_runtime::{
     CompletionReason, EndpointSelection, ProviderCredential, ProviderRunOutcome, ProviderRuntime,
-    ProviderStreamEvent as RuntimeStreamEvent, RuntimeError, TokenUsage,
+    ProviderStreamEvent as RuntimeStreamEvent, RuntimeError, RuntimeErrorKind, TokenUsage,
 };
 use lorepia_providers::{
     AnthropicOptions, ChatMessage, DeepSeekOptions, GenerationOptions, GoogleOptions, MessageRole,
@@ -15,14 +18,18 @@ use lorepia_providers::{
     compile_request,
 };
 use lorepia_storage::{
-    BeginTurn, ChatId as StorageChatId, ModelId as StorageModelId, ProviderId as StorageProviderId,
-    ProviderSelection as StorageProviderSelection, RequestFailureCode as StorageFailureCode,
-    RequestStateId, RequestStatus as StorageRequestStatus, ResponseCheckpoint, StartedTurn,
-    TerminalCheckpoint, TerminalOutcome, TimestampMillis, TokenUsage as StorageTokenUsage,
+    BeginTurn, ChatId as StorageChatId, CumulativeAck, DeliveryCheckpoint,
+    Message as StoredMessage, MessageRole as StoredMessageRole,
+    MessageStatus as StoredMessageStatus, ModelId as StorageModelId,
+    ProviderId as StorageProviderId, ProviderSelection as StorageProviderSelection,
+    RequestFailureCode as StorageFailureCode, RequestStateId,
+    RequestStatus as StorageRequestStatus, ResponseCheckpoint, StartedTurn, StreamGeneration,
+    StreamOwnerLabel, TerminalCheckpoint, TerminalOutcome, TimestampMillis,
+    TokenUsage as StorageTokenUsage,
 };
 use serde::{Deserialize, Serialize};
 use subtle::ConstantTimeEq;
-use tauri::{State, ipc::Channel};
+use tauri::{State, WebviewWindow, ipc::Channel};
 use tokio::sync::{Mutex as AsyncMutex, Notify, mpsc};
 use tokio_util::sync::CancellationToken;
 use url::Url;
@@ -37,17 +44,32 @@ use crate::{
 const MAX_ACTIVE_STREAMS: usize = 128;
 const MAX_IN_FLIGHT: u64 = 4;
 const ACK_TIMEOUT: Duration = Duration::from_secs(30);
+const ACK_DURABILITY_BARRIER_TIMEOUT: Duration = Duration::from_secs(5);
+const SEND_COMMIT_OBSERVATION_TIMEOUT: Duration = Duration::from_secs(5);
+const OWNER_RESET_TIMEOUT: Duration = Duration::from_secs(10);
 const TERMINAL_RETENTION: Duration = Duration::from_secs(5 * 60);
 const DIRECT_CHANNEL_BUDGET_BYTES: usize = 4_096;
 const MAX_DELTA_FRAGMENT_BYTES: usize = 512;
+const PER_STREAM_IN_FLIGHT_RESERVATION_BYTES: usize =
+    DIRECT_CHANNEL_BUDGET_BYTES * (MAX_IN_FLIGHT as usize + 1);
+const GLOBAL_IN_FLIGHT_RESERVATION_BYTES: usize =
+    PER_STREAM_IN_FLIGHT_RESERVATION_BYTES * MAX_ACTIVE_STREAMS;
 const MAX_PROVIDER_RESPONSE_ID_BYTES: usize = 256;
-const FIRST_CHAT_MAX_INPUT_BYTES: usize = 64 * 1024;
-const FIRST_CHAT_MAX_OUTPUT_TOKENS: u32 = 512;
+const CHAT_MAX_INPUT_BYTES: usize = 64 * 1024;
+const CHAT_MAX_OUTPUT_TOKENS: u32 = 512;
+const CHAT_HISTORY_LOAD_LIMIT: u16 = 64;
+const CHAT_HISTORY_MAX_MESSAGES: usize = CHAT_HISTORY_LOAD_LIMIT as usize;
+/// Product-owned UTF-8 content budget for system, retained history, and the
+/// current user message. This is deliberately not described as a token or
+/// provider context-window guarantee.
+const CHAT_CONTEXT_MAX_UTF8_BYTES: usize = 256 * 1024;
 const STORAGE_FLUSH_BYTES: usize = 4 * 1024;
 const STORAGE_FLUSH_INTERVAL: Duration = Duration::from_millis(250);
 const TERMINAL_STORAGE_RETRY_DELAYS: [Duration; 2] =
     [Duration::from_millis(25), Duration::from_millis(100)];
-const FIRST_CHAT_SYSTEM_PROMPT: &str = "You are Seraphine, the librarian of a moonlit archive. Stay in character, answer the user's latest message naturally in the user's language, and never claim access to tools, memories, or facts that are not included in this request.";
+const TERMINAL_RECOVERY_MAX_DELAY: Duration = Duration::from_secs(30);
+const CREDENTIAL_PREFLIGHT_TIMEOUT: Duration = Duration::from_secs(10);
+const CHAT_SYSTEM_PROMPT: &str = "You are Seraphine, the librarian of a moonlit archive. Stay in character, answer the user's latest message naturally in the user's language, and never claim access to tools, memories, or facts that are not included in this request.";
 
 #[derive(Clone, Debug, Serialize)]
 #[serde(rename_all = "camelCase")]
@@ -56,6 +78,8 @@ pub(crate) struct ProviderCommandError {
     message: String,
     http_status: Option<u16>,
     retriable: bool,
+    #[serde(skip)]
+    runtime_kind: Option<RuntimeErrorKind>,
 }
 
 impl ProviderCommandError {
@@ -65,6 +89,7 @@ impl ProviderCommandError {
             message: truncate_utf8(message.into(), 512),
             http_status: None,
             retriable: false,
+            runtime_kind: None,
         }
     }
 
@@ -78,6 +103,7 @@ impl ProviderCommandError {
             message: truncate_utf8(error.message().to_owned(), 512),
             http_status: error.http_status(),
             retriable: error.is_retriable(),
+            runtime_kind: Some(error.kind()),
         }
     }
 
@@ -189,18 +215,28 @@ impl TerminalReceipt {
 struct StreamMachine {
     last_sent_seq: u64,
     acknowledged_through: Option<u64>,
-    cancel_requested: bool,
+    last_durable_seq: u64,
+    persisted_acked_through: Option<u64>,
+    flush_requested_through: Option<u64>,
+    ack_deadline: Option<tokio::time::Instant>,
+    pending_send_seq: Option<u64>,
+    lease_failure: Option<ProviderCommandError>,
     terminal: Option<TerminalReceipt>,
     terminal_snapshot_returned: bool,
     terminal_committing: bool,
 }
 
 impl StreamMachine {
-    const fn after_started() -> Self {
+    fn after_started() -> Self {
         Self {
             last_sent_seq: 0,
             acknowledged_through: None,
-            cancel_requested: false,
+            last_durable_seq: 0,
+            persisted_acked_through: None,
+            flush_requested_through: None,
+            ack_deadline: Some(tokio::time::Instant::now() + ACK_TIMEOUT),
+            pending_send_seq: None,
+            lease_failure: None,
             terminal: None,
             terminal_snapshot_returned: false,
             terminal_committing: false,
@@ -224,22 +260,80 @@ impl StreamMachine {
                     .is_some_and(|acked| acked >= terminal.seq())
         })
     }
+
+    fn record_ack_progress(&mut self, seq: u64) {
+        let progressed = self
+            .acknowledged_through
+            .is_none_or(|acknowledged| seq > acknowledged);
+        self.acknowledged_through = Some(seq);
+        if self.in_flight() == 0 {
+            self.ack_deadline = None;
+        } else if progressed {
+            self.ack_deadline = Some(tokio::time::Instant::now() + ACK_TIMEOUT);
+        }
+    }
+
+    fn note_ack_activity(&mut self, seq: u64) {
+        if self
+            .acknowledged_through
+            .is_none_or(|acknowledged| seq > acknowledged)
+        {
+            self.ack_deadline = Some(tokio::time::Instant::now() + ACK_TIMEOUT);
+        }
+    }
+
+    fn request_flush_through(&mut self, seq: u64) {
+        if seq > self.last_durable_seq {
+            self.flush_requested_through = Some(
+                self.flush_requested_through
+                    .map_or(seq, |requested| requested.max(seq)),
+            );
+        }
+    }
+
+    fn publish_durable(&mut self, seq: u64) {
+        self.last_durable_seq = self.last_durable_seq.max(seq);
+        if self
+            .flush_requested_through
+            .is_some_and(|requested| requested <= self.last_durable_seq)
+        {
+            self.flush_requested_through = None;
+        }
+    }
 }
 
 struct StreamRequestState {
+    owner_label: StreamOwnerLabel,
+    stream_generation: StreamGeneration,
+    request_state_id: Mutex<Option<RequestStateId>>,
     control_token: String,
     cancellation: CancellationToken,
+    cancel_requested: AtomicBool,
+    forced_failure: AtomicBool,
+    ack_gate: AsyncMutex<()>,
     machine: AsyncMutex<StreamMachine>,
     notify: Notify,
+    flush_notify: Notify,
 }
 
 impl StreamRequestState {
-    fn new(control_token: String) -> Self {
+    fn new(
+        owner_label: StreamOwnerLabel,
+        stream_generation: StreamGeneration,
+        control_token: String,
+    ) -> Self {
         Self {
+            owner_label,
+            stream_generation,
+            request_state_id: Mutex::new(None),
             control_token,
             cancellation: CancellationToken::new(),
+            cancel_requested: AtomicBool::new(false),
+            forced_failure: AtomicBool::new(false),
+            ack_gate: AsyncMutex::new(()),
             machine: AsyncMutex::new(StreamMachine::after_started()),
             notify: Notify::new(),
+            flush_notify: Notify::new(),
         }
     }
 
@@ -248,35 +342,124 @@ impl StreamRequestState {
         let supplied = supplied.as_bytes();
         expected.len() == supplied.len() && bool::from(expected.ct_eq(supplied))
     }
-}
 
-#[derive(Clone, Default)]
-pub(crate) struct ProviderStreamRegistry {
-    requests: Arc<Mutex<HashMap<String, Arc<StreamRequestState>>>>,
-}
+    fn request_cancel(&self) -> bool {
+        if self.forced_failure.load(Ordering::Acquire) {
+            return false;
+        }
+        let accepted = !self.cancel_requested.swap(true, Ordering::AcqRel);
+        if accepted {
+            self.cancellation.cancel();
+            self.notify.notify_waiters();
+        }
+        accepted
+    }
 
-impl ProviderStreamRegistry {
-    fn insert_new(&self) -> Result<(String, Arc<StreamRequestState>), ProviderCommandError> {
-        let mut requests = self.requests.lock().map_err(|_| {
+    fn bind_started_turn(&self, started: &StartedTurn) -> Result<(), ProviderCommandError> {
+        if started.owner_label != self.owner_label
+            || started.stream_generation != self.stream_generation
+            || started.last_delivered_seq != 0
+            || started.last_durable_seq != 0
+            || started.last_acked_seq.is_some()
+        {
+            return Err(ProviderCommandError::internal(
+                "STREAM_STORAGE_IDENTITY_MISMATCH",
+                "local stream identity did not match the request owner",
+            ));
+        }
+        let mut request_state_id = self.request_state_id.lock().map_err(|_| {
             ProviderCommandError::internal(
                 "STREAM_REGISTRY_FAILED",
                 "stream registry is unavailable",
             )
         })?;
-        if requests.len() >= MAX_ACTIVE_STREAMS {
+        if request_state_id.is_some() {
+            return Err(ProviderCommandError::internal(
+                "STREAM_STORAGE_IDENTITY_MISMATCH",
+                "local stream identity was already bound",
+            ));
+        }
+        *request_state_id = Some(started.request_state_id.clone());
+        Ok(())
+    }
+
+    fn request_state_id(&self) -> Result<RequestStateId, ProviderCommandError> {
+        self.request_state_id
+            .lock()
+            .map_err(|_| {
+                ProviderCommandError::internal(
+                    "STREAM_REGISTRY_FAILED",
+                    "stream registry is unavailable",
+                )
+            })?
+            .clone()
+            .ok_or_else(|| {
+                ProviderCommandError::internal(
+                    "STREAM_STORAGE_IDENTITY_MISSING",
+                    "local stream identity was not initialized",
+                )
+            })
+    }
+}
+
+#[derive(Default)]
+struct ProviderStreamRegistryInner {
+    requests: HashMap<String, Arc<StreamRequestState>>,
+    reserved_in_flight_bytes: usize,
+}
+
+#[derive(Clone, Default)]
+pub(crate) struct ProviderStreamRegistry {
+    inner: Arc<Mutex<ProviderStreamRegistryInner>>,
+}
+
+impl ProviderStreamRegistry {
+    fn insert_new(
+        &self,
+        owner_label: StreamOwnerLabel,
+    ) -> Result<(String, Arc<StreamRequestState>), ProviderCommandError> {
+        let mut registry = self.inner.lock().map_err(|_| {
+            ProviderCommandError::internal(
+                "STREAM_REGISTRY_FAILED",
+                "stream registry is unavailable",
+            )
+        })?;
+        if registry.requests.len() >= MAX_ACTIVE_STREAMS {
             return Err(ProviderCommandError::new(
                 "TOO_MANY_ACTIVE_STREAMS",
                 "too many provider streams are active",
             ));
         }
+        let next_reserved = registry
+            .reserved_in_flight_bytes
+            .checked_add(PER_STREAM_IN_FLIGHT_RESERVATION_BYTES)
+            .ok_or_else(|| {
+                ProviderCommandError::internal(
+                    "STREAM_CAPACITY_OVERFLOW",
+                    "stream byte reservation overflowed",
+                )
+            })?;
+        if next_reserved > GLOBAL_IN_FLIGHT_RESERVATION_BYTES {
+            return Err(ProviderCommandError::new(
+                "STREAM_BYTE_BUDGET_EXHAUSTED",
+                "provider stream byte budget is exhausted",
+            ));
+        }
         loop {
             let request_id = format!("provider-{}", Uuid::new_v4().simple());
-            if requests.contains_key(&request_id) {
+            if registry.requests.contains_key(&request_id) {
                 continue;
             }
             let token = Uuid::new_v4().simple().to_string();
-            let state = Arc::new(StreamRequestState::new(token));
-            requests.insert(request_id.clone(), Arc::clone(&state));
+            let state = Arc::new(StreamRequestState::new(
+                owner_label.clone(),
+                StreamGeneration::new(),
+                token,
+            ));
+            registry
+                .requests
+                .insert(request_id.clone(), Arc::clone(&state));
+            registry.reserved_in_flight_bytes = next_reserved;
             return Ok((request_id, state));
         }
     }
@@ -287,7 +470,7 @@ impl ProviderStreamRegistry {
         control_token: &str,
     ) -> Result<Arc<StreamRequestState>, ProviderCommandError> {
         let state = self
-            .requests
+            .inner
             .lock()
             .map_err(|_| {
                 ProviderCommandError::internal(
@@ -295,6 +478,7 @@ impl ProviderStreamRegistry {
                     "stream registry is unavailable",
                 )
             })?
+            .requests
             .get(request_id)
             .cloned()
             .ok_or_else(request_not_found)?;
@@ -306,15 +490,49 @@ impl ProviderStreamRegistry {
     }
 
     fn remove_if_same(&self, request_id: &str, expected: &Arc<StreamRequestState>) {
-        let Ok(mut requests) = self.requests.lock() else {
+        let Ok(mut registry) = self.inner.lock() else {
             return;
         };
-        if requests
+        if registry
+            .requests
             .get(request_id)
             .is_some_and(|current| Arc::ptr_eq(current, expected))
         {
-            requests.remove(request_id);
+            registry.requests.remove(request_id);
+            registry.reserved_in_flight_bytes = registry
+                .reserved_in_flight_bytes
+                .checked_sub(PER_STREAM_IN_FLIGHT_RESERVATION_BYTES)
+                .expect("stream byte reservation invariant violated");
         }
+    }
+
+    pub(crate) fn cancel_owner(&self, owner_label: &str) -> usize {
+        let Ok(requests) = self.requests_for_owner(owner_label) else {
+            return 0;
+        };
+        let mut cancelled = 0;
+        for (_, state) in requests {
+            cancelled += usize::from(state.request_cancel());
+        }
+        cancelled
+    }
+
+    fn requests_for_owner(
+        &self,
+        owner_label: &str,
+    ) -> Result<Vec<(String, Arc<StreamRequestState>)>, ProviderCommandError> {
+        let registry = self.inner.lock().map_err(|_| {
+            ProviderCommandError::internal(
+                "STREAM_REGISTRY_FAILED",
+                "stream registry is unavailable",
+            )
+        })?;
+        Ok(registry
+            .requests
+            .iter()
+            .filter(|(_, state)| state.owner_label.as_str() == owner_label)
+            .map(|(request_id, state)| (request_id.clone(), Arc::clone(state)))
+            .collect())
     }
 }
 
@@ -331,7 +549,7 @@ pub(crate) struct StartProviderStreamResponse {
 
 #[derive(Debug, Deserialize)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
-pub(crate) struct FirstChatProfile {
+pub(crate) struct ChatProfile {
     provider_id: ProviderId,
     model_id: String,
 }
@@ -353,6 +571,13 @@ pub(crate) struct CancelProviderStreamResponse {
 
 #[derive(Debug, Serialize)]
 #[serde(rename_all = "camelCase")]
+pub(crate) struct ResetProviderStreamOwnerResponse {
+    cancelled: u64,
+    terminalized: u64,
+}
+
+#[derive(Debug, Serialize)]
+#[serde(rename_all = "camelCase")]
 pub(crate) struct ProviderStreamSnapshot {
     request_id: String,
     last_sent_seq: u64,
@@ -363,9 +588,13 @@ pub(crate) struct ProviderStreamSnapshot {
 }
 
 #[tauri::command]
+// The IPC payload plus Tauri-injected window and managed states are intentionally
+// kept as distinct arguments so the command boundary remains explicit.
+#[allow(clippy::too_many_arguments)]
 pub(crate) async fn start_provider_stream(
+    window: WebviewWindow,
     chat_id: String,
-    profile: FirstChatProfile,
+    profile: ChatProfile,
     user_message: String,
     on_event: Channel<ProviderChannelEvent>,
     vault: State<'_, CredentialVaultState>,
@@ -375,30 +604,48 @@ pub(crate) async fn start_provider_stream(
     let chat_id = StorageChatId::parse(chat_id).map_err(|_| {
         ProviderCommandError::new("FIRST_CHAT_ID_INVALID", "chat identifier is invalid")
     })?;
-    let request = build_first_chat_request(profile, user_message)?;
+    let storage_for_history = storage.inner().clone();
+    let chat_id_for_history = chat_id.clone();
+    let history = storage_for_history
+        .run_read(move |store| {
+            store.load_recent_messages(&chat_id_for_history, None, CHAT_HISTORY_LOAD_LIMIT)
+        })
+        .await
+        .map_err(ProviderCommandError::from_storage)?;
+    let request = build_chat_request(profile, user_message, &history.messages)?;
     let selection = storage_provider_selection(&request)?;
     let persisted_user_text = request
         .messages
-        .get(1)
+        .last()
+        .filter(|message| message.role == MessageRole::User)
         .map(|message| message.content.clone())
         .ok_or_else(|| {
             ProviderCommandError::internal(
                 "FIRST_CHAT_INTERNAL_STATE",
-                "first chat request did not contain a user message",
+                "chat request did not end with the current user message",
             )
         })?;
     let endpoint = EndpointSelection::Official;
-    let credential = load_provider_credential(&request, &endpoint, vault.vault()).await?;
-    let (request_id, state) = registry.insert_new()?;
+    let owner_label = StreamOwnerLabel::parse(window.label().to_owned()).map_err(|_| {
+        ProviderCommandError::internal(
+            "STREAM_OWNER_INVALID",
+            "native stream owner label is invalid",
+        )
+    })?;
+    let (request_id, state) = registry.insert_new(owner_label)?;
     let started_at_ms = TimestampMillis::now().map_err(|_| {
         ProviderCommandError::new("STORAGE_UNAVAILABLE", "local storage is unavailable")
     })?;
     let storage_for_turn = storage.inner().clone();
+    let owner_label_for_turn = state.owner_label.clone();
+    let generation_for_turn = state.stream_generation.clone();
     let started_turn_result = storage_for_turn
         .run(move |store| {
             store.begin_turn(BeginTurn {
                 chat_id,
                 selection,
+                owner_label: owner_label_for_turn,
+                stream_generation: generation_for_turn,
                 user_text: persisted_user_text,
                 started_at_ms,
             })
@@ -411,21 +658,60 @@ pub(crate) async fn start_provider_stream(
             return Err(ProviderCommandError::from_storage(error));
         }
     };
+    if let Err(error) = state.bind_started_turn(&started_turn) {
+        retire_rejected_start(
+            storage_for_turn.clone(),
+            started_turn.clone(),
+            started_at_ms,
+            request_id.clone(),
+            Arc::clone(&state),
+            registry.inner().clone(),
+        )
+        .await;
+        return Err(error);
+    }
+    // Persist the submitted user turn before consulting the OS credential
+    // store. A locked or unavailable keychain can no longer erase accepted
+    // input; the paired assistant row is deterministically failed instead.
+    let credential = match load_provider_credential(&request, &endpoint, vault.vault()).await {
+        Ok(credential) => credential,
+        Err(error) => {
+            retire_rejected_start(
+                storage_for_turn.clone(),
+                started_turn.clone(),
+                started_at_ms,
+                request_id.clone(),
+                Arc::clone(&state),
+                registry.inner().clone(),
+            )
+            .await;
+            return Err(error);
+        }
+    };
     let started = ProviderChannelEvent::Started {
         request_id: request_id.clone(),
         seq: 0,
         max_in_flight: MAX_IN_FLIGHT,
     };
     if let Err(error) = send_direct(&on_event, started) {
-        fail_started_turn(&storage_for_turn, &started_turn, started_at_ms).await;
-        registry.remove_if_same(&request_id, &state);
+        retire_rejected_start(
+            storage_for_turn.clone(),
+            started_turn.clone(),
+            started_at_ms,
+            request_id.clone(),
+            Arc::clone(&state),
+            registry.inner().clone(),
+        )
+        .await;
         return Err(error);
     }
+    state.machine.lock().await.ack_deadline = Some(tokio::time::Instant::now() + ACK_TIMEOUT);
 
     let control_token = state.control_token.clone();
     let request_id_for_task = request_id.clone();
     let registry_for_task = registry.inner().clone();
     let storage_for_task = storage.inner().clone();
+    tauri::async_runtime::spawn(run_ack_watchdog(Arc::clone(&state)));
     tauri::async_runtime::spawn(async move {
         run_stream_bridge(StreamBridgeInput {
             request_id: request_id_for_task,
@@ -474,24 +760,116 @@ async fn fail_started_turn(
     storage: &StorageState,
     started: &StartedTurn,
     started_at_ms: TimestampMillis,
-) {
-    let checkpoint = ResponseCheckpoint {
-        request_state_id: started.request_state_id.clone(),
-        expected_last_seq: started.last_seq,
-        through_seq: started.last_seq.saturating_add(1),
-        appended_text: String::new(),
-        provider_response_id: None,
-        usage: None,
-        at_ms: started_at_ms,
-    };
-    let _ = storage
-        .run(move |store| store.fail_turn(checkpoint, StorageFailureCode::Internal))
-        .await;
+) -> Result<(), ProviderCommandError> {
+    let mut result = persist_rejected_start(storage, started, started_at_ms).await;
+    for delay in TERMINAL_STORAGE_RETRY_DELAYS {
+        if result.is_ok() {
+            break;
+        }
+        tokio::time::sleep(delay).await;
+        result = persist_rejected_start(storage, started, started_at_ms).await;
+    }
+    result
 }
 
-fn build_first_chat_request(
-    profile: FirstChatProfile,
+async fn persist_rejected_start(
+    storage: &StorageState,
+    started: &StartedTurn,
+    at_ms: TimestampMillis,
+) -> Result<(), ProviderCommandError> {
+    let started = started.clone();
+    storage
+        .run(move |store| {
+            let mut current = store.get_request_state(&started.request_state_id)?;
+            if current.owner_label != started.owner_label
+                || current.stream_generation != started.stream_generation
+            {
+                return Err(lorepia_storage::StorageError::Conflict {
+                    entity: "stream identity",
+                });
+            }
+            if current.status != StorageRequestStatus::Running {
+                return Ok(());
+            }
+
+            let terminal_seq = started.last_durable_seq.saturating_add(1);
+            if current.last_delivered_seq == started.last_delivered_seq {
+                store.record_response_delivery(DeliveryCheckpoint {
+                    request_state_id: started.request_state_id.clone(),
+                    owner_label: started.owner_label.clone(),
+                    stream_generation: started.stream_generation.clone(),
+                    expected_last_delivered_seq: started.last_delivered_seq,
+                    through_seq: terminal_seq,
+                    at_ms,
+                })?;
+                current = store.get_request_state(&started.request_state_id)?;
+            }
+            if current.status != StorageRequestStatus::Running {
+                return Ok(());
+            }
+            if current.last_delivered_seq != terminal_seq
+                || current.last_durable_seq != started.last_durable_seq
+            {
+                return Err(lorepia_storage::StorageError::SequenceMismatch {
+                    expected: terminal_seq,
+                    actual: current.last_delivered_seq,
+                });
+            }
+            store.fail_turn(
+                ResponseCheckpoint {
+                    request_state_id: started.request_state_id,
+                    owner_label: started.owner_label,
+                    stream_generation: started.stream_generation,
+                    expected_last_durable_seq: started.last_durable_seq,
+                    through_seq: terminal_seq,
+                    appended_text: String::new(),
+                    provider_response_id: None,
+                    usage: None,
+                    at_ms,
+                },
+                StorageFailureCode::Internal,
+            )?;
+            Ok(())
+        })
+        .await
+        .map_err(ProviderCommandError::from_storage)
+}
+
+#[allow(clippy::too_many_arguments)]
+async fn retire_rejected_start(
+    storage: StorageState,
+    started: StartedTurn,
+    at_ms: TimestampMillis,
+    request_id: String,
+    state: Arc<StreamRequestState>,
+    registry: ProviderStreamRegistry,
+) {
+    if fail_started_turn(&storage, &started, at_ms).await.is_ok() {
+        registry.remove_if_same(&request_id, &state);
+        return;
+    }
+
+    // A transient disk-full/WAL failure must not strand this chat in
+    // `running`. Keep native ownership after the rejected invoke and retry
+    // until the terminal row is durable; app restart is the second recovery
+    // boundary if the process exits first.
+    tauri::async_runtime::spawn(async move {
+        let mut delay = Duration::from_secs(1);
+        loop {
+            tokio::time::sleep(delay).await;
+            if fail_started_turn(&storage, &started, at_ms).await.is_ok() {
+                registry.remove_if_same(&request_id, &state);
+                return;
+            }
+            delay = delay.saturating_mul(2).min(TERMINAL_RECOVERY_MAX_DELAY);
+        }
+    });
+}
+
+fn build_chat_request(
+    profile: ChatProfile,
     user_message: String,
+    stored_history: &[StoredMessage],
 ) -> Result<ProviderRequest, ProviderCommandError> {
     let model_id = profile.model_id.trim().to_owned();
     if model_id != profile.model_id {
@@ -501,10 +879,10 @@ fn build_first_chat_request(
         ));
     }
     let content = user_message.trim().to_owned();
-    if content.is_empty() || content.len() > FIRST_CHAT_MAX_INPUT_BYTES || content.contains('\0') {
+    if content.is_empty() || content.len() > CHAT_MAX_INPUT_BYTES || content.contains('\0') {
         return Err(ProviderCommandError::new(
             "FIRST_CHAT_MESSAGE_INVALID",
-            "first chat message is empty or exceeds the product limit",
+            "chat message is empty or exceeds the product limit",
         ));
     }
 
@@ -521,15 +899,33 @@ fn build_first_chat_request(
             ));
         }
     };
+    let history_byte_budget = CHAT_CONTEXT_MAX_UTF8_BYTES
+        .checked_sub(CHAT_SYSTEM_PROMPT.len())
+        .and_then(|remaining| remaining.checked_sub(content.len()))
+        .ok_or_else(|| {
+            ProviderCommandError::new(
+                "FIRST_CHAT_MESSAGE_INVALID",
+                "chat message exceeds the native context byte budget",
+            )
+        })?;
+    let retained_history = select_completed_history(
+        stored_history,
+        CHAT_HISTORY_MAX_MESSAGES,
+        history_byte_budget,
+    );
+    let mut messages = Vec::with_capacity(retained_history.len() + 2);
+    messages.push(ChatMessage::new(MessageRole::System, CHAT_SYSTEM_PROMPT));
+    messages.extend(retained_history);
+    // The active path is loaded before `begin_turn`, so the current input is
+    // appended exactly once and can never be duplicated from durable history.
+    messages.push(ChatMessage::new(MessageRole::User, content));
+
     let request = ProviderRequest {
         provider: profile.provider_id,
         model_id,
-        messages: vec![
-            ChatMessage::new(MessageRole::System, FIRST_CHAT_SYSTEM_PROMPT),
-            ChatMessage::new(MessageRole::User, content),
-        ],
+        messages,
         generation: GenerationOptions {
-            max_output_tokens: Some(FIRST_CHAT_MAX_OUTPUT_TOKENS),
+            max_output_tokens: Some(CHAT_MAX_OUTPUT_TOKENS),
             ..GenerationOptions::default()
         },
         provider_options,
@@ -545,15 +941,87 @@ fn build_first_chat_request(
     Ok(request)
 }
 
+/// Retains a newest-first suffix of closed turns without truncating message
+/// bodies. An unfinished assistant row is paired with the immediately
+/// preceding user row and both are excluded, so failed/cancelled generation
+/// attempts cannot silently become provider context on retry.
+fn select_completed_history(
+    stored_history: &[StoredMessage],
+    max_messages: usize,
+    max_utf8_bytes: usize,
+) -> Vec<ChatMessage> {
+    let max_pairs = max_messages / 2;
+    let mut newest_pairs = Vec::<(ChatMessage, ChatMessage)>::new();
+    let mut retained_bytes = 0usize;
+    let mut cursor = stored_history.len();
+
+    while cursor > 0 && newest_pairs.len() < max_pairs {
+        if cursor < 2 {
+            break;
+        }
+        let assistant = &stored_history[cursor - 1];
+        let user = &stored_history[cursor - 2];
+        let is_turn_pair =
+            user.role == StoredMessageRole::User && assistant.role == StoredMessageRole::Assistant;
+        if !is_turn_pair {
+            cursor -= 1;
+            continue;
+        }
+        cursor -= 2;
+
+        let is_closed = user.status == StoredMessageStatus::Complete
+            && assistant.status == StoredMessageStatus::Complete
+            && !user.text.trim().is_empty()
+            && !assistant.text.trim().is_empty();
+        if !is_closed {
+            continue;
+        }
+
+        let pair_bytes = match user.text.len().checked_add(assistant.text.len()) {
+            Some(bytes) => bytes,
+            None => break,
+        };
+        let projected = match retained_bytes.checked_add(pair_bytes) {
+            Some(bytes) => bytes,
+            None => break,
+        };
+        if projected > max_utf8_bytes {
+            // A larger newest eligible turn must not be replaced with stale
+            // older context merely because the older text happens to fit.
+            break;
+        }
+        retained_bytes = projected;
+        newest_pairs.push((
+            ChatMessage::new(MessageRole::User, user.text.clone()),
+            ChatMessage::new(MessageRole::Assistant, assistant.text.clone()),
+        ));
+    }
+
+    newest_pairs.reverse();
+    newest_pairs
+        .into_iter()
+        .flat_map(|(user, assistant)| [user, assistant])
+        .collect()
+}
+
 #[tauri::command]
 pub(crate) async fn ack_provider_stream(
     request_id: String,
     control_token: String,
     seq: u64,
     registry: State<'_, ProviderStreamRegistry>,
+    storage: State<'_, StorageState>,
 ) -> Result<AckProviderStreamResponse, ProviderCommandError> {
     let state = registry.authenticated(&request_id, &control_token)?;
-    let (response, should_remove) = {
+    let _ack_guard = state.ack_gate.lock().await;
+
+    // A direct Channel callback may invoke ACK on another task before the
+    // sender has reacquired the machine lock and committed `last_sent_seq`.
+    // Wait for that exact reserved send to commit or roll back instead of
+    // rejecting a legitimate zero-latency ACK as out of range.
+    wait_for_send_commit(&state, seq).await?;
+
+    let needs_durability_barrier = {
         let mut machine = state.machine.lock().await;
         if seq > machine.last_sent_seq
             || machine
@@ -565,7 +1033,103 @@ pub(crate) async fn ack_provider_stream(
                 "acknowledgement sequence is outside the delivered range",
             ));
         }
-        machine.acknowledged_through = Some(seq);
+        if machine.acknowledged_through == Some(seq) {
+            let response = AckProviderStreamResponse {
+                request_id: request_id.clone(),
+                acknowledged_through: seq,
+                in_flight: machine.in_flight(),
+            };
+            let should_remove = machine.can_evict();
+            drop(machine);
+            if should_remove {
+                registry.remove_if_same(&request_id, &state);
+            }
+            return Ok(response);
+        }
+        if let Some(terminal) = machine.terminal.as_ref() {
+            if seq > terminal.seq() {
+                return Err(ProviderCommandError::new(
+                    "INVALID_ACK",
+                    "acknowledgement sequence is outside the delivered range",
+                ));
+            }
+            false
+        } else {
+            machine.note_ack_activity(seq);
+            machine.request_flush_through(seq);
+            true
+        }
+    };
+
+    // Sequence zero is the Started event. The storage journal represents that
+    // baseline as `None`; positive cumulative ACKs are always persisted.
+    if seq == 0 {
+        let (response, should_remove) = {
+            let mut machine = state.machine.lock().await;
+            machine.record_ack_progress(seq);
+            let response = AckProviderStreamResponse {
+                request_id: request_id.clone(),
+                acknowledged_through: seq,
+                in_flight: machine.in_flight(),
+            };
+            (response, machine.can_evict())
+        };
+        state.notify.notify_waiters();
+        if should_remove {
+            registry.remove_if_same(&request_id, &state);
+        }
+        return Ok(response);
+    }
+
+    if needs_durability_barrier {
+        state.flush_notify.notify_one();
+        let barrier_deadline = tokio::time::Instant::now() + ACK_DURABILITY_BARRIER_TIMEOUT;
+        loop {
+            let notified = state.notify.notified();
+            let barrier_satisfied = {
+                let machine = state.machine.lock().await;
+                if let Some(error) = machine.lease_failure.clone() {
+                    return Err(error);
+                }
+                if machine.terminal.is_some() {
+                    true
+                } else if machine.terminal_committing {
+                    false
+                } else {
+                    machine.last_durable_seq >= seq
+                }
+            };
+            if barrier_satisfied {
+                break;
+            }
+            tokio::select! {
+                _ = notified => {}
+                _ = state.cancellation.cancelled() => {
+                    return Err(ProviderCommandError::new(
+                        "STREAM_CANCELLED",
+                        "provider stream was cancelled",
+                    ));
+                }
+                _ = tokio::time::sleep_until(barrier_deadline) => {
+                    let error = ProviderCommandError::new(
+                        "STREAM_ACK_DURABILITY_TIMEOUT",
+                        "provider stream acknowledgement durability timed out",
+                    );
+                    force_stream_failure(&state, error.clone()).await;
+                    return Err(error);
+                }
+            }
+        }
+    }
+
+    if let Err(error) = persist_cumulative_ack(&storage, &state, seq).await {
+        force_stream_failure(&state, error.clone()).await;
+        return Err(error);
+    }
+
+    let (response, should_remove) = {
+        let mut machine = state.machine.lock().await;
+        machine.record_ack_progress(seq);
         let response = AckProviderStreamResponse {
             request_id: request_id.clone(),
             acknowledged_through: seq,
@@ -580,6 +1144,121 @@ pub(crate) async fn ack_provider_stream(
     Ok(response)
 }
 
+async fn wait_for_send_commit(
+    state: &Arc<StreamRequestState>,
+    seq: u64,
+) -> Result<(), ProviderCommandError> {
+    let deadline = tokio::time::Instant::now() + SEND_COMMIT_OBSERVATION_TIMEOUT;
+    loop {
+        let notified = state.notify.notified();
+        let pending = state.machine.lock().await.pending_send_seq == Some(seq);
+        if !pending {
+            return Ok(());
+        }
+        tokio::select! {
+            _ = notified => {}
+            _ = state.cancellation.cancelled() => {
+                return Err(ProviderCommandError::new(
+                    "STREAM_CANCELLED",
+                    "provider stream was cancelled",
+                ));
+            }
+            _ = tokio::time::sleep_until(deadline) => {
+                return Err(ProviderCommandError::internal(
+                    "STREAM_SEND_COMMIT_TIMEOUT",
+                    "provider stream delivery did not reach a coherent state",
+                ));
+            }
+        }
+    }
+}
+
+async fn wait_for_pending_send_resolution(
+    state: &Arc<StreamRequestState>,
+) -> Result<(), ProviderCommandError> {
+    let deadline = tokio::time::Instant::now() + SEND_COMMIT_OBSERVATION_TIMEOUT;
+    loop {
+        let notified = state.notify.notified();
+        if state.machine.lock().await.pending_send_seq.is_none() {
+            return Ok(());
+        }
+        tokio::select! {
+            _ = notified => {}
+            _ = tokio::time::sleep_until(deadline) => {
+                return Err(ProviderCommandError::internal(
+                    "STREAM_SEND_COMMIT_TIMEOUT",
+                    "provider stream delivery did not reach a coherent state",
+                ));
+            }
+        }
+    }
+}
+
+async fn persist_cumulative_ack(
+    storage: &StorageState,
+    state: &Arc<StreamRequestState>,
+    seq: u64,
+) -> Result<(), ProviderCommandError> {
+    let request_state_id = state.request_state_id()?;
+    let expected_request_state_id = request_state_id.clone();
+    let owner_label = state.owner_label.clone();
+    let stream_generation = state.stream_generation.clone();
+    let expected_last_acked_seq = state.machine.lock().await.persisted_acked_through;
+    let at_ms = TimestampMillis::now().map_err(|_| {
+        ProviderCommandError::new("STORAGE_UNAVAILABLE", "local storage is unavailable")
+    })?;
+    let acknowledgement = CumulativeAck {
+        request_state_id,
+        owner_label: owner_label.clone(),
+        stream_generation: stream_generation.clone(),
+        expected_last_acked_seq,
+        through_seq: seq,
+        at_ms,
+    };
+    let progress = storage
+        .run(move |store| store.acknowledge_response(acknowledgement))
+        .await
+        .map_err(ProviderCommandError::from_storage)?;
+    if progress.request_state_id != expected_request_state_id
+        || progress.owner_label != owner_label
+        || progress.stream_generation != stream_generation
+        || progress.last_acked_seq != Some(seq)
+        || progress.last_durable_seq < seq
+        || progress.last_durable_seq > progress.last_delivered_seq
+    {
+        return Err(ProviderCommandError::internal(
+            "STREAM_STORAGE_IDENTITY_MISMATCH",
+            "local acknowledgement progress was inconsistent",
+        ));
+    }
+
+    let mut machine = state.machine.lock().await;
+    if machine.persisted_acked_through != expected_last_acked_seq {
+        return Err(ProviderCommandError::internal(
+            "STREAM_INTERNAL_STATE",
+            "provider acknowledgement state changed concurrently",
+        ));
+    }
+    machine.persisted_acked_through = Some(seq);
+    Ok(())
+}
+
+async fn force_stream_failure(state: &Arc<StreamRequestState>, error: ProviderCommandError) {
+    {
+        let mut machine = state.machine.lock().await;
+        if machine.terminal.is_none()
+            && !machine.terminal_committing
+            && machine.lease_failure.is_none()
+        {
+            machine.lease_failure = Some(error);
+            state.forced_failure.store(true, Ordering::Release);
+        }
+    }
+    state.cancellation.cancel();
+    state.notify.notify_waiters();
+    state.flush_notify.notify_waiters();
+}
+
 #[tauri::command]
 pub(crate) async fn cancel_provider_stream(
     request_id: String,
@@ -588,21 +1267,79 @@ pub(crate) async fn cancel_provider_stream(
 ) -> Result<CancelProviderStreamResponse, ProviderCommandError> {
     let state = registry.authenticated(&request_id, &control_token)?;
     let accepted = {
-        let mut machine = state.machine.lock().await;
-        if machine.cancel_requested || machine.terminal.is_some() || machine.terminal_committing {
+        let machine = state.machine.lock().await;
+        if state.cancel_requested.load(Ordering::Acquire)
+            || machine.terminal.is_some()
+            || machine.terminal_committing
+            || machine.lease_failure.is_some()
+        {
             false
         } else {
-            machine.cancel_requested = true;
-            true
+            state.request_cancel()
         }
     };
-    if accepted {
-        state.cancellation.cancel();
-        state.notify.notify_waiters();
-    }
     Ok(CancelProviderStreamResponse {
         request_id,
         accepted,
+    })
+}
+
+#[tauri::command]
+pub(crate) async fn reset_provider_stream_owner(
+    window: WebviewWindow,
+    registry: State<'_, ProviderStreamRegistry>,
+) -> Result<ResetProviderStreamOwnerResponse, ProviderCommandError> {
+    let owner_label = StreamOwnerLabel::parse(window.label().to_owned()).map_err(|_| {
+        ProviderCommandError::internal(
+            "STREAM_OWNER_INVALID",
+            "native stream owner label is invalid",
+        )
+    })?;
+    reset_owner_streams(owner_label.as_str(), registry.inner()).await
+}
+
+async fn reset_owner_streams(
+    owner_label: &str,
+    registry: &ProviderStreamRegistry,
+) -> Result<ResetProviderStreamOwnerResponse, ProviderCommandError> {
+    let requests = registry.requests_for_owner(owner_label)?;
+    let mut cancelled = 0usize;
+    for (_, state) in &requests {
+        let machine = state.machine.lock().await;
+        if machine.terminal.is_none()
+            && !machine.terminal_committing
+            && machine.lease_failure.is_none()
+            && state.request_cancel()
+        {
+            cancelled += 1;
+        }
+    }
+    let deadline = tokio::time::Instant::now() + OWNER_RESET_TIMEOUT;
+    let mut terminalized = 0usize;
+
+    for (request_id, state) in requests {
+        loop {
+            let notified = state.notify.notified();
+            if state.machine.lock().await.terminal.is_some() {
+                registry.remove_if_same(&request_id, &state);
+                terminalized += 1;
+                break;
+            }
+            tokio::select! {
+                _ = notified => {}
+                _ = tokio::time::sleep_until(deadline) => {
+                    return Err(ProviderCommandError::new(
+                        "STREAM_OWNER_RESET_TIMEOUT",
+                        "previous provider streams did not terminate in time",
+                    ));
+                }
+            }
+        }
+    }
+
+    Ok(ResetProviderStreamOwnerResponse {
+        cancelled: u64::try_from(cancelled).unwrap_or(u64::MAX),
+        terminalized: u64::try_from(terminalized).unwrap_or(u64::MAX),
     })
 }
 
@@ -613,6 +1350,10 @@ pub(crate) async fn get_provider_stream_snapshot(
     registry: State<'_, ProviderStreamRegistry>,
 ) -> Result<ProviderStreamSnapshot, ProviderCommandError> {
     let state = registry.authenticated(&request_id, &control_token)?;
+    // A direct Channel callback can re-enter Tauri before the sender
+    // reacquires the machine lock and publishes its terminal receipt.
+    // Never expose that transient reservation as a coherent snapshot.
+    wait_for_pending_send_resolution(&state).await?;
     let (snapshot, should_remove) = {
         let mut machine = state.machine.lock().await;
         if machine.terminal.is_some() {
@@ -623,7 +1364,7 @@ pub(crate) async fn get_provider_stream_snapshot(
             last_sent_seq: machine.last_sent_seq,
             acknowledged_through: machine.acknowledged_through,
             in_flight: machine.in_flight(),
-            cancel_requested: machine.cancel_requested,
+            cancel_requested: state.cancel_requested.load(Ordering::Acquire),
             terminal: machine.terminal.clone(),
         };
         (snapshot, machine.can_evict())
@@ -647,9 +1388,21 @@ async fn load_provider_credential(
         ));
     }
     let provider = request.provider;
-    let loaded = run_vault_operation(move || vault.load_api_key_for_native_use(provider))
-        .await
-        .map_err(ProviderCommandError::from_vault)?;
+    // This operation is read-only, so abandoning the join wait after the
+    // deadline cannot commit a late credential mutation. The platform call may
+    // finish on its blocking worker, but the request deterministically fails.
+    let loaded = tokio::time::timeout(
+        CREDENTIAL_PREFLIGHT_TIMEOUT,
+        run_vault_operation(move || vault.load_api_key_for_native_use(provider)),
+    )
+    .await
+    .map_err(|_| {
+        ProviderCommandError::new(
+            "CREDENTIAL_PREFLIGHT_TIMEOUT",
+            "credential store access timed out",
+        )
+    })?
+    .map_err(ProviderCommandError::from_vault)?;
     let copied = loaded.as_bytes().to_vec();
     let secret = String::from_utf8(copied).map_err(|error| {
         let mut bytes = error.into_bytes();
@@ -679,9 +1432,13 @@ async fn load_provider_credential(
 
 struct StreamPersistence {
     request_state_id: RequestStateId,
-    last_persisted_seq: u64,
+    owner_label: StreamOwnerLabel,
+    stream_generation: StreamGeneration,
+    last_delivered_seq: u64,
+    last_durable_seq: u64,
     through_seq: u64,
     appended_text: String,
+    visible_text_bytes: usize,
     provider_response_id: Option<String>,
     usage: StorageTokenUsage,
     has_usage: bool,
@@ -693,9 +1450,13 @@ impl StreamPersistence {
     fn new(started: StartedTurn, started_at_ms: TimestampMillis) -> Self {
         Self {
             request_state_id: started.request_state_id,
-            last_persisted_seq: started.last_seq,
-            through_seq: started.last_seq,
+            owner_label: started.owner_label,
+            stream_generation: started.stream_generation,
+            last_delivered_seq: started.last_delivered_seq,
+            last_durable_seq: started.last_durable_seq,
+            through_seq: started.last_durable_seq,
             appended_text: String::new(),
+            visible_text_bytes: 0,
             provider_response_id: None,
             usage: StorageTokenUsage::default(),
             has_usage: false,
@@ -718,7 +1479,12 @@ impl StreamPersistence {
             ));
         }
         if let Some(text) = visible_text {
+            self.validate_visible_fragment(text)?;
             self.appended_text.push_str(text);
+            self.visible_text_bytes = self
+                .visible_text_bytes
+                .checked_add(text.len())
+                .ok_or_else(response_too_large)?;
         }
         if let Some(id) = provider_response_id {
             self.provider_response_id = Some(id.to_owned());
@@ -729,6 +1495,17 @@ impl StreamPersistence {
         self.through_seq = seq;
         self.flush_deadline
             .get_or_insert_with(|| tokio::time::Instant::now() + STORAGE_FLUSH_INTERVAL);
+        Ok(())
+    }
+
+    fn validate_visible_fragment(&self, text: &str) -> Result<(), ProviderCommandError> {
+        if self
+            .visible_text_bytes
+            .checked_add(text.len())
+            .is_none_or(|bytes| bytes > lorepia_storage::MAX_MESSAGE_BYTES)
+        {
+            return Err(response_too_large());
+        }
         Ok(())
     }
 
@@ -752,7 +1529,7 @@ impl StreamPersistence {
     }
 
     fn is_dirty(&self) -> bool {
-        self.through_seq > self.last_persisted_seq
+        self.through_seq > self.last_durable_seq
     }
 
     fn should_flush_for_size(&self) -> bool {
@@ -777,7 +1554,9 @@ impl StreamPersistence {
         let at_ms = self.timestamp()?;
         Ok(ResponseCheckpoint {
             request_state_id: self.request_state_id.clone(),
-            expected_last_seq: self.last_persisted_seq,
+            owner_label: self.owner_label.clone(),
+            stream_generation: self.stream_generation.clone(),
+            expected_last_durable_seq: self.last_durable_seq,
             through_seq,
             appended_text: std::mem::take(&mut self.appended_text),
             provider_response_id: self.provider_response_id.take(),
@@ -802,7 +1581,7 @@ impl StreamPersistence {
             self.through_seq = terminal_seq;
             return Ok(());
         }
-        if terminal_seq == self.through_seq && self.last_persisted_seq < terminal_seq {
+        if terminal_seq == self.through_seq && self.last_durable_seq < terminal_seq {
             return Ok(());
         }
         Err(ProviderCommandError::internal(
@@ -811,7 +1590,53 @@ impl StreamPersistence {
         ))
     }
 
-    async fn flush(&mut self, storage: &StorageState) -> Result<(), ProviderCommandError> {
+    async fn record_delivery(
+        &mut self,
+        storage: &StorageState,
+        seq: u64,
+    ) -> Result<(), ProviderCommandError> {
+        if seq != self.last_delivered_seq.saturating_add(1) {
+            return Err(ProviderCommandError::internal(
+                "STORAGE_SEQUENCE_INVALID",
+                "stream delivery sequence is invalid",
+            ));
+        }
+        let checkpoint = DeliveryCheckpoint {
+            request_state_id: self.request_state_id.clone(),
+            owner_label: self.owner_label.clone(),
+            stream_generation: self.stream_generation.clone(),
+            expected_last_delivered_seq: self.last_delivered_seq,
+            through_seq: seq,
+            at_ms: self.timestamp()?,
+        };
+        let operation = checkpoint.clone();
+        let progress = storage
+            .run(move |store| store.record_response_delivery(operation))
+            .await
+            .map_err(ProviderCommandError::from_storage)?;
+        if progress.request_state_id != self.request_state_id
+            || progress.owner_label != self.owner_label
+            || progress.stream_generation != self.stream_generation
+            || progress.last_delivered_seq != seq
+            || progress.last_durable_seq != self.last_durable_seq
+            || progress
+                .last_acked_seq
+                .is_some_and(|acked| acked > progress.last_durable_seq)
+        {
+            return Err(ProviderCommandError::internal(
+                "STREAM_STORAGE_IDENTITY_MISMATCH",
+                "local delivery progress was inconsistent",
+            ));
+        }
+        self.last_delivered_seq = seq;
+        Ok(())
+    }
+
+    async fn flush(
+        &mut self,
+        storage: &StorageState,
+        state: &Arc<StreamRequestState>,
+    ) -> Result<(), ProviderCommandError> {
         if !self.is_dirty() {
             self.flush_deadline = None;
             return Ok(());
@@ -823,9 +1648,20 @@ impl StreamPersistence {
             .run(move |store| store.checkpoint_response(operation_checkpoint))
             .await;
         match result {
-            Ok(progress) if progress.last_seq == through_seq => {
-                self.last_persisted_seq = through_seq;
+            Ok(progress)
+                if progress.request_state_id == self.request_state_id
+                    && progress.last_delivered_seq == self.last_delivered_seq
+                    && progress.last_durable_seq == through_seq
+                    && progress
+                        .last_acked_seq
+                        .is_none_or(|acked| acked <= progress.last_durable_seq) =>
+            {
+                self.last_durable_seq = through_seq;
                 self.flush_deadline = None;
+                let mut machine = state.machine.lock().await;
+                machine.publish_durable(through_seq);
+                drop(machine);
+                state.notify.notify_waiters();
                 Ok(())
             }
             Ok(_) => {
@@ -845,6 +1681,7 @@ impl StreamPersistence {
     async fn finish(
         &mut self,
         storage: &StorageState,
+        state: &Arc<StreamRequestState>,
         terminal_seq: u64,
         outcome: TerminalOutcome,
     ) -> Result<(), ProviderCommandError> {
@@ -855,9 +1692,21 @@ impl StreamPersistence {
             outcome,
         };
         match storage.run(move |store| store.finish_turn(operation)).await {
-            Ok(progress) if progress.last_seq == terminal_seq => {
-                self.last_persisted_seq = terminal_seq;
+            Ok(progress)
+                if progress.request_state_id == self.request_state_id
+                    && progress.last_delivered_seq == terminal_seq
+                    && progress.last_durable_seq == terminal_seq
+                    && progress
+                        .last_acked_seq
+                        .is_none_or(|acked| acked <= progress.last_durable_seq)
+                    && progress.status != StorageRequestStatus::Running =>
+            {
+                self.last_durable_seq = terminal_seq;
                 self.flush_deadline = None;
+                let mut machine = state.machine.lock().await;
+                machine.publish_durable(terminal_seq);
+                drop(machine);
+                state.notify.notify_waiters();
                 Ok(())
             }
             Ok(_) => {
@@ -877,9 +1726,10 @@ impl StreamPersistence {
     async fn fail_after_terminal_error(
         &mut self,
         storage: &StorageState,
+        request: &Arc<StreamRequestState>,
         terminal_seq: u64,
     ) -> Result<StorageRequestStatus, ProviderCommandError> {
-        if terminal_seq != self.through_seq || self.last_persisted_seq >= terminal_seq {
+        if terminal_seq != self.through_seq || self.last_durable_seq >= terminal_seq {
             return Err(ProviderCommandError::internal(
                 "STORAGE_SEQUENCE_INVALID",
                 "terminal recovery sequence is invalid",
@@ -887,41 +1737,47 @@ impl StreamPersistence {
         }
         let checkpoint = self.checkpoint(terminal_seq)?;
         let operation_checkpoint = checkpoint.clone();
-        let known_last_seq = self.last_persisted_seq;
+        let known_last_durable_seq = self.last_durable_seq;
         let operation = storage
             .run(move |store| {
                 let state = store.get_request_state(&operation_checkpoint.request_state_id)?;
-                if state.status != StorageRequestStatus::Running {
-                    return Ok((state.status, state.last_seq));
+                if state.owner_label != operation_checkpoint.owner_label
+                    || state.stream_generation != operation_checkpoint.stream_generation
+                {
+                    return Err(lorepia_storage::StorageError::Conflict {
+                        entity: "stream identity",
+                    });
                 }
-                if state.last_seq >= terminal_seq {
+                if state.status != StorageRequestStatus::Running {
+                    return Ok((state.status, state.last_durable_seq));
+                }
+                if state.last_delivered_seq < terminal_seq
+                    || state.last_durable_seq != known_last_durable_seq
+                {
                     return Err(lorepia_storage::StorageError::SequenceMismatch {
-                        expected: state.last_seq,
-                        actual: terminal_seq,
+                        expected: state.last_durable_seq,
+                        actual: known_last_durable_seq,
                     });
                 }
 
                 let mut reconciled = operation_checkpoint;
-                if state.last_seq != known_last_seq {
-                    // An ambiguous earlier write may already own the buffered
-                    // payload. Close the request without risking duplicate text.
-                    reconciled.appended_text.clear();
-                    reconciled.provider_response_id = None;
-                    reconciled.usage = None;
-                }
-                reconciled.expected_last_seq = state.last_seq;
+                reconciled.expected_last_durable_seq = state.last_durable_seq;
                 store
                     .fail_turn(reconciled, StorageFailureCode::Internal)
-                    .map(|progress| (progress.status, progress.last_seq))
+                    .map(|progress| (progress.status, progress.last_durable_seq))
             })
             .await;
 
         match operation {
-            Ok((status, last_seq)) if status != StorageRequestStatus::Running => {
-                self.last_persisted_seq = last_seq;
+            Ok((status, last_durable_seq)) if status != StorageRequestStatus::Running => {
+                self.last_durable_seq = last_durable_seq;
                 self.appended_text.clear();
                 self.provider_response_id = None;
                 self.flush_deadline = None;
+                let mut machine = request.machine.lock().await;
+                machine.publish_durable(last_durable_seq);
+                drop(machine);
+                request.notify.notify_waiters();
                 Ok(status)
             }
             Ok(_) => {
@@ -982,10 +1838,16 @@ async fn run_stream_bridge(input: StreamBridgeInput) {
     );
     tokio::pin!(run);
 
-    let result = loop {
+    let mut result = loop {
         let flush_deadline = persistence.deadline();
         tokio::select! {
             biased;
+            _ = state.flush_notify.notified() => {
+                if let Err(error) = persistence.flush(&storage, &state).await {
+                    state.cancellation.cancel();
+                    break Err(error);
+                }
+            }
             event = event_rx.recv() => {
                 match event {
                     Some(event) => {
@@ -1025,7 +1887,7 @@ async fn run_stream_bridge(input: StreamBridgeInput) {
                 );
             }
             _ = wait_for_storage_flush(flush_deadline) => {
-                if let Err(error) = persistence.flush(&storage).await {
+                if let Err(error) = persistence.flush(&storage, &state).await {
                     state.cancellation.cancel();
                     break Err(error);
                 }
@@ -1033,8 +1895,21 @@ async fn run_stream_bridge(input: StreamBridgeInput) {
         }
     };
 
-    let cancelled = state.machine.lock().await.cancel_requested;
-    let terminal = if cancelled {
+    if let Err(error) = persistence.flush(&storage, &state).await {
+        state.cancellation.cancel();
+        result = Err(error);
+    }
+
+    let (lease_failure, cancelled) = {
+        let machine = state.machine.lock().await;
+        (
+            machine.lease_failure.clone(),
+            state.cancel_requested.load(Ordering::Acquire),
+        )
+    };
+    let terminal = if let Some(error) = lease_failure {
+        TerminalKind::Failed { error }
+    } else if cancelled {
         TerminalKind::Cancelled
     } else {
         match result {
@@ -1050,17 +1925,83 @@ async fn run_stream_bridge(input: StreamBridgeInput) {
         &request_id,
         &state,
         &channel,
-        terminal,
+        terminal.clone(),
         &mut persistence,
         &storage,
     )
     .await
     .is_err()
     {
-        registry.remove_if_same(&request_id, &state);
+        // Keep the authenticated request and its buffered persistence state
+        // alive until a transient disk/WAL failure clears. Dropping them here
+        // would leave a `running` row that wedges the chat until app restart.
+        tauri::async_runtime::spawn(recover_terminal_until_durable(
+            request_id,
+            state,
+            channel,
+            terminal,
+            persistence,
+            storage,
+            registry,
+        ));
         return;
     }
     schedule_terminal_cleanup(request_id, state, registry);
+}
+
+async fn run_ack_watchdog(state: Arc<StreamRequestState>) {
+    loop {
+        let notified = state.notify.notified();
+        let deadline = {
+            let machine = state.machine.lock().await;
+            if machine.terminal.is_some()
+                || machine.terminal_committing
+                || machine.lease_failure.is_some()
+            {
+                return;
+            }
+            machine.ack_deadline
+        };
+
+        let Some(deadline) = deadline else {
+            tokio::select! {
+                _ = state.cancellation.cancelled() => return,
+                _ = notified => continue,
+            }
+        };
+
+        tokio::select! {
+            _ = state.cancellation.cancelled() => return,
+            _ = notified => continue,
+            _ = tokio::time::sleep_until(deadline) => {}
+        }
+
+        let timed_out = {
+            let mut machine = state.machine.lock().await;
+            if machine.terminal.is_some()
+                || machine.terminal_committing
+                || machine.lease_failure.is_some()
+                || machine.in_flight() == 0
+                || machine
+                    .ack_deadline
+                    .is_none_or(|current| current > tokio::time::Instant::now())
+            {
+                false
+            } else {
+                machine.lease_failure = Some(ProviderCommandError::new(
+                    "STREAM_ACK_TIMEOUT",
+                    "provider stream acknowledgements timed out",
+                ));
+                state.forced_failure.store(true, Ordering::Release);
+                true
+            }
+        };
+        if timed_out {
+            state.cancellation.cancel();
+            state.notify.notify_waiters();
+            return;
+        }
+    }
 }
 
 async fn wait_for_storage_flush(deadline: Option<tokio::time::Instant>) {
@@ -1095,6 +2036,7 @@ async fn forward_runtime_event(
                 }
             })
             .await?;
+            persistence.record_delivery(storage, seq).await?;
             persistence.record(seq, None, Some(&persisted_id), None)?;
         }
         RuntimeStreamEvent::TextDelta { text } => {
@@ -1143,11 +2085,30 @@ async fn forward_runtime_event(
                 }
             })
             .await?;
+            persistence.record_delivery(storage, seq).await?;
             persistence.record(seq, None, None, Some(&persisted_usage))?;
         }
     }
-    if persistence.should_flush_for_size() {
-        persistence.flush(storage).await?;
+    flush_if_requested_or_pressured(persistence, storage, state).await?;
+    Ok(())
+}
+
+async fn flush_if_requested_or_pressured(
+    persistence: &mut StreamPersistence,
+    storage: &StorageState,
+    state: &Arc<StreamRequestState>,
+) -> Result<(), ProviderCommandError> {
+    let (flush_requested, flow_control_pressure) = {
+        let machine = state.machine.lock().await;
+        (
+            machine
+                .flush_requested_through
+                .is_some_and(|requested| requested <= persistence.through_seq),
+            machine.in_flight() >= MAX_IN_FLIGHT.saturating_sub(1),
+        )
+    };
+    if persistence.should_flush_for_size() || flush_requested || flow_control_pressure {
+        persistence.flush(storage, state).await?;
     }
     Ok(())
 }
@@ -1169,35 +2130,46 @@ async fn forward_text_fragments(
     kind: DeltaKind,
 ) -> Result<(), ProviderCommandError> {
     for fragment in split_utf8(&text, MAX_DELTA_FRAGMENT_BYTES) {
-        let persisted_fragment = fragment.clone();
+        if matches!(kind, DeltaKind::Text | DeltaKind::Refusal) {
+            // Reject before Channel delivery so the WebView can never observe
+            // bytes that the durable message row cannot commit.
+            persistence.validate_visible_fragment(fragment)?;
+        }
+        let event_text = fragment.to_owned();
         let seq = send_non_terminal(request_id, state, channel, |request_id, seq| match kind {
             DeltaKind::Text => ProviderChannelEvent::TextDelta {
                 request_id,
                 seq,
-                text: fragment,
+                text: event_text,
             },
             DeltaKind::Reasoning => ProviderChannelEvent::ReasoningDelta {
                 request_id,
                 seq,
-                text: fragment,
+                text: event_text,
             },
             DeltaKind::Refusal => ProviderChannelEvent::RefusalDelta {
                 request_id,
                 seq,
-                text: fragment,
+                text: event_text,
             },
         })
         .await?;
+        persistence.record_delivery(storage, seq).await?;
         let visible = match kind {
-            DeltaKind::Text | DeltaKind::Refusal => Some(persisted_fragment.as_str()),
+            DeltaKind::Text | DeltaKind::Refusal => Some(fragment),
             DeltaKind::Reasoning => None,
         };
         persistence.record(seq, visible, None, None)?;
-        if persistence.should_flush_for_size() {
-            persistence.flush(storage).await?;
-        }
+        flush_if_requested_or_pressured(persistence, storage, state).await?;
     }
     Ok(())
+}
+
+fn response_too_large() -> ProviderCommandError {
+    ProviderCommandError::new(
+        "STREAM_VISIBLE_OUTPUT_TOO_LARGE",
+        "provider stream visible output exceeded the product limit",
+    )
 }
 
 async fn send_non_terminal(
@@ -1206,13 +2178,19 @@ async fn send_non_terminal(
     channel: &Channel<ProviderChannelEvent>,
     make_event: impl FnOnce(String, u64) -> ProviderChannelEvent,
 ) -> Result<u64, ProviderCommandError> {
-    let deadline = tokio::time::Instant::now() + ACK_TIMEOUT;
     let mut make_event = Some(make_event);
     loop {
         let notified = state.notify.notified();
-        {
+        let reserved_seq = {
             let mut machine = state.machine.lock().await;
-            if machine.cancel_requested {
+            // The ACK watchdog publishes its failure while holding this same
+            // lock and only cancels the token after releasing it.  Check the
+            // published failure first so no sender can reserve one more event
+            // in that intentional hand-off window.
+            if let Some(error) = machine.lease_failure.clone() {
+                return Err(error);
+            }
+            if state.cancel_requested.load(Ordering::Acquire) || state.cancellation.is_cancelled() {
                 return Err(ProviderCommandError::new(
                     "STREAM_CANCELLED",
                     "provider stream was cancelled",
@@ -1224,20 +2202,54 @@ async fn send_non_terminal(
                     "provider stream already reached a terminal state",
                 ));
             }
-            if machine.in_flight() < MAX_IN_FLIGHT {
+            if machine.pending_send_seq.is_none() && machine.in_flight() < MAX_IN_FLIGHT {
                 let seq = machine.last_sent_seq.saturating_add(1);
-                let factory = make_event.take().ok_or_else(|| {
-                    ProviderCommandError::internal(
-                        "STREAM_INTERNAL_STATE",
-                        "provider event factory was already consumed",
-                    )
-                })?;
-                let event = factory(request_id.to_owned(), seq);
-                send_direct(channel, event)?;
-                machine.last_sent_seq = seq;
-                return Ok(seq);
+                machine.pending_send_seq = Some(seq);
+                Some(seq)
+            } else {
+                None
+            }
+        };
+
+        if let Some(seq) = reserved_seq {
+            let factory = make_event.take().ok_or_else(|| {
+                ProviderCommandError::internal(
+                    "STREAM_INTERNAL_STATE",
+                    "provider event factory was already consumed",
+                )
+            })?;
+            let event = factory(request_id.to_owned(), seq);
+            let send_result = send_direct(channel, event);
+
+            let mut machine = state.machine.lock().await;
+            if machine.pending_send_seq != Some(seq) {
+                drop(machine);
+                state.notify.notify_waiters();
+                return Err(ProviderCommandError::internal(
+                    "STREAM_INTERNAL_STATE",
+                    "provider event reservation was lost",
+                ));
+            }
+            machine.pending_send_seq = None;
+            match send_result {
+                Ok(()) => {
+                    let had_outstanding = machine.in_flight() > 0;
+                    machine.last_sent_seq = seq;
+                    if !had_outstanding || machine.ack_deadline.is_none() {
+                        machine.ack_deadline = Some(tokio::time::Instant::now() + ACK_TIMEOUT);
+                    }
+                    drop(machine);
+                    state.notify.notify_waiters();
+                    return Ok(seq);
+                }
+                Err(error) => {
+                    drop(machine);
+                    state.notify.notify_waiters();
+                    return Err(error);
+                }
             }
         }
+
         tokio::select! {
             _ = state.cancellation.cancelled() => {
                 return Err(ProviderCommandError::new(
@@ -1246,16 +2258,11 @@ async fn send_non_terminal(
                 ));
             }
             _ = notified => {}
-            _ = tokio::time::sleep_until(deadline) => {
-                return Err(ProviderCommandError::new(
-                    "STREAM_ACK_TIMEOUT",
-                    "provider stream acknowledgements timed out",
-                ));
-            }
         }
     }
 }
 
+#[derive(Clone)]
 enum TerminalKind {
     Completed {
         reason: Option<CompletionReason>,
@@ -1275,6 +2282,7 @@ async fn send_terminal(
     persistence: &mut StreamPersistence,
     storage: &StorageState,
 ) -> Result<(), ProviderCommandError> {
+    let ack_guard = state.ack_gate.lock().await;
     let seq = {
         let mut machine = state.machine.lock().await;
         if machine.terminal.is_some() {
@@ -1286,12 +2294,37 @@ async fn send_terminal(
                 "provider stream terminal state is already committing",
             ));
         }
-        if machine.cancel_requested {
+        if state.cancel_requested.load(Ordering::Acquire) {
             terminal = TerminalKind::Cancelled;
+        }
+        if machine.pending_send_seq.is_some() {
+            return Err(ProviderCommandError::internal(
+                "STREAM_INTERNAL_STATE",
+                "provider stream still had a pending event send",
+            ));
         }
         machine.terminal_committing = true;
         machine.last_sent_seq.saturating_add(1)
     };
+
+    if persistence.last_delivered_seq < seq {
+        if let Err(error) = persistence.record_delivery(storage, seq).await {
+            let mut machine = state.machine.lock().await;
+            machine.terminal_committing = false;
+            drop(machine);
+            state.notify.notify_waiters();
+            return Err(error);
+        }
+    } else if persistence.last_delivered_seq != seq {
+        let mut machine = state.machine.lock().await;
+        machine.terminal_committing = false;
+        drop(machine);
+        state.notify.notify_waiters();
+        return Err(ProviderCommandError::internal(
+            "STORAGE_SEQUENCE_INVALID",
+            "terminal delivery sequence is inconsistent",
+        ));
+    }
 
     if let TerminalKind::Completed {
         usage: Some(usage), ..
@@ -1304,9 +2337,10 @@ async fn send_terminal(
         TerminalKind::Cancelled => TerminalOutcome::Cancelled,
         TerminalKind::Failed { error } => TerminalOutcome::Failed(storage_failure_code(error)),
     };
-    if let Err(commit_error) = finish_terminal_with_retry(persistence, storage, seq, outcome).await
+    if let Err(commit_error) =
+        finish_terminal_with_retry(persistence, storage, state, seq, outcome).await
     {
-        let recovered = recover_failed_terminal_with_retry(persistence, storage, seq).await;
+        let recovered = recover_failed_terminal_with_retry(persistence, storage, state, seq).await;
         match recovered {
             Ok(StorageRequestStatus::Completed) if outcome == TerminalOutcome::Completed => {}
             Ok(StorageRequestStatus::Cancelled) => terminal = TerminalKind::Cancelled,
@@ -1331,6 +2365,20 @@ async fn send_terminal(
             }
         }
     }
+    {
+        let mut machine = state.machine.lock().await;
+        if machine.pending_send_seq.is_some() {
+            machine.terminal_committing = false;
+            drop(machine);
+            state.notify.notify_waiters();
+            return Err(ProviderCommandError::internal(
+                "STREAM_INTERNAL_STATE",
+                "provider stream acquired a conflicting terminal send reservation",
+            ));
+        }
+        machine.pending_send_seq = Some(seq);
+    }
+    drop(ack_guard);
 
     let (event, receipt) = match terminal {
         TerminalKind::Completed { reason, usage } => (
@@ -1360,32 +2408,72 @@ async fn send_terminal(
     };
     // Terminal delivery uses one reserved slot so cancellation and failure can
     // finish even when all regular in-flight slots are waiting for ACKs.
+    let send_result = send_direct(channel, event);
     let mut machine = state.machine.lock().await;
-    if let Err(error) = send_direct(channel, event) {
+    if machine.pending_send_seq != Some(seq) {
         machine.terminal_committing = false;
         state.notify.notify_waiters();
-        return Err(error);
+        return Err(ProviderCommandError::internal(
+            "STREAM_INTERNAL_STATE",
+            "provider terminal send reservation was lost",
+        ));
     }
+    machine.pending_send_seq = None;
+    // Storage is already terminal and is the source of truth. Publish the
+    // receipt even if the Channel closed so an authenticated recovery poll can
+    // synthesize the missing terminal event from the snapshot.
     machine.last_sent_seq = seq;
     machine.terminal = Some(receipt);
     machine.terminal_committing = false;
     state.notify.notify_waiters();
+    let _ = send_result;
     Ok(())
+}
+
+async fn recover_terminal_until_durable(
+    request_id: String,
+    state: Arc<StreamRequestState>,
+    channel: Channel<ProviderChannelEvent>,
+    terminal: TerminalKind,
+    mut persistence: StreamPersistence,
+    storage: StorageState,
+    registry: ProviderStreamRegistry,
+) {
+    let mut delay = Duration::from_secs(1);
+    loop {
+        tokio::time::sleep(delay).await;
+        if send_terminal(
+            &request_id,
+            &state,
+            &channel,
+            terminal.clone(),
+            &mut persistence,
+            &storage,
+        )
+        .await
+        .is_ok()
+        {
+            schedule_terminal_cleanup(request_id, state, registry);
+            return;
+        }
+        delay = delay.saturating_mul(2).min(TERMINAL_RECOVERY_MAX_DELAY);
+    }
 }
 
 async fn finish_terminal_with_retry(
     persistence: &mut StreamPersistence,
     storage: &StorageState,
+    state: &Arc<StreamRequestState>,
     seq: u64,
     outcome: TerminalOutcome,
 ) -> Result<(), ProviderCommandError> {
-    let mut result = persistence.finish(storage, seq, outcome).await;
+    let mut result = persistence.finish(storage, state, seq, outcome).await;
     for delay in TERMINAL_STORAGE_RETRY_DELAYS {
         if result.is_ok() {
             break;
         }
         tokio::time::sleep(delay).await;
-        result = persistence.finish(storage, seq, outcome).await;
+        result = persistence.finish(storage, state, seq, outcome).await;
     }
     result
 }
@@ -1393,15 +2481,20 @@ async fn finish_terminal_with_retry(
 async fn recover_failed_terminal_with_retry(
     persistence: &mut StreamPersistence,
     storage: &StorageState,
+    state: &Arc<StreamRequestState>,
     seq: u64,
 ) -> Result<StorageRequestStatus, ProviderCommandError> {
-    let mut result = persistence.fail_after_terminal_error(storage, seq).await;
+    let mut result = persistence
+        .fail_after_terminal_error(storage, state, seq)
+        .await;
     for delay in TERMINAL_STORAGE_RETRY_DELAYS {
         if result.is_ok() {
             break;
         }
         tokio::time::sleep(delay).await;
-        result = persistence.fail_after_terminal_error(storage, seq).await;
+        result = persistence
+            .fail_after_terminal_error(storage, state, seq)
+            .await;
     }
     result
 }
@@ -1413,6 +2506,32 @@ fn storage_failure_code(error: &ProviderCommandError) -> StorageFailureCode {
     if error.http_status == Some(429) {
         return StorageFailureCode::RateLimited;
     }
+    if error.http_status.is_some() {
+        return StorageFailureCode::ProviderRejected;
+    }
+    if let Some(kind) = error.runtime_kind {
+        return match kind {
+            RuntimeErrorKind::DnsResolution | RuntimeErrorKind::Http => {
+                StorageFailureCode::NetworkUnavailable
+            }
+            RuntimeErrorKind::CredentialMismatch | RuntimeErrorKind::InvalidCredential => {
+                StorageFailureCode::AuthenticationFailed
+            }
+            RuntimeErrorKind::HttpStatus | RuntimeErrorKind::Provider => {
+                StorageFailureCode::ProviderRejected
+            }
+            RuntimeErrorKind::Timeout => StorageFailureCode::Timeout,
+            RuntimeErrorKind::StreamTooLarge => StorageFailureCode::ResponseTooLarge,
+            RuntimeErrorKind::UnexpectedContentType | RuntimeErrorKind::StreamProtocol => {
+                StorageFailureCode::ProtocolViolation
+            }
+            RuntimeErrorKind::InvalidRequest
+            | RuntimeErrorKind::InvalidEndpoint
+            | RuntimeErrorKind::UnsafeEndpoint
+            | RuntimeErrorKind::Cancelled
+            | RuntimeErrorKind::ConsumerClosed => StorageFailureCode::Internal,
+        };
+    }
     match error.code.as_str() {
         "DNS_TIMEOUT" | "DNS_RESOLUTION_FAILED" | "DNS_NO_ADDRESSES" => {
             StorageFailureCode::NetworkUnavailable
@@ -1421,6 +2540,7 @@ fn storage_failure_code(error: &ProviderCommandError) -> StorageFailureCode {
         | "RESPONSE_HEADER_TIMEOUT"
         | "STREAM_IDLE_TIMEOUT"
         | "STREAM_ACK_TIMEOUT"
+        | "STREAM_ACK_DURABILITY_TIMEOUT"
         | "EXACT_TOKEN_COUNT_TIMEOUT" => StorageFailureCode::Timeout,
         "STREAM_VISIBLE_OUTPUT_TOO_LARGE"
         | "STREAM_EVENT_TOO_LARGE"
@@ -1468,27 +2588,40 @@ fn ensure_direct_serializable(value: &impl Serialize) -> Result<(), ProviderComm
     Ok(())
 }
 
-fn split_utf8(text: &str, max_bytes: usize) -> Vec<String> {
-    if text.is_empty() {
-        return Vec::new();
-    }
-    let mut fragments = Vec::new();
-    let mut start = 0;
-    while start < text.len() {
-        let mut end = start.saturating_add(max_bytes).min(text.len());
-        while end > start && !text.is_char_boundary(end) {
+struct Utf8Fragments<'a> {
+    remaining: &'a str,
+    max_bytes: usize,
+}
+
+impl<'a> Iterator for Utf8Fragments<'a> {
+    type Item = &'a str;
+
+    fn next(&mut self) -> Option<Self::Item> {
+        if self.remaining.is_empty() {
+            return None;
+        }
+        let mut end = self.max_bytes.min(self.remaining.len());
+        while end > 0 && !self.remaining.is_char_boundary(end) {
             end -= 1;
         }
-        if end == start {
-            end = text[start..]
+        if end == 0 {
+            end = self
+                .remaining
                 .char_indices()
                 .nth(1)
-                .map_or(text.len(), |(offset, _)| start + offset);
+                .map_or(self.remaining.len(), |(offset, _)| offset);
         }
-        fragments.push(text[start..end].to_owned());
-        start = end;
+        let (fragment, remaining) = self.remaining.split_at(end);
+        self.remaining = remaining;
+        Some(fragment)
     }
-    fragments
+}
+
+fn split_utf8(text: &str, max_bytes: usize) -> Utf8Fragments<'_> {
+    Utf8Fragments {
+        remaining: text,
+        max_bytes: max_bytes.max(1),
+    }
 }
 
 fn schedule_terminal_cleanup(
@@ -1496,7 +2629,7 @@ fn schedule_terminal_cleanup(
     state: Arc<StreamRequestState>,
     registry: ProviderStreamRegistry,
 ) {
-    tauri::async_runtime::spawn(async move {
+    tokio::spawn(async move {
         tokio::time::sleep(TERMINAL_RETENTION).await;
         registry.remove_if_same(&request_id, &state);
     });
@@ -1517,6 +2650,19 @@ fn truncate_utf8(mut value: String, max_bytes: usize) -> String {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use lorepia_storage::{CharacterId, CreateChat};
+
+    fn owner_label(value: &str) -> StreamOwnerLabel {
+        StreamOwnerLabel::parse(value).unwrap()
+    }
+
+    fn request_state(owner_label: &str) -> Arc<StreamRequestState> {
+        Arc::new(StreamRequestState::new(
+            self::owner_label(owner_label),
+            StreamGeneration::new(),
+            "0123456789abcdef".to_owned(),
+        ))
+    }
 
     fn started_turn() -> StartedTurn {
         StartedTurn {
@@ -1525,7 +2671,36 @@ mod tests {
             assistant_message_id: lorepia_storage::MessageId::parse("3".repeat(32)).unwrap(),
             user_ordinal: 1,
             assistant_ordinal: 2,
-            last_seq: 0,
+            owner_label: owner_label("main"),
+            stream_generation: StreamGeneration::new(),
+            last_delivered_seq: 0,
+            last_durable_seq: 0,
+            last_acked_seq: None,
+        }
+    }
+
+    fn stored_message(
+        ordinal: u64,
+        role: StoredMessageRole,
+        status: StoredMessageStatus,
+        text: impl Into<String>,
+    ) -> StoredMessage {
+        let at_ms = TimestampMillis::new(i64::try_from(ordinal).unwrap()).unwrap();
+        StoredMessage {
+            id: lorepia_storage::MessageId::parse(format!("{ordinal:032x}")).unwrap(),
+            chat_id: StorageChatId::parse("c".repeat(32)).unwrap(),
+            parent_id: (ordinal > 1).then(|| {
+                lorepia_storage::MessageId::parse(format!("{:032x}", ordinal - 1)).unwrap()
+            }),
+            sibling_ord: 1,
+            depth: ordinal - 1,
+            ordinal,
+            role,
+            status,
+            text: text.into(),
+            created_at_ms: at_ms,
+            updated_at_ms: at_ms,
+            completed_at_ms: (status == StoredMessageStatus::Complete).then_some(at_ms),
         }
     }
 
@@ -1536,7 +2711,7 @@ mod tests {
             let event = ProviderChannelEvent::TextDelta {
                 request_id: format!("provider-{}", "f".repeat(32)),
                 seq: u64::MAX,
-                text: fragment,
+                text: fragment.to_owned(),
             };
             assert!(serde_json::to_vec(&event).unwrap().len() <= DIRECT_CHANNEL_BUDGET_BYTES);
         }
@@ -1545,7 +2720,7 @@ mod tests {
     #[test]
     fn utf8_splitting_preserves_text_exactly() {
         let text = format!("{}{}{}", "a".repeat(511), "🦀", "나".repeat(400));
-        let fragments = split_utf8(&text, MAX_DELTA_FRAGMENT_BYTES);
+        let fragments = split_utf8(&text, MAX_DELTA_FRAGMENT_BYTES).collect::<Vec<_>>();
         assert_eq!(fragments.concat(), text);
         assert!(
             fragments
@@ -1556,10 +2731,238 @@ mod tests {
 
     #[test]
     fn control_tokens_are_bound_to_one_request() {
-        let state = StreamRequestState::new("0123456789abcdef".to_owned());
+        let state = StreamRequestState::new(
+            owner_label("main"),
+            StreamGeneration::new(),
+            "0123456789abcdef".to_owned(),
+        );
         assert!(state.authenticates("0123456789abcdef"));
         assert!(!state.authenticates("0123456789abcdee"));
         assert!(!state.authenticates("short"));
+    }
+
+    #[test]
+    fn storage_identity_rejects_stale_owner_generation_and_bind_replay() {
+        let state = request_state("main");
+        assert!(state.request_state_id().is_err());
+        let matching = StartedTurn {
+            request_state_id: RequestStateId::new(),
+            user_message_id: lorepia_storage::MessageId::new(),
+            assistant_message_id: lorepia_storage::MessageId::new(),
+            user_ordinal: 1,
+            assistant_ordinal: 2,
+            owner_label: state.owner_label.clone(),
+            stream_generation: state.stream_generation.clone(),
+            last_delivered_seq: 0,
+            last_durable_seq: 0,
+            last_acked_seq: None,
+        };
+
+        let mut stale_owner = matching.clone();
+        stale_owner.owner_label = owner_label("other");
+        assert_eq!(
+            state.bind_started_turn(&stale_owner).unwrap_err().code,
+            "STREAM_STORAGE_IDENTITY_MISMATCH"
+        );
+
+        let mut stale_generation = matching.clone();
+        stale_generation.stream_generation = StreamGeneration::new();
+        assert_eq!(
+            state.bind_started_turn(&stale_generation).unwrap_err().code,
+            "STREAM_STORAGE_IDENTITY_MISMATCH"
+        );
+
+        state.bind_started_turn(&matching).unwrap();
+        assert_eq!(state.request_state_id().unwrap(), matching.request_state_id);
+        assert_eq!(
+            state.bind_started_turn(&matching).unwrap_err().code,
+            "STREAM_STORAGE_IDENTITY_MISMATCH"
+        );
+    }
+
+    #[tokio::test]
+    async fn terminal_ack_is_durable_and_stale_identity_or_replay_cannot_advance_it() {
+        let directory = tempfile::tempdir().unwrap();
+        let storage = StorageState::open(Ok(directory.path().to_path_buf()));
+        let owner = owner_label("main");
+        let generation = StreamGeneration::new();
+        let owner_for_turn = owner.clone();
+        let generation_for_turn = generation.clone();
+        let started = storage
+            .run(move |store| {
+                let at_ms = TimestampMillis::now()?;
+                let chat = store.create_chat(CreateChat {
+                    character_id: CharacterId::parse("character-test")?,
+                    title: "terminal ACK test".to_owned(),
+                    at_ms,
+                })?;
+                store.begin_turn(BeginTurn {
+                    chat_id: chat.id,
+                    selection: StorageProviderSelection {
+                        provider_id: StorageProviderId::OpenAi,
+                        model_id: StorageModelId::parse("gpt-test")?,
+                    },
+                    owner_label: owner_for_turn,
+                    stream_generation: generation_for_turn,
+                    user_text: "hello".to_owned(),
+                    started_at_ms: at_ms,
+                })
+            })
+            .await
+            .unwrap();
+
+        let state = Arc::new(StreamRequestState::new(
+            owner.clone(),
+            generation.clone(),
+            "terminal-token".to_owned(),
+        ));
+        state.bind_started_turn(&started).unwrap();
+
+        let started_for_finish = started.clone();
+        storage
+            .run(move |store| {
+                let at_ms = TimestampMillis::now()?;
+                store.record_response_delivery(DeliveryCheckpoint {
+                    request_state_id: started_for_finish.request_state_id.clone(),
+                    owner_label: started_for_finish.owner_label.clone(),
+                    stream_generation: started_for_finish.stream_generation.clone(),
+                    expected_last_delivered_seq: 0,
+                    through_seq: 1,
+                    at_ms,
+                })?;
+                store.finish_turn(TerminalCheckpoint {
+                    checkpoint: ResponseCheckpoint {
+                        request_state_id: started_for_finish.request_state_id.clone(),
+                        owner_label: started_for_finish.owner_label.clone(),
+                        stream_generation: started_for_finish.stream_generation.clone(),
+                        expected_last_durable_seq: 0,
+                        through_seq: 1,
+                        appended_text: "answer".to_owned(),
+                        provider_response_id: None,
+                        usage: None,
+                        at_ms,
+                    },
+                    outcome: TerminalOutcome::Completed,
+                })
+            })
+            .await
+            .unwrap();
+        {
+            let mut machine = state.machine.lock().await;
+            machine.last_sent_seq = 1;
+            machine.last_durable_seq = 1;
+            machine.terminal = Some(TerminalReceipt::Completed {
+                seq: 1,
+                reason: None,
+                usage: None,
+            });
+            machine.ack_deadline = None;
+        }
+
+        for stale in [
+            Arc::new(StreamRequestState::new(
+                owner_label("other"),
+                generation.clone(),
+                "stale-owner".to_owned(),
+            )),
+            Arc::new(StreamRequestState::new(
+                owner.clone(),
+                StreamGeneration::new(),
+                "stale-generation".to_owned(),
+            )),
+        ] {
+            *stale.request_state_id.lock().unwrap() = Some(started.request_state_id.clone());
+            let error = persist_cumulative_ack(&storage, &stale, 1)
+                .await
+                .unwrap_err();
+            assert_eq!(error.code, "STORAGE_WRITE_FAILED");
+            assert_eq!(stale.machine.lock().await.persisted_acked_through, None);
+        }
+
+        persist_cumulative_ack(&storage, &state, 1).await.unwrap();
+        assert_eq!(state.machine.lock().await.persisted_acked_through, Some(1));
+
+        let replay = persist_cumulative_ack(&storage, &state, 1)
+            .await
+            .unwrap_err();
+        assert_eq!(replay.code, "STORAGE_INPUT_INVALID");
+        assert_eq!(state.machine.lock().await.persisted_acked_through, Some(1));
+
+        let request_state_id = started.request_state_id.clone();
+        let persisted = storage
+            .run(move |store| store.get_request_state(&request_state_id))
+            .await
+            .unwrap();
+        assert_eq!(persisted.status, StorageRequestStatus::Completed);
+        assert_eq!(persisted.last_delivered_seq, 1);
+        assert_eq!(persisted.last_durable_seq, 1);
+        assert_eq!(persisted.last_acked_seq, Some(1));
+    }
+
+    #[tokio::test]
+    async fn rejected_start_recovery_resumes_after_delivery_only_crash_window() {
+        let directory = tempfile::tempdir().unwrap();
+        let storage = StorageState::open(Ok(directory.path().to_path_buf()));
+        let owner = owner_label("main");
+        let generation = StreamGeneration::new();
+        let owner_for_turn = owner.clone();
+        let generation_for_turn = generation.clone();
+        let started = storage
+            .run(move |store| {
+                let at_ms = TimestampMillis::now()?;
+                let chat = store.create_chat(CreateChat {
+                    character_id: CharacterId::parse("rejected-start-test")?,
+                    title: "rejected start".to_owned(),
+                    at_ms,
+                })?;
+                store.begin_turn(BeginTurn {
+                    chat_id: chat.id,
+                    selection: StorageProviderSelection {
+                        provider_id: StorageProviderId::OpenAi,
+                        model_id: StorageModelId::parse("gpt-test")?,
+                    },
+                    owner_label: owner_for_turn,
+                    stream_generation: generation_for_turn,
+                    user_text: "persist me".to_owned(),
+                    started_at_ms: at_ms,
+                })
+            })
+            .await
+            .unwrap();
+
+        let delivery_only = started.clone();
+        storage
+            .run(move |store| {
+                store.record_response_delivery(DeliveryCheckpoint {
+                    request_state_id: delivery_only.request_state_id,
+                    owner_label: delivery_only.owner_label,
+                    stream_generation: delivery_only.stream_generation,
+                    expected_last_delivered_seq: 0,
+                    through_seq: 1,
+                    at_ms: TimestampMillis::now()?,
+                })
+            })
+            .await
+            .unwrap();
+
+        let at_ms = TimestampMillis::now().unwrap();
+        persist_rejected_start(&storage, &started, at_ms)
+            .await
+            .unwrap();
+        // A repeated recovery after the terminal commit is a no-op rather than
+        // a second terminal transition.
+        persist_rejected_start(&storage, &started, at_ms)
+            .await
+            .unwrap();
+
+        let request_state_id = started.request_state_id.clone();
+        let persisted = storage
+            .run(move |store| store.get_request_state(&request_state_id))
+            .await
+            .unwrap();
+        assert_eq!(persisted.status, StorageRequestStatus::Failed);
+        assert_eq!(persisted.last_delivered_seq, 1);
+        assert_eq!(persisted.last_durable_seq, 1);
     }
 
     #[test]
@@ -1579,13 +2982,341 @@ mod tests {
     }
 
     #[test]
-    fn first_chat_request_is_native_owned_and_minimal() {
-        let request = build_first_chat_request(
-            FirstChatProfile {
+    fn registry_enforces_count_and_global_reserved_byte_budget() {
+        let registry = ProviderStreamRegistry::default();
+        let mut inserted = Vec::new();
+        for _ in 0..MAX_ACTIVE_STREAMS {
+            inserted.push(registry.insert_new(owner_label("main")).unwrap());
+        }
+
+        let inner = registry.inner.lock().unwrap();
+        assert_eq!(inner.requests.len(), MAX_ACTIVE_STREAMS);
+        assert_eq!(
+            inner.reserved_in_flight_bytes,
+            GLOBAL_IN_FLIGHT_RESERVATION_BYTES
+        );
+        drop(inner);
+
+        let rejected = registry.insert_new(owner_label("main")).err().unwrap();
+        assert_eq!(rejected.code, "TOO_MANY_ACTIVE_STREAMS");
+
+        let (removed_id, removed_state) = inserted.pop().unwrap();
+        registry.remove_if_same(&removed_id, &removed_state);
+        assert_eq!(
+            registry.inner.lock().unwrap().reserved_in_flight_bytes,
+            GLOBAL_IN_FLIGHT_RESERVATION_BYTES - PER_STREAM_IN_FLIGHT_RESERVATION_BYTES
+        );
+
+        registry.insert_new(owner_label("main")).unwrap();
+        let inner = registry.inner.lock().unwrap();
+        assert_eq!(inner.requests.len(), MAX_ACTIVE_STREAMS);
+        assert_eq!(
+            inner.reserved_in_flight_bytes,
+            GLOBAL_IN_FLIGHT_RESERVATION_BYTES
+        );
+    }
+
+    #[test]
+    fn reserved_byte_budget_is_an_independent_admission_gate() {
+        let registry = ProviderStreamRegistry::default();
+        registry.inner.lock().unwrap().reserved_in_flight_bytes =
+            GLOBAL_IN_FLIGHT_RESERVATION_BYTES;
+
+        let rejected = registry.insert_new(owner_label("main")).err().unwrap();
+        assert_eq!(rejected.code, "STREAM_BYTE_BUDGET_EXHAUSTED");
+        assert!(registry.inner.lock().unwrap().requests.is_empty());
+    }
+
+    #[test]
+    fn owner_cleanup_cancels_only_requests_bound_to_destroyed_window() {
+        let registry = ProviderStreamRegistry::default();
+        let (_, main_one) = registry.insert_new(owner_label("main")).unwrap();
+        let (_, main_two) = registry.insert_new(owner_label("main")).unwrap();
+        let (_, settings) = registry.insert_new(owner_label("settings")).unwrap();
+
+        assert_eq!(registry.cancel_owner("main"), 2);
+        assert!(main_one.cancellation.is_cancelled());
+        assert!(main_two.cancellation.is_cancelled());
+        assert!(!settings.cancellation.is_cancelled());
+        assert_eq!(registry.cancel_owner("main"), 0);
+    }
+
+    #[tokio::test]
+    async fn owner_reset_cancels_waits_for_terminal_and_releases_admission() {
+        let registry = ProviderStreamRegistry::default();
+        let (_, state) = registry.insert_new(owner_label("main")).unwrap();
+        let state_for_terminal = Arc::clone(&state);
+        tokio::spawn(async move {
+            state_for_terminal.cancellation.cancelled().await;
+            {
+                let mut machine = state_for_terminal.machine.lock().await;
+                machine.last_sent_seq = 1;
+                machine.terminal = Some(TerminalReceipt::Cancelled { seq: 1 });
+                machine.ack_deadline = None;
+            }
+            state_for_terminal.notify.notify_waiters();
+        });
+
+        let response = reset_owner_streams("main", &registry).await.unwrap();
+        assert_eq!(response.cancelled, 1);
+        assert_eq!(response.terminalized, 1);
+        assert!(registry.inner.lock().unwrap().requests.is_empty());
+        assert_eq!(registry.inner.lock().unwrap().reserved_in_flight_bytes, 0);
+    }
+
+    #[tokio::test(start_paused = true)]
+    async fn owner_reset_fails_closed_when_terminal_storage_never_finishes() {
+        let registry = ProviderStreamRegistry::default();
+        let (_, state) = registry.insert_new(owner_label("main")).unwrap();
+        let reset_registry = registry.clone();
+        let reset = tokio::spawn(async move { reset_owner_streams("main", &reset_registry).await });
+        tokio::task::yield_now().await;
+        assert!(state.cancellation.is_cancelled());
+
+        tokio::time::advance(OWNER_RESET_TIMEOUT).await;
+        tokio::task::yield_now().await;
+        let error = reset.await.unwrap().unwrap_err();
+        assert_eq!(error.code, "STREAM_OWNER_RESET_TIMEOUT");
+        assert_eq!(registry.inner.lock().unwrap().requests.len(), 1);
+    }
+
+    #[tokio::test(start_paused = true)]
+    async fn never_ack_times_out_even_before_the_count_window_is_full() {
+        let state = request_state("main");
+        let watchdog = tokio::spawn(run_ack_watchdog(Arc::clone(&state)));
+        tokio::task::yield_now().await;
+
+        tokio::time::advance(Duration::from_secs(29)).await;
+        tokio::task::yield_now().await;
+        assert!(!state.cancellation.is_cancelled());
+
+        tokio::time::advance(Duration::from_secs(1)).await;
+        tokio::task::yield_now().await;
+        watchdog.await.unwrap();
+        let machine = state.machine.lock().await;
+        assert!(state.cancellation.is_cancelled());
+        assert_eq!(
+            machine
+                .lease_failure
+                .as_ref()
+                .map(|error| error.code.as_str()),
+            Some("STREAM_ACK_TIMEOUT")
+        );
+    }
+
+    #[tokio::test(start_paused = true)]
+    async fn ack_progress_renews_lease_but_duplicate_ack_does_not() {
+        let state = request_state("main");
+        state.machine.lock().await.last_sent_seq = 1;
+        let watchdog = tokio::spawn(run_ack_watchdog(Arc::clone(&state)));
+        tokio::task::yield_now().await;
+
+        tokio::time::advance(Duration::from_secs(20)).await;
+        state.machine.lock().await.record_ack_progress(0);
+        state.notify.notify_waiters();
+        tokio::task::yield_now().await;
+
+        tokio::time::advance(Duration::from_secs(20)).await;
+        state.machine.lock().await.record_ack_progress(0);
+        state.notify.notify_waiters();
+        tokio::task::yield_now().await;
+
+        tokio::time::advance(Duration::from_secs(9)).await;
+        tokio::task::yield_now().await;
+        assert!(!state.cancellation.is_cancelled());
+
+        tokio::time::advance(Duration::from_secs(1)).await;
+        tokio::task::yield_now().await;
+        watchdog.await.unwrap();
+        assert!(state.cancellation.is_cancelled());
+    }
+
+    #[tokio::test]
+    async fn channel_send_runs_without_machine_lock_and_failure_rolls_back() {
+        let state = request_state("main");
+        let state_for_send = Arc::clone(&state);
+        let lock_was_free = Arc::new(AtomicBool::new(false));
+        let lock_was_free_for_send = Arc::clone(&lock_was_free);
+        let channel = Channel::new(move |_| {
+            lock_was_free_for_send
+                .store(state_for_send.machine.try_lock().is_ok(), Ordering::Release);
+            Err(tauri::Error::FailedToReceiveMessage)
+        });
+        let initial_deadline = state.machine.lock().await.ack_deadline;
+
+        let result = send_non_terminal("provider-test", &state, &channel, |request_id, seq| {
+            ProviderChannelEvent::TextDelta {
+                request_id,
+                seq,
+                text: "delta".to_owned(),
+            }
+        })
+        .await;
+
+        assert_eq!(result.unwrap_err().code, "STREAM_CHANNEL_CLOSED");
+        assert!(lock_was_free.load(Ordering::Acquire));
+        let machine = state.machine.lock().await;
+        assert_eq!(machine.last_sent_seq, 0);
+        assert_eq!(machine.pending_send_seq, None);
+        assert_eq!(machine.ack_deadline, initial_deadline);
+    }
+
+    #[tokio::test]
+    async fn ack_lease_failure_blocks_send_before_cancellation_token_handoff() {
+        let state = request_state("main");
+        {
+            let mut machine = state.machine.lock().await;
+            machine.lease_failure = Some(ProviderCommandError::new(
+                "STREAM_ACK_TIMEOUT",
+                "provider stream acknowledgements timed out",
+            ));
+            state.forced_failure.store(true, Ordering::Release);
+        }
+        assert!(!state.cancellation.is_cancelled());
+
+        let channel_was_called = Arc::new(AtomicBool::new(false));
+        let channel_was_called_for_send = Arc::clone(&channel_was_called);
+        let channel = Channel::new(move |_| {
+            channel_was_called_for_send.store(true, Ordering::Release);
+            Ok(())
+        });
+
+        let error = send_non_terminal("provider-test", &state, &channel, |request_id, seq| {
+            ProviderChannelEvent::TextDelta {
+                request_id,
+                seq,
+                text: "must-not-send".to_owned(),
+            }
+        })
+        .await
+        .unwrap_err();
+
+        assert_eq!(error.code, "STREAM_ACK_TIMEOUT");
+        assert!(!channel_was_called.load(Ordering::Acquire));
+        let machine = state.machine.lock().await;
+        assert_eq!(machine.last_sent_seq, 0);
+        assert_eq!(machine.pending_send_seq, None);
+    }
+
+    #[tokio::test]
+    async fn successful_send_commits_state_after_unlocked_channel_delivery() {
+        let state = request_state("main");
+        state.machine.lock().await.record_ack_progress(0);
+        let state_for_send = Arc::clone(&state);
+        let lock_was_free = Arc::new(AtomicBool::new(false));
+        let lock_was_free_for_send = Arc::clone(&lock_was_free);
+        let channel = Channel::new(move |_| {
+            lock_was_free_for_send
+                .store(state_for_send.machine.try_lock().is_ok(), Ordering::Release);
+            Ok(())
+        });
+
+        let seq = send_non_terminal("provider-test", &state, &channel, |request_id, seq| {
+            ProviderChannelEvent::TextDelta {
+                request_id,
+                seq,
+                text: "delta".to_owned(),
+            }
+        })
+        .await
+        .unwrap();
+
+        assert_eq!(seq, 1);
+        assert!(lock_was_free.load(Ordering::Acquire));
+        let machine = state.machine.lock().await;
+        assert_eq!(machine.last_sent_seq, 1);
+        assert_eq!(machine.pending_send_seq, None);
+        assert!(machine.ack_deadline.is_some());
+    }
+
+    #[tokio::test]
+    async fn zero_latency_ack_waits_for_unlocked_send_commit() {
+        let state = request_state("main");
+        state.machine.lock().await.pending_send_seq = Some(1);
+
+        let state_for_ack = Arc::clone(&state);
+        let acknowledgement = tokio::spawn(async move {
+            wait_for_send_commit(&state_for_ack, 1).await.unwrap();
+            state_for_ack.machine.lock().await.last_sent_seq
+        });
+        tokio::task::yield_now().await;
+        assert!(!acknowledgement.is_finished());
+
+        {
+            let mut machine = state.machine.lock().await;
+            machine.pending_send_seq = None;
+            machine.last_sent_seq = 1;
+        }
+        state.notify.notify_waiters();
+
+        assert_eq!(acknowledgement.await.unwrap(), 1);
+    }
+
+    #[tokio::test]
+    async fn zero_latency_snapshot_waits_for_terminal_send_commit() {
+        let state = request_state("main");
+        {
+            let mut machine = state.machine.lock().await;
+            machine.pending_send_seq = Some(1);
+            machine.terminal_committing = true;
+        }
+
+        let state_for_snapshot = Arc::clone(&state);
+        let snapshot = tokio::spawn(async move {
+            wait_for_pending_send_resolution(&state_for_snapshot)
+                .await
+                .unwrap();
+            let machine = state_for_snapshot.machine.lock().await;
+            (
+                machine.last_sent_seq,
+                matches!(
+                    machine.terminal,
+                    Some(TerminalReceipt::Cancelled { seq: 1 })
+                ),
+            )
+        });
+        tokio::task::yield_now().await;
+        assert!(!snapshot.is_finished());
+
+        {
+            let mut machine = state.machine.lock().await;
+            machine.pending_send_seq = None;
+            machine.last_sent_seq = 1;
+            machine.terminal = Some(TerminalReceipt::Cancelled { seq: 1 });
+            machine.terminal_committing = false;
+        }
+        state.notify.notify_waiters();
+
+        assert_eq!(snapshot.await.unwrap(), (1, true));
+    }
+
+    #[tokio::test(start_paused = true)]
+    async fn terminal_fallback_retains_request_until_five_minute_ttl() {
+        let registry = ProviderStreamRegistry::default();
+        let (request_id, state) = registry.insert_new(owner_label("main")).unwrap();
+        let token = state.control_token.clone();
+        schedule_terminal_cleanup(request_id.clone(), Arc::clone(&state), registry.clone());
+        tokio::task::yield_now().await;
+
+        tokio::time::advance(TERMINAL_RETENTION - Duration::from_millis(1)).await;
+        tokio::task::yield_now().await;
+        assert!(registry.authenticated(&request_id, &token).is_ok());
+
+        tokio::time::advance(Duration::from_millis(1)).await;
+        tokio::task::yield_now().await;
+        assert!(registry.authenticated(&request_id, &token).is_err());
+        assert_eq!(registry.inner.lock().unwrap().reserved_in_flight_bytes, 0);
+    }
+
+    #[test]
+    fn chat_request_is_native_owned_and_minimal_without_history() {
+        let request = build_chat_request(
+            ChatProfile {
                 provider_id: ProviderId::Anthropic,
                 model_id: "claude-test".to_owned(),
             },
             "  안녕하세요  ".to_owned(),
+            &[],
         )
         .unwrap();
 
@@ -1593,28 +3324,29 @@ mod tests {
         assert_eq!(request.model_id, "claude-test");
         assert_eq!(request.messages.len(), 2);
         assert_eq!(request.messages[0].role, MessageRole::System);
-        assert_eq!(request.messages[0].content, FIRST_CHAT_SYSTEM_PROMPT);
+        assert_eq!(request.messages[0].content, CHAT_SYSTEM_PROMPT);
         assert_eq!(
             request.messages[1],
             ChatMessage::new(MessageRole::User, "안녕하세요")
         );
         assert_eq!(
             request.generation.max_output_tokens,
-            Some(FIRST_CHAT_MAX_OUTPUT_TOKENS)
+            Some(CHAT_MAX_OUTPUT_TOKENS)
         );
         assert!(request.additional_parameters.is_empty());
         assert!(request.tokenizer_override.is_none());
     }
 
     #[test]
-    fn first_chat_rejects_vertex_invalid_models_and_unbounded_messages() {
+    fn chat_request_rejects_vertex_invalid_models_and_unbounded_messages() {
         let build = |provider_id, model_id: &str, message: String| {
-            build_first_chat_request(
-                FirstChatProfile {
+            build_chat_request(
+                ChatProfile {
                     provider_id,
                     model_id: model_id.to_owned(),
                 },
                 message,
+                &[],
             )
         };
 
@@ -1625,10 +3357,252 @@ mod tests {
             build(
                 ProviderId::OpenAi,
                 "model",
-                "a".repeat(FIRST_CHAT_MAX_INPUT_BYTES + 1),
+                "a".repeat(CHAT_MAX_INPUT_BYTES + 1),
             )
             .is_err()
         );
+    }
+
+    #[test]
+    fn chat_request_includes_completed_history_and_appends_current_user_once() {
+        let history = vec![
+            stored_message(
+                1,
+                StoredMessageRole::User,
+                StoredMessageStatus::Complete,
+                "첫 질문",
+            ),
+            stored_message(
+                2,
+                StoredMessageRole::Assistant,
+                StoredMessageStatus::Complete,
+                "첫 답변",
+            ),
+            stored_message(
+                3,
+                StoredMessageRole::User,
+                StoredMessageStatus::Complete,
+                "둘째 질문",
+            ),
+            stored_message(
+                4,
+                StoredMessageRole::Assistant,
+                StoredMessageStatus::Complete,
+                "둘째 답변",
+            ),
+        ];
+        let request = build_chat_request(
+            ChatProfile {
+                provider_id: ProviderId::GoogleGemini,
+                model_id: "gemini-test".to_owned(),
+            },
+            "  지금 질문  ".to_owned(),
+            &history,
+        )
+        .unwrap();
+
+        assert_eq!(
+            request
+                .messages
+                .iter()
+                .map(|message| (message.role, message.content.as_str()))
+                .collect::<Vec<_>>(),
+            vec![
+                (MessageRole::System, CHAT_SYSTEM_PROMPT),
+                (MessageRole::User, "첫 질문"),
+                (MessageRole::Assistant, "첫 답변"),
+                (MessageRole::User, "둘째 질문"),
+                (MessageRole::Assistant, "둘째 답변"),
+                (MessageRole::User, "지금 질문"),
+            ]
+        );
+        assert_eq!(
+            request
+                .messages
+                .iter()
+                .filter(|message| message.content == "지금 질문")
+                .count(),
+            1
+        );
+        assert!(
+            request
+                .messages
+                .iter()
+                .map(|message| message.content.len())
+                .sum::<usize>()
+                <= CHAT_CONTEXT_MAX_UTF8_BYTES
+        );
+        compile_request(&request).expect("bounded Gemini history must compile");
+    }
+
+    #[test]
+    fn incomplete_assistant_turns_and_their_users_are_excluded() {
+        let history = vec![
+            stored_message(
+                1,
+                StoredMessageRole::User,
+                StoredMessageStatus::Complete,
+                "완료 질문",
+            ),
+            stored_message(
+                2,
+                StoredMessageRole::Assistant,
+                StoredMessageStatus::Complete,
+                "완료 답변",
+            ),
+            stored_message(
+                3,
+                StoredMessageRole::User,
+                StoredMessageStatus::Complete,
+                "취소된 질문",
+            ),
+            stored_message(
+                4,
+                StoredMessageRole::Assistant,
+                StoredMessageStatus::Partial,
+                "부분 답변",
+            ),
+            stored_message(
+                5,
+                StoredMessageRole::User,
+                StoredMessageStatus::Complete,
+                "실패한 질문",
+            ),
+            stored_message(
+                6,
+                StoredMessageRole::Assistant,
+                StoredMessageStatus::Failed,
+                "실패 전 일부",
+            ),
+        ];
+
+        let selected = select_completed_history(&history, usize::MAX, usize::MAX);
+        assert_eq!(
+            selected,
+            vec![
+                ChatMessage::new(MessageRole::User, "완료 질문"),
+                ChatMessage::new(MessageRole::Assistant, "완료 답변"),
+            ]
+        );
+    }
+
+    #[test]
+    fn history_limits_prefer_the_newest_complete_turns() {
+        let mut history = Vec::new();
+        for turn in 1..=4 {
+            history.push(stored_message(
+                turn * 2 - 1,
+                StoredMessageRole::User,
+                StoredMessageStatus::Complete,
+                format!("user-{turn}"),
+            ));
+            history.push(stored_message(
+                turn * 2,
+                StoredMessageRole::Assistant,
+                StoredMessageStatus::Complete,
+                format!("assistant-{turn}"),
+            ));
+        }
+
+        let selected = select_completed_history(&history, 4, usize::MAX);
+        assert_eq!(
+            selected
+                .iter()
+                .map(|message| message.content.as_str())
+                .collect::<Vec<_>>(),
+            vec!["user-3", "assistant-3", "user-4", "assistant-4"]
+        );
+    }
+
+    #[test]
+    fn history_budget_counts_utf8_bytes_without_truncating_or_stale_fallback() {
+        let history = vec![
+            stored_message(
+                1,
+                StoredMessageRole::User,
+                StoredMessageStatus::Complete,
+                "old",
+            ),
+            stored_message(
+                2,
+                StoredMessageRole::Assistant,
+                StoredMessageStatus::Complete,
+                "answer",
+            ),
+            stored_message(
+                3,
+                StoredMessageRole::User,
+                StoredMessageStatus::Complete,
+                "최신",
+            ),
+            stored_message(
+                4,
+                StoredMessageRole::Assistant,
+                StoredMessageStatus::Complete,
+                "응답",
+            ),
+        ];
+        let newest_bytes = "최신".len() + "응답".len();
+
+        let exact = select_completed_history(&history, usize::MAX, newest_bytes);
+        assert_eq!(
+            exact,
+            vec![
+                ChatMessage::new(MessageRole::User, "최신"),
+                ChatMessage::new(MessageRole::Assistant, "응답"),
+            ]
+        );
+        assert_eq!(
+            exact
+                .iter()
+                .map(|message| message.content.len())
+                .sum::<usize>(),
+            newest_bytes
+        );
+        assert!(
+            select_completed_history(&history, usize::MAX, newest_bytes - 1).is_empty(),
+            "older context must not replace an oversized newest eligible turn"
+        );
+    }
+
+    #[test]
+    fn bounded_multiturn_request_compiles_for_each_enabled_provider() {
+        let history = vec![
+            stored_message(
+                1,
+                StoredMessageRole::User,
+                StoredMessageStatus::Complete,
+                "prior question",
+            ),
+            stored_message(
+                2,
+                StoredMessageRole::Assistant,
+                StoredMessageStatus::Complete,
+                "prior answer",
+            ),
+        ];
+        let enabled = [
+            (ProviderId::OpenAi, "gpt-test"),
+            (ProviderId::Anthropic, "claude-test"),
+            (ProviderId::DeepSeek, "deepseek-test"),
+            (ProviderId::OllamaCloud, "ollama-test"),
+            (ProviderId::GoogleGemini, "gemini-test"),
+        ];
+
+        for (provider_id, model_id) in enabled {
+            let request = build_chat_request(
+                ChatProfile {
+                    provider_id,
+                    model_id: model_id.to_owned(),
+                },
+                "current question".to_owned(),
+                &history,
+            )
+            .unwrap();
+            compile_request(&request).unwrap_or_else(|error| {
+                panic!("{provider_id:?} bounded multi-turn request did not compile: {error}")
+            });
+        }
     }
 
     #[test]
@@ -1673,6 +3647,33 @@ mod tests {
     }
 
     #[test]
+    fn visible_output_limit_accepts_exact_boundary_and_rejects_next_byte() {
+        let started_at = TimestampMillis::new(10).unwrap();
+        let mut persistence = StreamPersistence::new(started_turn(), started_at);
+        let prefix = "a".repeat(lorepia_storage::MAX_MESSAGE_BYTES - 1);
+        persistence
+            .record(1, Some(&prefix), None, None)
+            .expect("max minus one");
+        persistence
+            .record(2, Some("b"), None, None)
+            .expect("exact max");
+        assert_eq!(
+            persistence.visible_text_bytes,
+            lorepia_storage::MAX_MESSAGE_BYTES
+        );
+
+        let error = persistence
+            .record(3, Some("c"), None, None)
+            .expect_err("max plus one");
+        assert_eq!(error.code, "STREAM_VISIBLE_OUTPUT_TOO_LARGE");
+        assert_eq!(persistence.through_seq, 2);
+        assert_eq!(
+            persistence.appended_text.len(),
+            lorepia_storage::MAX_MESSAGE_BYTES
+        );
+    }
+
+    #[test]
     fn terminal_checkpoint_can_be_retried_without_losing_buffered_text() {
         let started_at = TimestampMillis::new(10).unwrap();
         let mut persistence = StreamPersistence::new(started_turn(), started_at);
@@ -1684,7 +3685,7 @@ mod tests {
 
         persistence.enter_terminal_sequence(2).unwrap();
         let retry = persistence.checkpoint(2).unwrap();
-        assert_eq!(retry.expected_last_seq, 0);
+        assert_eq!(retry.expected_last_durable_seq, 0);
         assert_eq!(retry.through_seq, 2);
         assert_eq!(retry.appended_text, "visible");
         assert!(persistence.enter_terminal_sequence(1).is_err());
@@ -1697,6 +3698,7 @@ mod tests {
             message: "provider controlled body".to_owned(),
             http_status: Some(401),
             retriable: false,
+            runtime_kind: None,
         };
         assert_eq!(
             storage_failure_code(&authentication),
@@ -1704,5 +3706,53 @@ mod tests {
         );
         let timeout = ProviderCommandError::new("STREAM_ACK_TIMEOUT", "bounded");
         assert_eq!(storage_failure_code(&timeout), StorageFailureCode::Timeout);
+    }
+
+    #[test]
+    fn runtime_error_kinds_map_to_durable_failure_categories() {
+        let cases = [
+            (
+                RuntimeErrorKind::DnsResolution,
+                StorageFailureCode::NetworkUnavailable,
+            ),
+            (
+                RuntimeErrorKind::Http,
+                StorageFailureCode::NetworkUnavailable,
+            ),
+            (
+                RuntimeErrorKind::HttpStatus,
+                StorageFailureCode::ProviderRejected,
+            ),
+            (
+                RuntimeErrorKind::Provider,
+                StorageFailureCode::ProviderRejected,
+            ),
+            (RuntimeErrorKind::Timeout, StorageFailureCode::Timeout),
+            (
+                RuntimeErrorKind::StreamTooLarge,
+                StorageFailureCode::ResponseTooLarge,
+            ),
+            (
+                RuntimeErrorKind::StreamProtocol,
+                StorageFailureCode::ProtocolViolation,
+            ),
+            (
+                RuntimeErrorKind::InvalidCredential,
+                StorageFailureCode::AuthenticationFailed,
+            ),
+        ];
+        for (runtime_kind, expected) in cases {
+            let mut error = ProviderCommandError::new("provider-specific-code", "bounded");
+            error.runtime_kind = Some(runtime_kind);
+            assert_eq!(storage_failure_code(&error), expected, "{runtime_kind:?}");
+        }
+
+        let mut not_found = ProviderCommandError::new("OPENAI_HTTP_ERROR", "bounded");
+        not_found.http_status = Some(404);
+        not_found.runtime_kind = Some(RuntimeErrorKind::HttpStatus);
+        assert_eq!(
+            storage_failure_code(&not_found),
+            StorageFailureCode::ProviderRejected
+        );
     }
 }

@@ -1,17 +1,11 @@
 import { invoke } from "@tauri-apps/api/core";
 
 import type { ThreadMode } from "$lib/chat/types";
-import type {
-  ApiKeyProviderId,
-  LlmProviderId,
-} from "$lib/providers/catalog";
+import type { ApiKeyProviderId, LlmProviderId } from "$lib/providers/catalog";
 import type { ThemePreference } from "$lib/design/theme.svelte";
 
 const MAX_CHAT_PAGE = 100;
-const MAX_MESSAGE_PAGE = 200;
-const MAX_MESSAGE_HISTORY_PAGES = 50;
-const MAX_MESSAGE_HISTORY_ITEMS = MAX_MESSAGE_PAGE * MAX_MESSAGE_HISTORY_PAGES;
-const MAX_MESSAGE_HISTORY_TEXT_BYTES = 16 * 1024 * 1024;
+export const MAX_MESSAGE_PAGE = 200;
 const MAX_TITLE_BYTES = 1024;
 const MAX_CHARACTER_ID_BYTES = 128;
 const MAX_MESSAGE_BYTES = 1024 * 1024;
@@ -72,6 +66,12 @@ export type ChatPage = Readonly<{
 export type MessagePage = Readonly<{
   items: readonly StoredMessage[];
   hasMore: boolean;
+  olderCursor: MessageCursor | null;
+}>;
+
+export type MessageCursor = Readonly<{
+  chatId: string;
+  ordinal: number;
 }>;
 
 export type ChatCursor = Readonly<{
@@ -83,6 +83,38 @@ export type StorageStatus = Readonly<{
   available: boolean;
   schemaVersion: number | null;
   errorCode: string | null;
+  walMaintenance: WalMaintenanceStatus;
+}>;
+
+export type WalMaintenanceStatus = Readonly<{
+  schedulerStarted: boolean;
+  running: boolean;
+  intervalMs: number;
+  restartThresholdBytes: number;
+  emergencyTruncateThresholdBytes: number;
+  successfulRuns: number;
+  failedRuns: number;
+  consecutiveStarvationRuns: number;
+  activeReaders: number;
+  oldestReaderAgeMs: number | null;
+  lastAttemptStartedAtMs: number | null;
+  lastAttemptCompletedAtMs: number | null;
+  lastAttemptDurationMs: number | null;
+  lastSuccessAtMs: number | null;
+  lastErrorAtMs: number | null;
+  lastErrorCode: string | null;
+  passiveBusy: boolean | null;
+  passiveRemainingFrames: number | null;
+  passiveWalFileBytes: number | null;
+  restartBusy: boolean | null;
+  restartRemainingFrames: number | null;
+  restartWalFileBytes: number | null;
+  truncateBusy: boolean | null;
+  truncateRemainingFrames: number | null;
+  truncateWalFileBytes: number | null;
+  thresholdExceeded: boolean | null;
+  emergencyTruncateThresholdExceeded: boolean | null;
+  starvationObserved: boolean | null;
 }>;
 
 export type DeleteChatReceipt = Readonly<{
@@ -121,11 +153,7 @@ function exactRecord(
 }
 
 function isSafeNonNegativeInteger(value: unknown): value is number {
-  return (
-    typeof value === "number" &&
-    Number.isSafeInteger(value) &&
-    value >= 0
-  );
+  return typeof value === "number" && Number.isSafeInteger(value) && value >= 0;
 }
 
 function boundedString(
@@ -151,14 +179,7 @@ function parseId(value: unknown, error: string): string {
 function parseChat(value: unknown): StoredChat {
   const record = exactRecord(
     value,
-    [
-      "id",
-      "characterId",
-      "title",
-      "revision",
-      "createdAtMs",
-      "updatedAtMs",
-    ],
+    ["id", "characterId", "title", "revision", "createdAtMs", "updatedAtMs"],
     "INVALID_STORED_CHAT",
   );
   if (
@@ -203,6 +224,21 @@ function compareChatCursor(left: ChatCursor, right: ChatCursor): number {
   }
   if (left.chatId === right.chatId) return 0;
   return left.chatId < right.chatId ? -1 : 1;
+}
+
+function parseMessageCursor(value: unknown): MessageCursor {
+  const record = exactRecord(
+    value,
+    ["chatId", "ordinal"],
+    "INVALID_MESSAGE_PAGE",
+  );
+  if (!isSafeNonNegativeInteger(record.ordinal) || record.ordinal < 1) {
+    throw new Error("INVALID_MESSAGE_PAGE");
+  }
+  return Object.freeze({
+    chatId: parseId(record.chatId, "INVALID_MESSAGE_PAGE"),
+    ordinal: record.ordinal,
+  });
 }
 
 function parseMessage(value: unknown): StoredMessage {
@@ -301,6 +337,145 @@ function parseVersionedPreferences(value: unknown): VersionedAppPreferences {
   });
 }
 
+function isNullableSafeNonNegativeInteger(
+  value: unknown,
+): value is number | null {
+  return value === null || isSafeNonNegativeInteger(value);
+}
+
+function isNullableBoolean(value: unknown): value is boolean | null {
+  return value === null || typeof value === "boolean";
+}
+
+function parseWalMaintenanceStatus(value: unknown): WalMaintenanceStatus {
+  const record = exactRecord(
+    value,
+    [
+      "schedulerStarted",
+      "running",
+      "intervalMs",
+      "restartThresholdBytes",
+      "emergencyTruncateThresholdBytes",
+      "successfulRuns",
+      "failedRuns",
+      "consecutiveStarvationRuns",
+      "activeReaders",
+      "oldestReaderAgeMs",
+      "lastAttemptStartedAtMs",
+      "lastAttemptCompletedAtMs",
+      "lastAttemptDurationMs",
+      "lastSuccessAtMs",
+      "lastErrorAtMs",
+      "lastErrorCode",
+      "passiveBusy",
+      "passiveRemainingFrames",
+      "passiveWalFileBytes",
+      "restartBusy",
+      "restartRemainingFrames",
+      "restartWalFileBytes",
+      "truncateBusy",
+      "truncateRemainingFrames",
+      "truncateWalFileBytes",
+      "thresholdExceeded",
+      "emergencyTruncateThresholdExceeded",
+      "starvationObserved",
+    ],
+    "INVALID_WAL_MAINTENANCE_STATUS",
+  );
+  const passiveSamplePresent = record.passiveBusy !== null;
+  const restartSamplePresent = record.restartBusy !== null;
+  const truncateSamplePresent = record.truncateBusy !== null;
+  if (
+    typeof record.schedulerStarted !== "boolean" ||
+    typeof record.running !== "boolean" ||
+    (record.running && !record.schedulerStarted) ||
+    !isSafeNonNegativeInteger(record.intervalMs) ||
+    record.intervalMs < 1 ||
+    !isSafeNonNegativeInteger(record.restartThresholdBytes) ||
+    record.restartThresholdBytes < 1 ||
+    !isSafeNonNegativeInteger(record.emergencyTruncateThresholdBytes) ||
+    record.emergencyTruncateThresholdBytes < record.restartThresholdBytes ||
+    !isSafeNonNegativeInteger(record.successfulRuns) ||
+    !isSafeNonNegativeInteger(record.failedRuns) ||
+    !isSafeNonNegativeInteger(record.consecutiveStarvationRuns) ||
+    record.consecutiveStarvationRuns > record.successfulRuns ||
+    !isSafeNonNegativeInteger(record.activeReaders) ||
+    !isNullableSafeNonNegativeInteger(record.oldestReaderAgeMs) ||
+    (record.activeReaders === 0) !== (record.oldestReaderAgeMs === null) ||
+    !isNullableSafeNonNegativeInteger(record.lastAttemptStartedAtMs) ||
+    !isNullableSafeNonNegativeInteger(record.lastAttemptCompletedAtMs) ||
+    !isNullableSafeNonNegativeInteger(record.lastAttemptDurationMs) ||
+    !isNullableSafeNonNegativeInteger(record.lastSuccessAtMs) ||
+    !isNullableSafeNonNegativeInteger(record.lastErrorAtMs) ||
+    !(
+      record.lastErrorCode === null || boundedString(record.lastErrorCode, 64)
+    ) ||
+    !isNullableBoolean(record.passiveBusy) ||
+    !isNullableSafeNonNegativeInteger(record.passiveRemainingFrames) ||
+    !isNullableSafeNonNegativeInteger(record.passiveWalFileBytes) ||
+    !isNullableBoolean(record.restartBusy) ||
+    !isNullableSafeNonNegativeInteger(record.restartRemainingFrames) ||
+    !isNullableSafeNonNegativeInteger(record.restartWalFileBytes) ||
+    !isNullableBoolean(record.truncateBusy) ||
+    !isNullableSafeNonNegativeInteger(record.truncateRemainingFrames) ||
+    !isNullableSafeNonNegativeInteger(record.truncateWalFileBytes) ||
+    !isNullableBoolean(record.thresholdExceeded) ||
+    !isNullableBoolean(record.emergencyTruncateThresholdExceeded) ||
+    !isNullableBoolean(record.starvationObserved) ||
+    passiveSamplePresent !== (record.passiveRemainingFrames !== null) ||
+    passiveSamplePresent !== (record.passiveWalFileBytes !== null) ||
+    passiveSamplePresent !== (record.thresholdExceeded !== null) ||
+    passiveSamplePresent !==
+      (record.emergencyTruncateThresholdExceeded !== null) ||
+    passiveSamplePresent !== (record.starvationObserved !== null) ||
+    restartSamplePresent !== (record.restartRemainingFrames !== null) ||
+    restartSamplePresent !== (record.restartWalFileBytes !== null) ||
+    truncateSamplePresent !== (record.truncateRemainingFrames !== null) ||
+    truncateSamplePresent !== (record.truncateWalFileBytes !== null) ||
+    (passiveSamplePresent &&
+      restartSamplePresent !== (record.thresholdExceeded === true)) ||
+    (record.emergencyTruncateThresholdExceeded === true &&
+      !restartSamplePresent) ||
+    (truncateSamplePresent &&
+      (record.emergencyTruncateThresholdExceeded !== true ||
+        record.restartBusy !== false ||
+        record.restartRemainingFrames !== 0))
+  ) {
+    throw new Error("INVALID_WAL_MAINTENANCE_STATUS");
+  }
+  return Object.freeze({
+    schedulerStarted: record.schedulerStarted,
+    running: record.running,
+    intervalMs: record.intervalMs,
+    restartThresholdBytes: record.restartThresholdBytes,
+    emergencyTruncateThresholdBytes: record.emergencyTruncateThresholdBytes,
+    successfulRuns: record.successfulRuns,
+    failedRuns: record.failedRuns,
+    consecutiveStarvationRuns: record.consecutiveStarvationRuns,
+    activeReaders: record.activeReaders,
+    oldestReaderAgeMs: record.oldestReaderAgeMs,
+    lastAttemptStartedAtMs: record.lastAttemptStartedAtMs,
+    lastAttemptCompletedAtMs: record.lastAttemptCompletedAtMs,
+    lastAttemptDurationMs: record.lastAttemptDurationMs,
+    lastSuccessAtMs: record.lastSuccessAtMs,
+    lastErrorAtMs: record.lastErrorAtMs,
+    lastErrorCode: record.lastErrorCode,
+    passiveBusy: record.passiveBusy,
+    passiveRemainingFrames: record.passiveRemainingFrames,
+    passiveWalFileBytes: record.passiveWalFileBytes,
+    restartBusy: record.restartBusy,
+    restartRemainingFrames: record.restartRemainingFrames,
+    restartWalFileBytes: record.restartWalFileBytes,
+    truncateBusy: record.truncateBusy,
+    truncateRemainingFrames: record.truncateRemainingFrames,
+    truncateWalFileBytes: record.truncateWalFileBytes,
+    thresholdExceeded: record.thresholdExceeded,
+    emergencyTruncateThresholdExceeded:
+      record.emergencyTruncateThresholdExceeded,
+    starvationObserved: record.starvationObserved,
+  });
+}
+
 export function createStorageClient(
   invokeCommand: StorageInvoker = (command, args) =>
     invoke<unknown>(command, args),
@@ -309,7 +484,7 @@ export function createStorageClient(
     async getStorageStatus(): Promise<StorageStatus> {
       const record = exactRecord(
         await invokeCommand("get_storage_status"),
-        ["available", "schemaVersion", "errorCode"],
+        ["available", "schemaVersion", "errorCode", "walMaintenance"],
         "INVALID_STORAGE_STATUS",
       );
       if (
@@ -318,10 +493,7 @@ export function createStorageClient(
           record.schemaVersion === null ||
           isSafeNonNegativeInteger(record.schemaVersion)
         ) ||
-        !(
-          record.errorCode === null ||
-          boundedString(record.errorCode, 64)
-        ) ||
+        !(record.errorCode === null || boundedString(record.errorCode, 64)) ||
         record.available !== (record.errorCode === null)
       ) {
         throw new Error("INVALID_STORAGE_STATUS");
@@ -330,6 +502,7 @@ export function createStorageClient(
         available: record.available,
         schemaVersion: record.schemaVersion,
         errorCode: record.errorCode,
+        walMaintenance: parseWalMaintenanceStatus(record.walMaintenance),
       });
     },
     async createChat(characterId: string, title: string): Promise<StoredChat> {
@@ -341,15 +514,10 @@ export function createStorageClient(
       limit = MAX_CHAT_PAGE,
       before: ChatCursor | null = null,
     ): Promise<ChatPage> {
-      if (
-        !Number.isSafeInteger(limit) ||
-        limit < 1 ||
-        limit > MAX_CHAT_PAGE
-      ) {
+      if (!Number.isSafeInteger(limit) || limit < 1 || limit > MAX_CHAT_PAGE) {
         throw new Error("INVALID_CHAT_PAGE");
       }
-      const validatedBefore =
-        before === null ? null : parseChatCursor(before);
+      const validatedBefore = before === null ? null : parseChatCursor(before);
       const record = exactRecord(
         await invokeCommand("list_chats", { limit, before: validatedBefore }),
         ["items", "nextCursor"],
@@ -396,6 +564,7 @@ export function createStorageClient(
     async loadChatMessages(
       chatId: string,
       limit = MAX_MESSAGE_PAGE,
+      before: MessageCursor | null = null,
     ): Promise<MessagePage> {
       parseId(chatId, "INVALID_MESSAGE_PAGE");
       if (
@@ -405,70 +574,64 @@ export function createStorageClient(
       ) {
         throw new Error("INVALID_MESSAGE_PAGE");
       }
-      const allItems: StoredMessage[] = [];
-      const seenIds = new Set<string>();
-      let afterOrdinal: number | null = null;
-      let textBytes = 0;
-      for (let pageIndex = 0; pageIndex < MAX_MESSAGE_HISTORY_PAGES; pageIndex += 1) {
-        const record = exactRecord(
-          await invokeCommand("load_chat_messages", {
-            chatId,
-            limit,
-            afterOrdinal,
-          }),
-          ["items", "nextOrdinal"],
-          "INVALID_MESSAGE_PAGE",
-        );
-        if (
-          !Array.isArray(record.items) ||
-          record.items.length > limit ||
-          !(
-            record.nextOrdinal === null ||
-            isSafeNonNegativeInteger(record.nextOrdinal)
-          )
-        ) {
-          throw new Error("INVALID_MESSAGE_PAGE");
-        }
-        const pageItems = record.items.map(parseMessage);
-        let previousOrdinal = afterOrdinal ?? 0;
-        for (const message of pageItems) {
-          if (
-            message.chatId !== chatId ||
-            seenIds.has(message.id) ||
-            message.ordinal <= previousOrdinal
-          ) {
-            throw new Error("INVALID_MESSAGE_PAGE");
-          }
-          previousOrdinal = message.ordinal;
-          seenIds.add(message.id);
-          textBytes += utf8Length(message.text);
-          if (
-            allItems.length + 1 > MAX_MESSAGE_HISTORY_ITEMS ||
-            textBytes > MAX_MESSAGE_HISTORY_TEXT_BYTES
-          ) {
-            throw new Error("MESSAGE_HISTORY_LIMIT_EXCEEDED");
-          }
-          allItems.push(message);
-        }
-        const nextOrdinal = record.nextOrdinal;
-        if (
-          nextOrdinal !== null &&
-          (pageItems.length === 0 ||
-            pageItems.length !== limit ||
-            nextOrdinal !== pageItems.at(-1)?.ordinal ||
-            nextOrdinal <= (afterOrdinal ?? 0))
-        ) {
-          throw new Error("INVALID_MESSAGE_PAGE");
-        }
-        if (nextOrdinal === null) {
-          return Object.freeze({
-            items: Object.freeze(allItems),
-            hasMore: false,
-          });
-        }
-        afterOrdinal = nextOrdinal;
+      const validatedBefore =
+        before === null ? null : parseMessageCursor(before);
+      if (validatedBefore !== null && validatedBefore.chatId !== chatId) {
+        throw new Error("INVALID_MESSAGE_PAGE");
       }
-      throw new Error("MESSAGE_HISTORY_LIMIT_EXCEEDED");
+      const record = exactRecord(
+        await invokeCommand("load_chat_messages", {
+          chatId,
+          limit,
+          before: validatedBefore,
+        }),
+        ["items", "hasMore", "olderCursor"],
+        "INVALID_MESSAGE_PAGE",
+      );
+      if (
+        !Array.isArray(record.items) ||
+        record.items.length > limit ||
+        typeof record.hasMore !== "boolean" ||
+        !(record.olderCursor === null || isRecord(record.olderCursor))
+      ) {
+        throw new Error("INVALID_MESSAGE_PAGE");
+      }
+      const items = record.items.map(parseMessage);
+      const seenIds = new Set<string>();
+      let previousOrdinal = 0;
+      for (const message of items) {
+        if (
+          message.chatId !== chatId ||
+          seenIds.has(message.id) ||
+          message.ordinal <= previousOrdinal ||
+          (validatedBefore !== null &&
+            message.ordinal >= validatedBefore.ordinal)
+        ) {
+          throw new Error("INVALID_MESSAGE_PAGE");
+        }
+        previousOrdinal = message.ordinal;
+        seenIds.add(message.id);
+      }
+      const olderCursor =
+        record.olderCursor === null
+          ? null
+          : parseMessageCursor(record.olderCursor);
+      if (
+        record.hasMore !== (olderCursor !== null) ||
+        (olderCursor !== null &&
+          (items.length === 0 ||
+            olderCursor.chatId !== chatId ||
+            olderCursor.ordinal !== items[0]?.ordinal ||
+            (validatedBefore !== null &&
+              olderCursor.ordinal >= validatedBefore.ordinal)))
+      ) {
+        throw new Error("INVALID_MESSAGE_PAGE");
+      }
+      return Object.freeze({
+        items: Object.freeze(items),
+        hasMore: record.hasMore,
+        olderCursor,
+      });
     },
     async deleteChat(chatId: string): Promise<DeleteChatReceipt> {
       const record = exactRecord(

@@ -18,6 +18,15 @@ const androidActivity = readFileSync(
   ),
   "utf8",
 );
+const appTemplate = readFileSync(new URL("../app.html", import.meta.url), "utf8");
+const platformInit = readFileSync(
+  new URL("../../static/platform-init.js", import.meta.url),
+  "utf8",
+);
+const designTokens = readFileSync(
+  new URL("./design/tokens.css", import.meta.url),
+  "utf8",
+);
 const appleProject = readFileSync(
   new URL("../../src-tauri/gen/apple/project.yml", import.meta.url),
   "utf8",
@@ -40,14 +49,19 @@ describe("native product boundary", () => {
       "allow-start-provider-stream",
       "allow-ack-provider-stream",
       "allow-cancel-provider-stream",
+      "allow-reset-provider-stream-owner",
       "allow-get-provider-stream-snapshot",
       "allow-get-storage-status",
+      "allow-get-asset-store-status",
       "allow-create-chat",
       "allow-list-chats",
       "allow-load-chat-messages",
       "allow-delete-chat",
       "allow-get-app-preferences",
       "allow-update-app-preferences",
+      "allow-get-product-safety-contract",
+      "allow-prepare-ai-output-report",
+      "allow-export-redacted-diagnostics",
     ]);
   });
 
@@ -78,6 +92,29 @@ describe("native product boundary", () => {
     expect(androidActivity).toContain("package dev.lorepia.client");
     expect(appleProject).toContain(
       "PRODUCT_BUNDLE_IDENTIFIER: dev.lorepia.client",
+    );
+  });
+
+  it("gives Android safe-area ownership to native padding exactly once", () => {
+    expect(androidActivity).not.toContain(".style");
+    expect(androidActivity).not.toContain("evaluateJavascript");
+    expect(androidActivity).toContain(
+      "view.setPadding(0, bars.top, 0, bars.bottom)",
+    );
+    expect(androidActivity).toContain("ViewCompat.requestApplyInsets(webView)");
+    expect(appTemplate).toContain(
+      '<script src="%sveltekit.assets%/platform-init.js"></script>',
+    );
+    expect(appTemplate).not.toMatch(/<script(?![^>]+src=)[^>]*>/u);
+    expect(platformInit).toContain('navigator.userAgent.includes("Android")');
+    expect(platformInit).toContain(
+      'document.documentElement.dataset.nativeInsetOwner = "android-view-padding"',
+    );
+    expect(designTokens).toContain(
+      ':root[data-native-inset-owner="android-view-padding"]',
+    );
+    expect(designTokens).toMatch(
+      /data-native-inset-owner="android-view-padding"[^}]+--safe-top:\s*0px;[^}]+--safe-bottom:\s*0px;/su,
     );
   });
 });

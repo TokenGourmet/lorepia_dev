@@ -65,10 +65,16 @@
                   {#if entry.message.narration}
                     <span class="narration">{entry.message.narration}</span>
                     {" "}
-                  {/if}{entry.message.text}{#if entry.message.streaming}<span
+                  {/if}{entry.message.text}{#each entry.message.streamingChunks ?? [] as chunk}{chunk}{/each}{#if entry.message.streaming}<span
                       class="cursor"
                       aria-hidden="true"
-                    ></span>{/if}
+                    ></span>{/if}{#if !entry.message.streaming && entry.message.deliveryState === "partial"}<span
+                      class="delivery-state"
+                      aria-label="응답이 중단됨"
+                    >중단됨</span>{:else if !entry.message.streaming && entry.message.deliveryState === "failed"}<span
+                      class="delivery-state failed"
+                      aria-label="응답 실패"
+                    >실패</span>{/if}
                 </p>
               </div>
               {#if entry.showTime}
@@ -113,10 +119,16 @@
             {#if entry.message.narration}
               <span class="narration">{entry.message.narration}</span>
               {" "}
-            {/if}{entry.message.text}{#if entry.message.streaming}<span
+            {/if}{entry.message.text}{#each entry.message.streamingChunks ?? [] as chunk}{chunk}{/each}{#if entry.message.streaming}<span
                 class="cursor"
                 aria-hidden="true"
-              ></span>{/if}
+              ></span>{/if}{#if !entry.message.streaming && entry.message.deliveryState === "partial"}<span
+                class="delivery-state"
+                aria-label="응답이 중단됨"
+              >중단됨</span>{:else if !entry.message.streaming && entry.message.deliveryState === "failed"}<span
+                class="delivery-state failed"
+                aria-label="응답 실패"
+              >실패</span>{/if}
           </p>
         {:else}
           <div class="note">
@@ -216,6 +228,18 @@
     border-radius: var(--r-bubble);
     padding: 10px 14px;
     min-width: 0;
+  }
+
+  .delivery-state {
+    display: inline-block;
+    margin-left: var(--sp-2);
+    color: var(--text-mid);
+    font-family: var(--font-ui);
+    font-size: var(--fs-caption);
+  }
+
+  .delivery-state.failed {
+    color: var(--text-danger, var(--text-mid));
   }
 
   .row.character.tail .bubble {

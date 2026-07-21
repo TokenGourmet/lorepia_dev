@@ -5,6 +5,7 @@ import {
   FIRST_CHAT_STREAM_PROTOCOL_ERROR,
   FIRST_CHAT_STREAM_UNKNOWN_ERROR,
   publicStreamErrorMessage,
+  resetProviderStreamOwner,
   startFirstChatStream,
   type CommandInvoker,
   type FirstChatStreamCallbacks,
@@ -485,6 +486,35 @@ describe("first chat provider stream", () => {
       "terminal:failed",
     ]);
     expect(log).not.toContain("terminal:completed");
+  });
+});
+
+describe("provider stream owner reset", () => {
+  it("uses the injected native owner and accepts only bounded closed receipts", async () => {
+    const invokeCommand: CommandInvoker = vi.fn(async () => ({
+      cancelled: 2,
+      terminalized: 3,
+    }));
+    await expect(resetProviderStreamOwner({ invokeCommand })).resolves.toEqual({
+      cancelled: 2,
+      terminalized: 3,
+    });
+    expect(invokeCommand).toHaveBeenCalledWith(
+      "reset_provider_stream_owner",
+      {},
+    );
+
+    for (const forged of [
+      { cancelled: -1, terminalized: 0 },
+      { cancelled: 129, terminalized: 0 },
+      { cancelled: 0, terminalized: 0, owner: "other" },
+    ]) {
+      await expect(
+        resetProviderStreamOwner({
+          invokeCommand: async () => forged,
+        }),
+      ).rejects.toThrow("INVALID_STREAM_OWNER_RESET_RESPONSE");
+    }
   });
 });
 
