@@ -1,0 +1,99 @@
++
++  const lastSeq =
++    value.lastSeq === null
++      ? null
++      : isNonnegativeSafeInteger(value.lastSeq)
++        ? value.lastSeq
++        : undefined;
++  const lastAckedSeq =
++    value.lastAckedSeq === null
++      ? null
++      : isNonnegativeSafeInteger(value.lastAckedSeq)
++        ? value.lastAckedSeq
++        : undefined;
++  const inFlight = isNonnegativeSafeInteger(value.inFlight) ? value.inFlight : null;
+   const batchWindowMs = isNonnegativeSafeInteger(value.batchWindowMs)
+     ? value.batchWindowMs
+     : null;
+@@ -304,7 +320,24 @@ function hasValidSnapshotPayload(value: unknown): value is StreamSnapshot {
+   const maxInFlight = isNonnegativeSafeInteger(value.maxInFlight)
+     ? value.maxInFlight
+     : null;
+-  const inFlight = isNonnegativeSafeInteger(value.inFlight) ? value.inFlight : null;
++
++  if (lastSeq === undefined || lastAckedSeq === undefined || inFlight === null) return false;
++
++  const expectedInFlight =
++    lastSeq === null
++      ? 0
++      : lastAckedSeq === null
++        ? lastSeq + 1
++        : lastSeq - lastAckedSeq;
++  const sequenceStateIsValid =
++    value.status === "queued"
++      ? lastSeq === null && lastAckedSeq === null && inFlight === 0
++      : lastSeq !== null &&
++        (lastAckedSeq === null || lastAckedSeq <= lastSeq) &&
++        Number.isSafeInteger(expectedInFlight) &&
++        expectedInFlight >= 0 &&
++        inFlight === expectedInFlight;
++
+   const batchWindowIsValid =
+     batchWindowMs !== null && batchWindowMs >= 16 && batchWindowMs <= 50;
+   const effectiveBatchWindowIsValid =
+@@ -316,20 +349,16 @@ function hasValidSnapshotPayload(value: unknown): value is StreamSnapshot {
+   const maxInFlightIsValid =
+     maxInFlight !== null && maxInFlight >= 2 && maxInFlight <= 64;
+   const inFlightIsValid =
+-    inFlight !== null &&
+-    maxInFlight !== null &&
+-    maxInFlightIsValid &&
+-    inFlight <= maxInFlight;
++    maxInFlight !== null && maxInFlightIsValid && inFlight <= maxInFlight;
+ 
+   return (
+     typeof value.requestId === "string" &&
+     value.requestId.length > 0 &&
+-    statusIsValid &&
+-    isNonnegativeSafeInteger(value.lastSeq) &&
+-    isNonnegativeSafeInteger(value.lastAckedSeq) &&
+-    inFlightIsValid &&
+     typeof value.text === "string" &&
+     errorIsValid &&
++    statusErrorIsValid &&
++    sequenceStateIsValid &&
++    inFlightIsValid &&
+     batchWindowIsValid &&
+     effectiveBatchWindowIsValid &&
+     maxInFlightIsValid
+diff --git a/spikes/channel-stream/src/lib/stream-protocol.ts b/spikes/channel-stream/src/lib/stream-protocol.ts
+index 67df412..98b8a4b 100644
+--- a/spikes/channel-stream/src/lib/stream-protocol.ts
++++ b/spikes/channel-stream/src/lib/stream-protocol.ts
+@@ -73,8 +73,8 @@ export type StreamSnapshotStatus =
+ export type StreamSnapshot = {
+   requestId: string;
+   status: StreamSnapshotStatus;
+-  lastSeq: number;
+-  lastAckedSeq: number;
++  lastSeq: number | null;
++  lastAckedSeq: number | null;
+   inFlight: number;
+   text: string;
+   error: StreamFailure | null;
+diff --git a/spikes/channel-stream/src/routes/+page.svelte b/spikes/channel-stream/src/routes/+page.svelte
+index e81dd26..6ddd934 100644
+--- a/spikes/channel-stream/src/routes/+page.svelte
++++ b/spikes/channel-stream/src/routes/+page.svelte
+@@ -471,9 +471,9 @@
+         <dt>상태</dt>
+         <dd>{backendStatusLabel[snapshot.status]}</dd>
+         <dt>마지막 seq</dt>
+-        <dd>{snapshot.lastSeq}</dd>
++        <dd>{snapshot.lastSeq ?? "—"}</dd>
+         <dt>마지막 ACK seq</dt>
+-        <dd>{snapshot.lastAckedSeq}</dd>
++        <dd>{snapshot.lastAckedSeq ?? "—"}</dd>
+         <dt>in-flight</dt>
+         <dd>{snapshot.inFlight}</dd>
+         <dt>기본 배칭 윈도우</dt>
