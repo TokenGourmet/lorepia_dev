@@ -1,36 +1,44 @@
-name: Apply Rust sequence-state hardening
+name: Build clean Rust review commit
 
 on:
-  pull_request:
+  push:
     branches:
-      - agent/m1-stream-lifecycle-hardening
-    types: [opened, synchronize, reopened]
+      - agent/rust-core-tooling
 
 permissions:
   contents: write
 
 concurrency:
-  group: rust-core-iteration-1
+  group: rust-core-clean-iteration-1
   cancel-in-progress: false
 
 jobs:
   apply-and-validate:
-    if: github.head_ref == 'agent/rust-core-deep-review' && github.actor != 'github-actions[bot]'
+    if: github.actor != 'github-actions[bot]'
     runs-on: ubuntu-22.04
     timeout-minutes: 45
     defaults:
       run:
         shell: bash
     steps:
-      - name: Check out exact review branch
+      - name: Check out tooling inputs
         uses: actions/checkout@v6
         with:
-          ref: agent/rust-core-deep-review
+          ref: agent/rust-core-tooling
+          path: tooling
+          fetch-depth: 0
+
+      - name: Check out clean review branch
+        uses: actions/checkout@v6
+        with:
+          ref: agent/rust-core-deep-review-clean
+          path: work
           fetch-depth: 0
 
       - name: Reassemble and apply reviewed patch
+        working-directory: work
         run: |
-          cat .review/iteration-1.patch.part-* > "$RUNNER_TEMP/iteration-1.patch"
+          cat ../tooling/.review/iteration-1.patch.part-* > "$RUNNER_TEMP/iteration-1.patch"
           git apply --check "$RUNNER_TEMP/iteration-1.patch"
           git apply "$RUNNER_TEMP/iteration-1.patch"
           git diff --check
@@ -51,37 +59,23 @@ jobs:
         with:
           node-version: 22
           cache: npm
-          cache-dependency-path: spikes/channel-stream/package-lock.json
+          cache-dependency-path: work/spikes/channel-stream/package-lock.json
 
       - name: Set up pinned Rust toolchain
         run: |
           rustup toolchain install 1.97.1 --profile minimal --component rustfmt --component clippy --no-self-update
           rustc +1.97.1 --version --verbose
 
-      - name: Install locked frontend dependencies
-        working-directory: spikes/channel-stream
-        run: npm ci
-
-      - name: Run frontend contract tests
-        working-directory: spikes/channel-stream
-        run: npm test -- --reporter=verbose 2>&1 | tee "$RUNNER_TEMP/vitest.log"
-
-      - name: Upload frontend test log
-        if: always()
-        uses: actions/upload-artifact@v4
-        with:
-          name: rust-core-iteration-1-vitest
-          path: ${{ runner.temp }}/vitest.log
-          if-no-files-found: warn
-          retention-days: 1
-
-      - name: Check and build frontend
-        working-directory: spikes/channel-stream
+      - name: Validate frontend contract
+        working-directory: work/spikes/channel-stream
         run: |
+          npm ci
+          npm test
           npm run check
           npm run build
 
       - name: Format and validate Rust core
+        working-directory: work
         run: |
           cargo +1.97.1 fmt --manifest-path spikes/channel-stream/src-tauri/Cargo.toml --all
           cargo +1.97.1 test --locked --manifest-path spikes/channel-stream/src-tauri/Cargo.toml --all-targets
@@ -89,11 +83,11 @@ jobs:
           cargo +1.97.1 check --locked --manifest-path spikes/channel-stream/src-tauri/Cargo.toml --all-targets
           cargo +1.97.1 fmt --manifest-path spikes/channel-stream/src-tauri/Cargo.toml --all -- --check
 
-      - name: Commit only validated source changes
+      - name: Commit validated source to clean branch
+        working-directory: work
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git rm -r .review .github/workflows/export-rust-review-source.yml
           git add \
             spikes/channel-stream/src-tauri/src/lib.rs \
             spikes/channel-stream/src/lib/stream-contract.test.ts \
@@ -102,4 +96,4 @@ jobs:
             spikes/channel-stream/src/routes/+page.svelte
           git diff --cached --check
           git commit -m "fix Rust stream sequence state"
-          git push origin HEAD:agent/rust-core-deep-review
+          git push origin HEAD:agent/rust-core-deep-review-clean
