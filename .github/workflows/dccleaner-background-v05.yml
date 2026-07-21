@@ -1,0 +1,129 @@
+name: Build DC Cleaner Background 0.5 APK
+
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - 'dccleaner-background-v05/**'
+      - '.github/workflows/dccleaner-background-v05.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Restore and verify pinned source
+        shell: bash
+        run: |
+          set -euo pipefail
+          echo 'c7547b8b762a71eeeb1400cd687254a2e50d3503a1a095a57c3b29ac0ce9a27c  dccleaner-background-v05/source.tar.gz.b64.part-00' | sha256sum -c -
+          echo 'e407fb8a35587c3ba397178aeb66e974e8e0208b722cccfb622cfd06196743cd  dccleaner-background-v05/source.tar.gz.b64.part-01' | sha256sum -c -
+          echo '3283b8c8de0a8dcacc5613e6edb07248df52d6bca035be0f36e18a1a07c768ce  dccleaner-background-v05/source.tar.gz.b64.part-02' | sha256sum -c -
+          echo '3e0ba4d9bcc5f470a0cbab6ef5502e7849ba9135dd71d1230b8f2e1f5bf888c2  dccleaner-background-v05/source.tar.gz.b64.part-03' | sha256sum -c -
+          echo 'edb113670a2cd27a9dac5d05611fb963d6c6a13cd2cdf386c93e79cfc23ff5e0  dccleaner-background-v05/source.tar.gz.b64.tail-00' | sha256sum -c -
+          echo 'b217d3b9e5a5ba06a3e1283ce063512624cd826eec89f35dd2e57380e344ca5c  dccleaner-background-v05/source.tar.gz.b64.tail-01' | sha256sum -c -
+          echo 'cab9e356a10ca6b4356b08e58c0ad3249f20ef1bea506413937e9d3149d5d5a1  dccleaner-background-v05/source.tar.gz.b64.tail-02' | sha256sum -c -
+          echo 'f2c3cf699780f87f3a85ad876c91b312dca388bc6e8f875a04306011cb15f275  dccleaner-background-v05/source.tar.gz.b64.tail-03' | sha256sum -c -
+          echo '25b4e65e78dc19a1a067943ae503def705688174cfe36b4da9ef5d16b2258f56  dccleaner-background-v05/source.tar.gz.b64.tail-04' | sha256sum -c -
+          echo '714fb39e38b022bf35710ab6844fbb9be3e4a6a1931502410fd0c335f71e9930  dccleaner-background-v05/source.tar.gz.b64.tail-05' | sha256sum -c -
+          echo 'e6520ef1f539ec2f64c25836c4eec74335a0f8127e9666f6c0b337c31211a12b  dccleaner-background-v05/source.tar.gz.b64.tail-06' | sha256sum -c -
+          echo '9cad6b2549674f940ea45ada7ddc40aab822b88cccdfbcb1b0e02cc42cb53e92  dccleaner-background-v05/source.tar.gz.b64.tail-07' | sha256sum -c -
+          cat \
+            dccleaner-background-v05/source.tar.gz.b64.part-00 \
+            dccleaner-background-v05/source.tar.gz.b64.part-01 \
+            dccleaner-background-v05/source.tar.gz.b64.part-02 \
+            dccleaner-background-v05/source.tar.gz.b64.part-03 \
+            dccleaner-background-v05/source.tar.gz.b64.tail-00 \
+            dccleaner-background-v05/source.tar.gz.b64.tail-01 \
+            dccleaner-background-v05/source.tar.gz.b64.tail-02 \
+            dccleaner-background-v05/source.tar.gz.b64.tail-03 \
+            dccleaner-background-v05/source.tar.gz.b64.tail-04 \
+            dccleaner-background-v05/source.tar.gz.b64.tail-05 \
+            dccleaner-background-v05/source.tar.gz.b64.tail-06 \
+            dccleaner-background-v05/source.tar.gz.b64.tail-07 \
+            > /tmp/dccleaner-background-v05-source.tar.gz.b64
+          echo '609958c106b1b8d3140e2e768155e9d0f7be9554ae7388f25b7a069bb1a1941e  /tmp/dccleaner-background-v05-source.tar.gz.b64' | sha256sum -c -
+          base64 --decode /tmp/dccleaner-background-v05-source.tar.gz.b64 > /tmp/DC-Cleaner-Background-0.5.0-source.tar.gz
+          echo '32b08817a0d50943dfcd2f664f41dd7016068f709a1756d2f4e5b4370b3084d9  /tmp/DC-Cleaner-Background-0.5.0-source.tar.gz' | sha256sum -c -
+          mkdir -p dccleaner-background-v05-src
+          tar -xzf /tmp/DC-Cleaner-Background-0.5.0-source.tar.gz -C dccleaner-background-v05-src
+          grep -Fq "versionName '0.5.0'" dccleaner-background-v05-src/app/build.gradle
+          grep -Fq 'class CleanerForegroundService' dccleaner-background-v05-src/app/src/main/java/com/tokengourmet/dccleanersafe/CleanerForegroundService.java
+          grep -Fq 'buildFillAndSubmitScript' dccleaner-background-v05-src/app/src/main/java/com/tokengourmet/dccleanersafe/MainActivity.java
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - uses: android-actions/setup-android@v3
+
+      - name: Install pinned Android SDK packages
+        shell: bash
+        run: |
+          yes | sdkmanager --licenses >/dev/null || true
+          sdkmanager 'platforms;android-35' 'build-tools;35.0.0'
+
+      - uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: '8.9'
+
+      - name: Unit tests, lint, and APK build
+        working-directory: dccleaner-background-v05-src
+        run: gradle --no-daemon --stacktrace clean testDebugUnitTest lintDebug assembleDebug
+
+      - name: Verify APK privacy and attack surface
+        id: security
+        continue-on-error: true
+        working-directory: dccleaner-background-v05-src
+        shell: bash
+        run: |
+          set -o pipefail
+          bash -x scripts/security-check.sh app/build/outputs/apk/debug/app-debug.apk 2>&1 | tee security-check.log
+
+      - name: Record dependency graph
+        if: always()
+        working-directory: dccleaner-background-v05-src
+        run: gradle --no-daemon app:dependencies --configuration debugRuntimeClasspath > dependencies.txt
+
+      - name: Stage deliverables
+        if: always()
+        working-directory: dccleaner-background-v05-src
+        shell: bash
+        run: |
+          set -euo pipefail
+          rm -rf dist
+          mkdir -p dist
+          cp app/build/outputs/apk/debug/app-debug.apk dist/DC-Cleaner-Background-0.5.0-debug.apk
+          cp README.md AUDIT.md LICENSE dist/
+          cp /tmp/DC-Cleaner-Background-0.5.0-source.tar.gz dist/
+          for report in permissions.txt apk-badging.txt manifest-tree.txt signature.txt dependencies.txt security-check.log app-debug.apk.sha256 dex-files.txt dex-packages.txt; do
+            if [[ -f "$report" ]]; then cp "$report" dist/; fi
+          done
+          curl --fail --location --retry 3 --silent --show-error \
+            https://www.gnu.org/licenses/agpl-3.0.txt \
+            --output dist/LICENSE-AGPL-3.0.txt
+          (cd dist && sha256sum \
+            DC-Cleaner-Background-0.5.0-debug.apk \
+            DC-Cleaner-Background-0.5.0-source.tar.gz \
+            LICENSE-AGPL-3.0.txt > SHA256SUMS.txt)
+
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: dc-cleaner-background-v0.5-apk
+          path: dccleaner-background-v05-src/dist/
+          if-no-files-found: error
+          retention-days: 14
+
+      - name: Enforce security gate
+        if: always()
+        shell: bash
+        run: test '${{ steps.security.outcome }}' = 'success'
