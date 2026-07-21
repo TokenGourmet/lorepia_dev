@@ -7,7 +7,7 @@ This disposable Tauri 2 + SvelteKit application validates LorePia's native-to-we
 - Rust sends typed `started`, `delta`, and one terminal event through `tauri::ipc::Channel`.
 - Every event carries a request ID and a contiguous, monotonically increasing sequence number.
 - The producer batches mock upstream chunks in a configured 16-50 ms window.
-- The frontend acknowledges consumed sequence numbers. A bounded in-flight window prevents an unbounded producer queue, and consumer delay expands the effective batching window without dropping text.
+- The frontend acknowledges consumed sequence numbers. A bounded in-flight window prevents an unbounded producer queue, and consumer delay expands the effective batching window without dropping text. If no ACK frees capacity within `ackTimeoutMs`, the producer emits one structured `ACK_TIMEOUT` failure instead of polling forever.
 - Cancellation produces one `cancelled` terminal event and preserves the exact partial text and last sequence in the backend snapshot.
 - Deterministic failure injection produces one `failed` terminal event with the same recovery snapshot guarantees.
 

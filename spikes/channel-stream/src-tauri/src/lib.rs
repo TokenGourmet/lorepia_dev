@@ -738,9 +738,27 @@ async fn run_stream(
             delta.push_str(chunk);
         }
 
-        if !wait_for_data_capacity(&request, config.ack_timeout_ms).await {
-            emit_cancelled(&request, &channel).await;
-            return;
+        match wait_for_data_capacity(&request, config.ack_timeout_ms).await {
+            CapacityWait::Ready => {}
+            CapacityWait::Cancelled => {
+                emit_cancelled(&request, &channel).await;
+                return;
+            }
+            CapacityWait::TimedOut => {
+                emit_failed(
+                    &request,
+                    &channel,
+                    StreamFailure::new(
+                        "ACK_TIMEOUT",
+                        format!(
+                            "frontend did not free stream capacity within {} ms",
+                            config.ack_timeout_ms
+                        ),
+                    ),
+                )
+                .await;
+                return;
+            }
         }
 
         match emit_delta(&request, &channel, delta).await {
@@ -798,23 +816,36 @@ async fn sleep_unless_cancelled(request: &StreamRequest, duration_ms: u64) -> bo
     }
 }
 
-async fn wait_for_data_capacity(request: &StreamRequest, poll_ms: u64) -> bool {
+enum CapacityWait {
+    Ready,
+    Cancelled,
+    TimedOut,
+}
+
+async fn wait_for_data_capacity(request: &StreamRequest, timeout_ms: u64) -> CapacityWait {
+    let deadline = tokio::time::Instant::now() + Duration::from_millis(timeout_ms);
     loop {
         {
             let mut machine = request.machine.lock().await;
-            if machine.status.is_terminal() {
-                return false;
-            }
-            if machine.cancel_requested {
-                return false;
+            if machine.status.is_terminal() || machine.cancel_requested {
+                return CapacityWait::Cancelled;
             }
             if machine.has_data_capacity() {
-                return true;
+                return CapacityWait::Ready;
             }
             machine.apply_pressure();
         }
-        let _ =
-            tokio::time::timeout(Duration::from_millis(poll_ms), request.notify.notified()).await;
+
+        let remaining = deadline.saturating_duration_since(tokio::time::Instant::now());
+        if remaining.is_zero() {
+            return CapacityWait::TimedOut;
+        }
+        if tokio::time::timeout(remaining, request.notify.notified())
+            .await
+            .is_err()
+        {
+            return CapacityWait::TimedOut;
+        }
     }
 }
 
@@ -1699,5 +1730,58 @@ mod tests {
         assert_eq!(snapshot.effective_batch_window_ms, 50);
         assert_eq!(snapshot.text.len(), chunks.len());
         assert!(snapshot.in_flight <= snapshot.max_in_flight);
+    }
+
+    #[tokio::test(flavor = "current_thread")]
+    async fn missing_ack_times_out_with_failed_terminal() {
+        use tauri::ipc::InvokeResponseBody;
+
+        let mut config = config(24, 2);
+        config.ack_timeout_ms = 10;
+        let mut machine = StreamMachine::new("request-ack-timeout".into(), &config);
+        let started = machine.start().unwrap();
+        let request = Arc::new(StreamRequest::new(machine));
+        let captured = Arc::new(Mutex::new(Vec::<serde_json::Value>::new()));
+        let callback_captured = Arc::clone(&captured);
+        let channel = Channel::new(move |body| {
+            let InvokeResponseBody::Json(json) = body else {
+                return Err(std::io::Error::other("unexpected raw channel body").into());
+            };
+            callback_captured
+                .lock()
+                .unwrap()
+                .push(serde_json::from_str(&json)?);
+            Ok(())
+        });
+
+        channel.send(started).unwrap();
+        tokio::time::timeout(
+            Duration::from_secs(1),
+            run_stream(Arc::clone(&request), config, channel),
+        )
+        .await
+        .expect("missing ACK should terminate the stream");
+
+        let events = captured.lock().unwrap().clone();
+        assert_eq!(events.len(), 2);
+        assert_eq!(events[0]["type"], "started");
+        assert_eq!(events[1]["type"], "failed");
+        assert_eq!(events[1]["error"]["code"], "ACK_TIMEOUT");
+        assert!(events[1]["error"]["message"]
+            .as_str()
+            .unwrap()
+            .contains("10 ms"));
+
+        let snapshot = request.machine.lock().await.snapshot();
+        assert_eq!(snapshot.status, StreamStatus::Failed);
+        assert_eq!(snapshot.last_seq, 1);
+        assert_eq!(snapshot.last_acked_seq, -1);
+        assert_eq!(snapshot.in_flight, 2);
+        assert_eq!(snapshot.text, "");
+        assert_eq!(
+            snapshot.error.as_ref().map(|error| error.code.as_str()),
+            Some("ACK_TIMEOUT")
+        );
+        assert_eq!(request.terminal_seq.load(Ordering::Acquire), 1);
     }
 }
