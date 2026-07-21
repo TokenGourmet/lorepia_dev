@@ -1,0 +1,92 @@
+name: Build DC Cleaner 1.2 Fixed APK
+
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - 'dccleaner-v120-bootstrap/**'
+      - '.github/workflows/dccleaner-v120-fixed.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Restore exact reviewed source
+        shell: bash
+        run: |
+          set -euo pipefail
+          echo '141003ed8524542f085636ddc8545659b2f6d649f5aa4214ca6ace4536768a89  dccleaner-v120-bootstrap/source.tar.gz.b64.part-06a' | sha256sum -c -
+          echo '6f6f0782bc19ae2215a7c88a0304de1a5827d48c91fa9607c7ee115c831efa79  dccleaner-v120-bootstrap/source.tar.gz.b64.part-06b' | sha256sum -c -
+          cat \
+            dccleaner-v120-bootstrap/source.tar.gz.b64.part-00 \
+            dccleaner-v120-bootstrap/source.tar.gz.b64.part-01 \
+            dccleaner-v120-bootstrap/source.tar.gz.b64.part-02 \
+            dccleaner-v120-bootstrap/source.tar.gz.b64.part-03-04 \
+            dccleaner-v120-bootstrap/source.tar.gz.b64.part-05 \
+            dccleaner-v120-bootstrap/source.tar.gz.b64.part-06a \
+            dccleaner-v120-bootstrap/source.tar.gz.b64.part-06b \
+            dccleaner-v120-bootstrap/source.tar.gz.b64.part-07-08 \
+            dccleaner-v120-bootstrap/source.tar.gz.b64.part-09-10 \
+            dccleaner-v120-bootstrap/source.tar.gz.b64.part-11-12 \
+            > /tmp/DC-Cleaner-1.2.0-source.tar.gz.b64
+          echo '140c1bee246408b91ef1accfea17b63714f04001df0fe11d48e1776e7943c2bf  /tmp/DC-Cleaner-1.2.0-source.tar.gz.b64' | sha256sum -c -
+          base64 --decode /tmp/DC-Cleaner-1.2.0-source.tar.gz.b64 > /tmp/DC-Cleaner-1.2.0-source.tar.gz
+          echo 'ff7e8c15032ba938b0f0f490d7d2d41a2f5538068b328070513843a316f64e32  /tmp/DC-Cleaner-1.2.0-source.tar.gz' | sha256sum -c -
+          mkdir -p dccleaner-v120-src
+          tar -xzf /tmp/DC-Cleaner-1.2.0-source.tar.gz -C dccleaner-v120-src
+          grep -Fq "versionName '1.2.0'" dccleaner-v120-src/app/build.gradle
+          grep -Fq 'collectDcinsideCookies' dccleaner-v120-src/app/src/main/java/com/dokpamo/dccleaner/MainActivity.java
+          grep -Fq 'verifyAuthenticatedAccount' dccleaner-v120-src/app/src/main/java/com/dokpamo/dccleaner/DcClient.java
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - uses: android-actions/setup-android@v3
+
+      - name: Install Android SDK packages
+        shell: bash
+        run: |
+          yes | sdkmanager --licenses >/dev/null || true
+          sdkmanager 'platforms;android-35' 'build-tools;35.0.0'
+
+      - uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: '8.9'
+
+      - name: Test, lint, and build
+        working-directory: dccleaner-v120-src
+        run: gradle --no-daemon --stacktrace clean testDebugUnitTest lintDebug assembleDebug
+
+      - name: Verify APK
+        working-directory: dccleaner-v120-src
+        run: bash scripts/security-check.sh app/build/outputs/apk/debug/app-debug.apk
+
+      - name: Stage artifact
+        working-directory: dccleaner-v120-src
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p dist
+          cp app/build/outputs/apk/debug/app-debug.apk dist/DC-Cleaner-1.2.0.apk
+          cp /tmp/DC-Cleaner-1.2.0-source.tar.gz dist/
+          cp README.md AUDIT.md LICENSE dist/
+          for report in permissions.txt permissions-raw.txt apk-badging.txt manifest-tree.txt signature.txt app-debug.apk.sha256 dex-files.txt dex-packages.txt; do
+            if [[ -f "$report" ]]; then cp "$report" dist/; fi
+          done
+          (cd dist && sha256sum DC-Cleaner-1.2.0.apk DC-Cleaner-1.2.0-source.tar.gz > SHA256SUMS.txt)
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: dc-cleaner-v1.2-fixed-apk
+          path: dccleaner-v120-src/dist/
+          if-no-files-found: error
+          retention-days: 14
