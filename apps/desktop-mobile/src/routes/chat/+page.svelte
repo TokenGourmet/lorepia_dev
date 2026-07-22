@@ -375,11 +375,41 @@
         <span class="tagline">달빛 서고의 사서</span>
       </span>
     </button>
-    <span class="header-spacer"></span>
+    <button
+      class="more"
+      type="button"
+      onclick={openPanel}
+      aria-label="대화 설정 열기"
+    >
+      <svg
+        viewBox="0 0 24 24"
+        width="20"
+        height="20"
+        fill="currentColor"
+        aria-hidden="true"
+      >
+        <circle cx="5" cy="12" r="1.8" />
+        <circle cx="12" cy="12" r="1.8" />
+        <circle cx="19" cy="12" r="1.8" />
+      </svg>
+    </button>
   </header>
 
   <div class="scroll" bind:this={scrollRegion}>
-    <MessageThread {messages} {mode} {characterName} {characterInitial} />
+    {#if messages.length === 0}
+      <div class="empty-thread">
+        <Avatar initial={characterInitial} size={72} />
+        <p class="empty-name">{characterName}</p>
+        <p class="empty-tagline">달빛 서고의 사서</p>
+        <p class="empty-hint">
+          {storageUnavailable
+            ? "로컬 저장소를 사용할 수 없어 대화를 불러오지 못했습니다"
+            : "첫 인사를 건네보세요"}
+        </p>
+      </div>
+    {:else}
+      <MessageThread {messages} {mode} {characterName} {characterInitial} />
+    {/if}
   </div>
 
   <div class="composer-slot">
@@ -463,29 +493,42 @@
   }
 
   .top {
+    position: relative;
+    z-index: 2;
     display: flex;
     align-items: center;
     gap: var(--sp-2);
     min-height: calc(var(--size-touch) + var(--sp-2));
     padding: var(--sp-2) var(--sp-3);
     padding-top: calc(var(--sp-2) + var(--safe-top));
-    background: var(--surface-header);
-    border-bottom: 0.5px solid var(--hairline);
+    background: var(--bar-bg);
+    -webkit-backdrop-filter: blur(20px) saturate(1.6);
+    backdrop-filter: blur(20px) saturate(1.6);
   }
 
   .back,
-  .header-spacer {
+  .more {
     width: var(--size-touch);
     height: var(--size-touch);
     flex-shrink: 0;
-  }
-
-  .back {
     display: inline-flex;
     align-items: center;
     justify-content: center;
+    border: none;
+    padding: 0;
+    background: transparent;
     border-radius: var(--r-pill);
     color: var(--text-mid);
+    cursor: pointer;
+    transition:
+      background var(--dur-fast) var(--ease-out),
+      transform var(--dur-base) var(--ease-spring);
+  }
+
+  .back:active,
+  .more:active {
+    background: var(--surface-bubble);
+    transform: scale(0.9);
   }
 
   .identity {
@@ -534,6 +577,59 @@
     scroll-behavior: smooth;
   }
 
+  .empty-thread {
+    position: relative;
+    height: 100%;
+    box-sizing: border-box;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: var(--sp-1);
+    padding: var(--sp-6);
+    text-align: center;
+    animation: lp-pop var(--dur-page) var(--ease-spring) backwards;
+  }
+
+  .empty-thread::before {
+    content: "";
+    position: absolute;
+    width: 260px;
+    height: 260px;
+    border-radius: var(--r-pill);
+    background: radial-gradient(closest-side, var(--tint-soft), transparent);
+    z-index: 0;
+    pointer-events: none;
+  }
+
+  .empty-thread > :global(*) {
+    position: relative;
+    z-index: 1;
+  }
+
+  .empty-name {
+    margin: var(--sp-2) 0 0;
+    font-size: 18px;
+    font-weight: 700;
+    letter-spacing: -0.01em;
+    color: var(--text-strong);
+  }
+
+  .empty-tagline {
+    margin: 0;
+    font-size: var(--fs-label);
+    color: var(--text-mid);
+  }
+
+  .empty-hint {
+    margin: var(--sp-4) 0 0;
+    padding: var(--sp-2) var(--sp-4);
+    background: var(--surface-bubble);
+    border-radius: var(--r-pill);
+    font-size: var(--fs-label);
+    color: var(--text-mid);
+  }
+
   .composer-slot {
     background: var(--surface-page);
   }
@@ -551,6 +647,8 @@
     border: none;
     padding: 0;
     background: rgba(0, 0, 0, 0.35);
+    -webkit-backdrop-filter: blur(6px);
+    backdrop-filter: blur(6px);
     cursor: pointer;
     opacity: 0;
     visibility: hidden;
@@ -570,16 +668,17 @@
     right: 0;
     bottom: 0;
     width: min(320px, 84vw);
-    background: var(--surface-header);
-    border-left: 0.5px solid var(--hairline);
+    background: var(--surface-card);
+    border-radius: var(--r-card) 0 0 var(--r-card);
+    box-shadow: var(--shadow-float);
     padding: calc(var(--sp-4) + var(--safe-top)) var(--sp-4)
       calc(var(--sp-4) + var(--safe-bottom));
     display: flex;
     flex-direction: column;
     gap: var(--sp-3);
     box-sizing: border-box;
-    transform: translateX(100%);
-    transition: transform var(--dur-base) var(--ease-out);
+    transform: translateX(105%);
+    transition: transform var(--dur-slow) var(--ease-out);
   }
 
   .panel.open {
@@ -622,30 +721,39 @@
 
   .segment {
     display: flex;
-    border: 0.5px solid var(--hairline);
-    border-radius: var(--r-pill);
+    background: var(--surface-bubble);
+    border-radius: 10px;
     padding: 2px;
     gap: 2px;
   }
 
   .segment button {
-    min-height: 32px;
+    min-height: 30px;
     padding: 0 var(--sp-3);
     border: none;
-    border-radius: var(--r-pill);
+    border-radius: 8px;
     background: transparent;
     color: var(--text-mid);
     font-family: var(--font-ui);
     font-size: var(--fs-label);
+    font-weight: 500;
     cursor: pointer;
     transition:
-      background var(--dur-fast) var(--ease-out),
-      color var(--dur-fast) var(--ease-out);
+      background var(--dur-base) var(--ease-out),
+      color var(--dur-base) var(--ease-out),
+      box-shadow var(--dur-base) var(--ease-out),
+      transform var(--dur-fast) var(--ease-spring);
+  }
+
+  .segment button:active {
+    transform: scale(0.95);
   }
 
   .segment button.active {
-    background: var(--invert-surface);
-    color: var(--invert-text);
+    background: var(--segment-thumb);
+    color: var(--text-strong);
+    font-weight: 600;
+    box-shadow: 0 1px 4px rgba(0, 0, 0, 0.12);
   }
 
   .panel-link {

@@ -42,26 +42,26 @@
 
 <div class="screen">
   <header class="top">
-    <a class="back" href="/" aria-label="서재로 돌아가기">
+    <h1>가져오기</h1>
+  </header>
+
+  <section class="drop">
+    <span class="drop-ic" aria-hidden="true">
       <svg
         viewBox="0 0 24 24"
-        width="20"
-        height="20"
+        width="26"
+        height="26"
         fill="none"
         stroke="currentColor"
         stroke-width="2"
         stroke-linecap="round"
         stroke-linejoin="round"
-        aria-hidden="true"
       >
-        <path d="m15 18-6-6 6-6" />
+        <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
+        <path d="M7 10l5 5 5-5" />
+        <path d="M12 15V3" />
       </svg>
-    </a>
-    <h1>캐릭터 가져오기</h1>
-    <span class="spacer"></span>
-  </header>
-
-  <section class="drop">
+    </span>
     <p class="drop-title">카드 파일을 선택하세요</p>
     <p class="drop-sub">PNG 카드와 ZIP 아카이브를 지원합니다</p>
     <button type="button" class="pick" disabled>파일 선택</button>
@@ -103,56 +103,59 @@
   }
 
   .top {
+    position: sticky;
+    top: 0;
+    z-index: 5;
     display: flex;
     align-items: center;
-    gap: var(--sp-2);
-    padding: var(--sp-2) var(--sp-3);
-    padding-top: calc(var(--sp-2) + var(--safe-top));
+    padding: var(--sp-3) var(--sp-4);
+    padding-top: calc(var(--sp-3) + var(--safe-top));
+    background: var(--bar-bg);
+    -webkit-backdrop-filter: blur(20px) saturate(1.6);
+    backdrop-filter: blur(20px) saturate(1.6);
   }
 
   .top h1 {
     margin: 0;
-    font-size: 17px;
-    font-weight: 500;
+    font-size: 33px;
+    font-weight: 800;
+    letter-spacing: -0.03em;
     color: var(--text-strong);
   }
 
-  .back,
-  .spacer {
-    width: var(--size-touch);
-    height: var(--size-touch);
-    flex-shrink: 0;
-  }
-
-  .back {
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
-    border-radius: var(--r-pill);
-    color: var(--text-mid);
-  }
-
-  .top h1 {
-    flex: 1;
-    text-align: center;
-  }
-
   .drop {
-    margin: var(--sp-4);
+    margin: var(--sp-2) var(--sp-4) 0;
     padding: var(--sp-6) var(--sp-4);
-    border: 1.5px dashed var(--hairline);
-    border-radius: 12px;
+    background: var(--surface-card);
+    border: 1.5px dashed var(--field-border);
+    border-radius: var(--r-card);
+    box-shadow: var(--shadow-card);
     display: flex;
     flex-direction: column;
     align-items: center;
     gap: var(--sp-1);
     text-align: center;
+    animation: lp-rise var(--dur-page) var(--ease-out) backwards;
+    animation-delay: 40ms;
+  }
+
+  .drop-ic {
+    width: 56px;
+    height: 56px;
+    margin-bottom: var(--sp-2);
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 18px;
+    background: var(--tint-soft);
+    color: var(--tint);
   }
 
   .drop-title {
     margin: 0;
-    font-size: var(--fs-chat);
-    font-weight: 500;
+    font-size: 17px;
+    font-weight: 700;
+    letter-spacing: -0.01em;
     color: var(--text-strong);
   }
 
@@ -168,12 +171,17 @@
     padding: 0 var(--sp-5);
     border: none;
     border-radius: var(--r-pill);
-    background: var(--invert-surface);
-    color: var(--invert-text);
+    background: var(--tint);
+    color: #fff;
     font-family: var(--font-ui);
     font-size: var(--fs-ui);
-    font-weight: 500;
+    font-weight: 600;
     cursor: pointer;
+    transition: transform var(--dur-fast) var(--ease-spring);
+  }
+
+  .pick:not(:disabled):active {
+    transform: scale(0.95);
   }
 
   .pick:disabled {
@@ -214,11 +222,20 @@
     margin: var(--sp-2) 0 0;
     padding: 0;
     list-style: none;
+    background: var(--surface-card);
+    border-radius: var(--r-card);
+    box-shadow: var(--shadow-card);
+    overflow: hidden;
+    animation: lp-rise var(--dur-page) var(--ease-out) backwards;
+    animation-delay: 100ms;
   }
 
   .results li {
-    padding: var(--sp-3) var(--sp-1);
-    border-bottom: 0.5px solid var(--hairline);
+    padding: var(--sp-3) var(--sp-4);
+  }
+
+  .results li + li {
+    border-top: 0.5px solid var(--hairline);
   }
 
   .result-line {
@@ -243,26 +260,48 @@
     padding: 2px var(--sp-2);
   }
 
+  .verdict {
+    font-weight: 600;
+  }
+
   .verdict.accepted {
-    background: var(--surface-bubble);
-    color: var(--text-strong);
+    background: var(--success-soft);
+    color: var(--success);
   }
 
   .verdict.quarantined {
-    border: 0.5px solid var(--text-mid);
-    color: var(--text-mid);
+    background: var(--warning-soft);
+    color: var(--warning);
   }
 
   .verdict.rejected {
-    border: 0.5px solid var(--hairline);
-    color: var(--text-faint);
-    text-decoration: line-through;
+    background: var(--danger-soft);
+    color: var(--danger);
   }
 
   .detail {
     margin: var(--sp-1) 0 0;
     font-size: var(--fs-label);
     color: var(--text-mid);
+  }
+
+  @media (min-width: 700px) {
+    .top {
+      padding-left: max(var(--sp-4), calc((100% - 680px) / 2));
+    }
+
+    .drop {
+      width: min(100% - var(--sp-4) * 2, 680px);
+      margin-left: auto;
+      margin-right: auto;
+      box-sizing: border-box;
+    }
+
+    .results {
+      width: min(100%, 712px);
+      margin-inline: auto;
+      box-sizing: border-box;
+    }
   }
 
   .policy {

@@ -44,42 +44,6 @@
 <div class="screen">
   <header class="top">
     <h1>서재</h1>
-    <nav aria-label="주요 메뉴">
-      <a href="/import" aria-label="캐릭터 가져오기">
-        <svg
-          viewBox="0 0 24 24"
-          width="20"
-          height="20"
-          fill="none"
-          stroke="currentColor"
-          stroke-width="2"
-          stroke-linecap="round"
-          stroke-linejoin="round"
-          aria-hidden="true"
-        >
-          <path d="M12 5v14" />
-          <path d="M5 12h14" />
-        </svg>
-      </a>
-      <a href="/settings" aria-label="설정">
-        <svg
-          viewBox="0 0 24 24"
-          width="20"
-          height="20"
-          fill="none"
-          stroke="currentColor"
-          stroke-width="2"
-          stroke-linecap="round"
-          stroke-linejoin="round"
-          aria-hidden="true"
-        >
-          <circle cx="12" cy="12" r="3" />
-          <path
-            d="M19.4 15a1.7 1.7 0 0 0 .34 1.87l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.7 1.7 0 0 0-1.87-.34 1.7 1.7 0 0 0-1.03 1.56V21a2 2 0 1 1-4 0v-.09a1.7 1.7 0 0 0-1.11-1.56 1.7 1.7 0 0 0-1.87.34l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.7 1.7 0 0 0 .34-1.87 1.7 1.7 0 0 0-1.56-1.03H3a2 2 0 1 1 0-4h.09A1.7 1.7 0 0 0 4.65 8.9a1.7 1.7 0 0 0-.34-1.87l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.7 1.7 0 0 0 1.87.34h.09A1.7 1.7 0 0 0 10.13 3V3a2 2 0 1 1 4 0v.09a1.7 1.7 0 0 0 1.03 1.56 1.7 1.7 0 0 0 1.87-.34l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.7 1.7 0 0 0-.34 1.87v.09a1.7 1.7 0 0 0 1.56 1.03H21a2 2 0 1 1 0 4h-.09a1.7 1.7 0 0 0-1.51 1.03Z"
-          />
-        </svg>
-      </a>
-    </nav>
   </header>
 
   {#if loading}
@@ -113,27 +77,6 @@
               <span class="preview">{character.lastMessage}</span>
             </span>
           </a>
-          <a
-            class="info"
-            href={`/character/${character.id}`}
-            aria-label={`${character.name} 정보`}
-          >
-            <svg
-              viewBox="0 0 24 24"
-              width="18"
-              height="18"
-              fill="none"
-              stroke="currentColor"
-              stroke-width="2"
-              stroke-linecap="round"
-              stroke-linejoin="round"
-              aria-hidden="true"
-            >
-              <circle cx="12" cy="12" r="9" />
-              <path d="M12 16v-5" />
-              <path d="M12 8h.01" />
-            </svg>
-          </a>
         </li>
       {/each}
     </ol>
@@ -155,43 +98,31 @@
   }
 
   .top {
+    position: sticky;
+    top: 0;
+    z-index: 5;
     display: flex;
     align-items: center;
     justify-content: space-between;
     padding: var(--sp-3) var(--sp-4);
     padding-top: calc(var(--sp-3) + var(--safe-top));
+    background: var(--bar-bg);
+    -webkit-backdrop-filter: blur(20px) saturate(1.6);
+    backdrop-filter: blur(20px) saturate(1.6);
   }
 
   .top h1 {
     margin: 0;
-    font-size: 20px;
-    font-weight: 500;
+    font-size: 33px;
+    font-weight: 800;
+    letter-spacing: -0.03em;
     color: var(--text-strong);
-  }
-
-  nav {
-    display: flex;
-    gap: var(--sp-1);
-  }
-
-  nav a {
-    width: var(--size-touch);
-    height: var(--size-touch);
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
-    border-radius: var(--r-pill);
-    color: var(--text-mid);
-    transition: background var(--dur-fast) var(--ease-out);
-  }
-
-  nav a:active {
-    background: var(--surface-bubble);
   }
 
   .status {
     margin: 0;
     padding: var(--sp-2) var(--sp-4);
+    box-sizing: border-box;
     font-size: var(--fs-label);
     color: var(--text-mid);
   }
@@ -201,6 +132,11 @@
     align-items: center;
     justify-content: space-between;
     gap: var(--sp-3);
+    margin: var(--sp-2) var(--sp-4) 0;
+    padding: var(--sp-3) var(--sp-4);
+    background: var(--surface-card);
+    border-radius: var(--r-card);
+    box-shadow: var(--shadow-card);
     color: var(--text-strong);
   }
 
@@ -217,26 +153,71 @@
   }
 
   .list {
-    margin: 0;
+    margin: var(--sp-2) 0 0;
     padding: 0;
     list-style: none;
+    display: flex;
+    flex-direction: column;
+    gap: 0;
   }
 
   .list li {
-    display: flex;
-    align-items: center;
-    border-bottom: 0.5px solid var(--hairline);
+    position: relative;
+    animation: lp-pop var(--dur-page) var(--ease-spring) backwards;
+  }
+
+  .list li:not(:last-child)::after {
+    content: "";
+    position: absolute;
+    right: 0;
+    bottom: 0;
+    left: calc(var(--sp-4) + 48px + var(--sp-3));
+    height: 0.5px;
+    background: var(--hairline);
+    pointer-events: none;
+  }
+
+  .list li:nth-child(1) {
+    animation-delay: 40ms;
+  }
+  .list li:nth-child(2) {
+    animation-delay: 90ms;
+  }
+  .list li:nth-child(3) {
+    animation-delay: 140ms;
+  }
+  .list li:nth-child(4) {
+    animation-delay: 190ms;
+  }
+  .list li:nth-child(5) {
+    animation-delay: 240ms;
+  }
+  .list li:nth-child(n + 6) {
+    animation-delay: 290ms;
   }
 
   .row {
-    flex: 1;
     display: flex;
     align-items: center;
     gap: var(--sp-3);
+    width: 100%;
     min-height: 72px;
-    padding: var(--sp-3) 0 var(--sp-3) var(--sp-4);
+    padding: var(--sp-3) var(--sp-4);
+    box-sizing: border-box;
     text-decoration: none;
     min-width: 0;
+    transition: background var(--dur-fast) var(--ease-out);
+  }
+
+  /* Rows run edge to edge, so the press state is what marks the tap target. */
+  .row:active {
+    background: var(--surface-bubble);
+  }
+
+  @media (hover: hover) {
+    .row:hover {
+      background: var(--surface-bubble);
+    }
   }
 
   .body {
@@ -249,7 +230,7 @@
 
   .line {
     display: flex;
-    align-items: baseline;
+    align-items: center;
     justify-content: space-between;
     gap: var(--sp-2);
   }
@@ -257,6 +238,7 @@
   .name {
     font-size: var(--fs-chat);
     font-weight: 500;
+    letter-spacing: -0.02em;
     color: var(--text-strong);
     white-space: nowrap;
     overflow: hidden;
@@ -278,19 +260,8 @@
     text-overflow: ellipsis;
   }
 
-  .info {
-    width: var(--size-touch);
-    height: var(--size-touch);
-    margin-right: var(--sp-2);
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
-    border-radius: var(--r-pill);
-    color: var(--text-faint);
-    flex-shrink: 0;
-  }
-
   .empty {
+    position: relative;
     flex: 1;
     display: flex;
     flex-direction: column;
@@ -299,6 +270,22 @@
     gap: var(--sp-2);
     padding: var(--sp-6);
     text-align: center;
+    animation: lp-pop var(--dur-page) var(--ease-spring) backwards;
+  }
+
+  .empty::before {
+    content: "";
+    position: absolute;
+    width: 280px;
+    height: 280px;
+    border-radius: var(--r-pill);
+    background: radial-gradient(closest-side, var(--tint-soft), transparent);
+    pointer-events: none;
+  }
+
+  .empty > :global(*) {
+    position: relative;
+    z-index: 1;
   }
 
   .empty h2 {
@@ -321,11 +308,17 @@
     align-items: center;
     padding: 0 var(--sp-5);
     border-radius: var(--r-pill);
-    background: var(--invert-surface);
-    color: var(--invert-text);
+    background: var(--tint);
+    color: #fff;
     font-size: var(--fs-ui);
-    font-weight: 500;
+    font-weight: 600;
     text-decoration: none;
+    box-shadow: var(--shadow-card);
+    transition: transform var(--dur-fast) var(--ease-out);
+  }
+
+  .cta:active {
+    transform: scale(0.96);
   }
 
   .core {
@@ -335,5 +328,25 @@
     font-size: var(--fs-caption);
     color: var(--text-faint);
     text-align: center;
+  }
+
+  @media (min-width: 700px) {
+    .top {
+      padding-left: max(var(--sp-4), calc((100% - 680px) / 2));
+    }
+
+    /* Rows carry the page gutter in their own padding, so this column is
+       wider by exactly that much and avatars stay flush with the title. */
+    .status,
+    .list {
+      width: min(100%, calc(680px + var(--sp-4) * 2));
+      margin-inline: auto;
+    }
+
+    /* Card-shaped, so its border lands on the gutter like the title. */
+    .status.error {
+      width: min(100% - var(--sp-4) * 2, 680px);
+      margin-inline: auto;
+    }
   }
 </style>

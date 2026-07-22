@@ -33,10 +33,13 @@
   --lh-chat: 1.6;
   --lh-story: 1.8;
 
-  --r-bubble: 16px;
-  --r-tail: 4px;
-  --r-block: 10px;
+  --r-bubble: 20px;
+  --r-tail: 6px;
+  --r-block: 12px;
+  --r-card: 24px;
   --r-pill: 999px;
+
+  --size-tabbar: 60px;
 
   --size-avatar: 36px;
   --size-touch: 44px;
@@ -46,7 +49,9 @@
   --dur-fast: 120ms;
   --dur-base: 200ms;
   --dur-slow: 320ms;
+  --dur-page: 400ms;
   --ease-out: cubic-bezier(0.2, 0, 0, 1);
+  --ease-spring: cubic-bezier(0.34, 1.45, 0.3, 1);
 
   --font-ui:
     "Pretendard Variable", Pretendard, -apple-system, BlinkMacSystemFont,
@@ -81,6 +86,17 @@ body > div {
   height: 100%;
 }
 
+/* Keep native scrolling while hiding platform scrollbar chrome. */
+* {
+  scrollbar-width: none;
+}
+
+*::-webkit-scrollbar {
+  display: none;
+  width: 0;
+  height: 0;
+}
+
 :root,
 [data-theme="light"] {
   color-scheme: light;
@@ -88,6 +104,7 @@ body > div {
   --surface-header: var(--paper-2);
   --surface-bubble: var(--paper-2);
   --surface-field: var(--paper-0);
+  --surface-card: var(--paper-0);
   --field-border: var(--paper-4);
   --hairline: var(--paper-4);
   --text-strong: var(--ink-strong);
@@ -96,6 +113,20 @@ body > div {
   --invert-surface: var(--ink-invert);
   --invert-text: var(--ink-on-invert);
   --cursor-color: var(--ink-strong);
+  --segment-thumb: var(--paper-0);
+  --tint: #c15f3c;
+  --tint-soft: rgba(193, 95, 60, 0.12);
+  --success: #4d8a4f;
+  --success-soft: rgba(77, 138, 79, 0.14);
+  --warning: #a8762f;
+  --warning-soft: rgba(168, 118, 47, 0.14);
+  --danger: #b2483c;
+  --danger-soft: rgba(178, 72, 60, 0.12);
+  --shadow-card:
+    0 2px 4px rgba(31, 30, 28, 0.04), 0 12px 32px rgba(31, 30, 28, 0.07);
+  --shadow-float:
+    0 4px 10px rgba(31, 30, 28, 0.08), 0 18px 44px rgba(31, 30, 28, 0.16);
+  --bar-bg: rgba(250, 249, 245, 0.82);
 }
 
 [data-theme="dark"] {
@@ -104,6 +135,7 @@ body > div {
   --surface-header: var(--charcoal-0);
   --surface-bubble: var(--charcoal-2);
   --surface-field: var(--charcoal-2);
+  --surface-card: var(--charcoal-2);
   --field-border: var(--charcoal-2);
   --hairline: #3a3936;
   --text-strong: var(--cream-strong);
@@ -112,6 +144,20 @@ body > div {
   --invert-surface: var(--cream-invert);
   --invert-text: var(--cream-on-invert);
   --cursor-color: var(--cream-strong);
+  --segment-thumb: var(--charcoal-4);
+  --tint: #e08b66;
+  --tint-soft: rgba(224, 139, 102, 0.16);
+  --success: #7fb883;
+  --success-soft: rgba(127, 184, 131, 0.16);
+  --warning: #d3a05a;
+  --warning-soft: rgba(211, 160, 90, 0.16);
+  --danger: #d3766a;
+  --danger-soft: rgba(211, 118, 106, 0.16);
+  --shadow-card:
+    0 2px 4px rgba(0, 0, 0, 0.22), 0 12px 32px rgba(0, 0, 0, 0.3);
+  --shadow-float:
+    0 4px 10px rgba(0, 0, 0, 0.32), 0 18px 44px rgba(0, 0, 0, 0.45);
+  --bar-bg: rgba(38, 38, 36, 0.82);
 }
 
 @media (prefers-color-scheme: dark) {
@@ -121,6 +167,7 @@ body > div {
     --surface-header: var(--charcoal-0);
     --surface-bubble: var(--charcoal-2);
     --surface-field: var(--charcoal-2);
+    --surface-card: var(--charcoal-2);
     --field-border: var(--charcoal-2);
     --hairline: #3a3936;
     --text-strong: var(--cream-strong);
@@ -129,5 +176,56 @@ body > div {
     --invert-surface: var(--cream-invert);
     --invert-text: var(--cream-on-invert);
     --cursor-color: var(--cream-strong);
+    --segment-thumb: var(--charcoal-4);
+    --tint: #e08b66;
+    --tint-soft: rgba(224, 139, 102, 0.16);
+    --success: #7fb883;
+    --success-soft: rgba(127, 184, 131, 0.16);
+    --warning: #d3a05a;
+    --warning-soft: rgba(211, 160, 90, 0.16);
+    --danger: #d3766a;
+    --danger-soft: rgba(211, 118, 106, 0.16);
+    --shadow-card:
+      0 2px 4px rgba(0, 0, 0, 0.22), 0 12px 32px rgba(0, 0, 0, 0.3);
+    --shadow-float:
+      0 4px 10px rgba(0, 0, 0, 0.32), 0 18px 44px rgba(0, 0, 0, 0.45);
+    --bar-bg: rgba(38, 38, 36, 0.82);
+  }
+}
+
+/* Shared entrance motion. Component styles may reference these global
+   keyframes; the reduced-motion guard below disables them everywhere. */
+@keyframes lp-rise {
+  from {
+    opacity: 0;
+    transform: translateY(14px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+@keyframes lp-pop {
+  0% {
+    opacity: 0;
+    transform: scale(0.94) translateY(10px);
+  }
+  60% {
+    opacity: 1;
+  }
+  100% {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
   }
 }

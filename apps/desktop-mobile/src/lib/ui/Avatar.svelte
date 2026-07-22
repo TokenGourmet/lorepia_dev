@@ -22,10 +22,10 @@
 <style>
   .avatar {
     border-radius: var(--r-pill);
-    background: var(--surface-bubble);
-    color: var(--text-strong);
+    background: var(--tint-soft);
+    color: var(--tint);
     font-family: var(--font-ui);
-    font-weight: 500;
+    font-weight: 600;
     display: inline-flex;
     align-items: center;
     justify-content: center;

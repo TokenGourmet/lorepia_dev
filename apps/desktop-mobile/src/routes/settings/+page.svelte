@@ -167,51 +167,80 @@
 
 <div class="screen">
   <header class="top">
-    <a class="back" href="/" aria-label="서재로 돌아가기">
-      <svg
-        viewBox="0 0 24 24"
-        width="20"
-        height="20"
-        fill="none"
-        stroke="currentColor"
-        stroke-width="2"
-        stroke-linecap="round"
-        stroke-linejoin="round"
-        aria-hidden="true"
-      >
-        <path d="m15 18-6-6 6-6" />
-      </svg>
-    </a>
     <h1>설정</h1>
-    <span class="spacer"></span>
   </header>
 
   <section>
     <h2>화면</h2>
-    <div class="row">
-      <span class="label">테마</span>
-      <div class="segment" role="group" aria-label="테마 선택">
-        {#each themeOptions as option (option.value)}
-          <button
-            type="button"
-            class:active={theme.preference === option.value}
-            onclick={() => appPreferences.setTheme(option.value)}
-            >{option.label}</button
-          >
-        {/each}
+    <div class="card">
+      <div class="row">
+        <span class="lead">
+          <span class="ric" aria-hidden="true">
+            <svg
+              viewBox="0 0 24 24"
+              width="16"
+              height="16"
+              fill="none"
+              stroke="currentColor"
+              stroke-width="2"
+              stroke-linecap="round"
+              stroke-linejoin="round"
+            >
+              <circle cx="12" cy="12" r="4" />
+              <path d="M12 2v2" />
+              <path d="M12 20v2" />
+              <path d="m4.9 4.9 1.4 1.4" />
+              <path d="m17.7 17.7 1.4 1.4" />
+              <path d="M2 12h2" />
+              <path d="M20 12h2" />
+              <path d="m6.3 17.7-1.4 1.4" />
+              <path d="m19.1 4.9-1.4 1.4" />
+            </svg>
+          </span>
+          <span class="label">테마</span>
+        </span>
+        <div class="segment" role="group" aria-label="테마 선택">
+          {#each themeOptions as option (option.value)}
+            <button
+              type="button"
+              class:active={theme.preference === option.value}
+              onclick={() => appPreferences.setTheme(option.value)}
+              >{option.label}</button
+            >
+          {/each}
+        </div>
       </div>
-    </div>
-    <div class="row">
-      <span class="label">기본 표시 모드</span>
-      <div class="segment" role="group" aria-label="기본 표시 모드 선택">
-        {#each modeOptions as option (option.value)}
-          <button
-            type="button"
-            class:active={defaultMode === option.value}
-            onclick={() => appPreferences.setDefaultMode(option.value)}
-            >{option.label}</button
-          >
-        {/each}
+      <div class="row">
+        <span class="lead">
+          <span class="ric" aria-hidden="true">
+            <svg
+              viewBox="0 0 24 24"
+              width="16"
+              height="16"
+              fill="none"
+              stroke="currentColor"
+              stroke-width="2"
+              stroke-linecap="round"
+              stroke-linejoin="round"
+            >
+              <path d="M12 7v14" />
+              <path
+                d="M3 18a1 1 0 0 1-1-1V4a1 1 0 0 1 1-1h5a4 4 0 0 1 4 4 4 4 0 0 1 4-4h5a1 1 0 0 1 1 1v13a1 1 0 0 1-1 1h-6a3 3 0 0 0-3 3 3 3 0 0 0-3-3z"
+              />
+            </svg>
+          </span>
+          <span class="label">기본 표시 모드</span>
+        </span>
+        <div class="segment" role="group" aria-label="기본 표시 모드 선택">
+          {#each modeOptions as option (option.value)}
+            <button
+              type="button"
+              class:active={defaultMode === option.value}
+              onclick={() => appPreferences.setDefaultMode(option.value)}
+              >{option.label}</button
+            >
+          {/each}
+        </div>
       </div>
     </div>
   </section>
@@ -381,13 +410,52 @@
 
   <section>
     <h2>정보</h2>
-    <div class="row">
-      <span class="label">버전</span>
-      <span class="value">0.1.0</span>
-    </div>
-    <div class="row">
-      <span class="label">라이선스</span>
-      <span class="value">Apache-2.0</span>
+    <div class="card">
+      <div class="row">
+        <span class="lead">
+          <span class="ric" aria-hidden="true">
+            <svg
+              viewBox="0 0 24 24"
+              width="16"
+              height="16"
+              fill="none"
+              stroke="currentColor"
+              stroke-width="2"
+              stroke-linecap="round"
+              stroke-linejoin="round"
+            >
+              <circle cx="12" cy="12" r="9" />
+              <path d="M12 16v-5" />
+              <path d="M12 8h.01" />
+            </svg>
+          </span>
+          <span class="label">버전</span>
+        </span>
+        <span class="value">0.1.0</span>
+      </div>
+      <div class="row">
+        <span class="lead">
+          <span class="ric" aria-hidden="true">
+            <svg
+              viewBox="0 0 24 24"
+              width="16"
+              height="16"
+              fill="none"
+              stroke="currentColor"
+              stroke-width="2"
+              stroke-linecap="round"
+              stroke-linejoin="round"
+            >
+              <path d="M15 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7z" />
+              <path d="M14 2v4a2 2 0 0 0 2 2h4" />
+              <path d="M8 13h8" />
+              <path d="M8 17h5" />
+            </svg>
+          </span>
+          <span class="label">라이선스</span>
+        </span>
+        <span class="value">Apache-2.0</span>
+      </div>
     </div>
   </section>
 </div>
@@ -408,47 +476,59 @@
   }
 
   .top {
+    position: sticky;
+    top: 0;
+    z-index: 5;
     display: flex;
     align-items: center;
-    gap: var(--sp-2);
-    padding: var(--sp-2) var(--sp-3);
-    padding-top: calc(var(--sp-2) + var(--safe-top));
+    padding: var(--sp-3) var(--sp-4);
+    padding-top: calc(var(--sp-3) + var(--safe-top));
+    background: var(--bar-bg);
+    -webkit-backdrop-filter: blur(20px) saturate(1.6);
+    backdrop-filter: blur(20px) saturate(1.6);
   }
 
   .top h1 {
-    flex: 1;
     margin: 0;
-    font-size: 17px;
-    font-weight: 500;
+    font-size: 33px;
+    font-weight: 800;
+    letter-spacing: -0.03em;
     color: var(--text-strong);
-    text-align: center;
-  }
-
-  .back,
-  .spacer {
-    width: var(--size-touch);
-    height: var(--size-touch);
-    flex-shrink: 0;
-  }
-
-  .back {
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
-    border-radius: var(--r-pill);
-    color: var(--text-mid);
   }
 
   section {
     padding: 0 var(--sp-4);
     margin-top: var(--sp-4);
+    animation: lp-rise var(--dur-page) var(--ease-out) backwards;
+  }
+
+  section:nth-of-type(1) {
+    animation-delay: 40ms;
+  }
+  section:nth-of-type(2) {
+    animation-delay: 90ms;
+  }
+  section:nth-of-type(3) {
+    animation-delay: 140ms;
+  }
+  section:nth-of-type(4) {
+    animation-delay: 190ms;
   }
 
   h2 {
-    margin: 0 0 var(--sp-1);
+    margin: 0 0 var(--sp-2);
+    padding-left: var(--sp-2);
     font-size: var(--fs-label);
-    font-weight: 500;
+    font-weight: 600;
+    letter-spacing: 0.02em;
     color: var(--text-mid);
+  }
+
+  .card {
+    padding: 0 var(--sp-4);
+    background: var(--surface-card);
+    border-radius: var(--r-card);
+    box-shadow: var(--shadow-card);
   }
 
   .row {
@@ -456,9 +536,31 @@
     align-items: center;
     justify-content: space-between;
     gap: var(--sp-3);
-    min-height: var(--size-touch);
+    min-height: 52px;
     padding: var(--sp-1) 0;
-    border-bottom: 0.5px solid var(--hairline);
+  }
+
+  .row + .row {
+    border-top: 0.5px solid var(--hairline);
+  }
+
+  .lead {
+    display: inline-flex;
+    align-items: center;
+    gap: var(--sp-3);
+    min-width: 0;
+  }
+
+  .ric {
+    width: 30px;
+    height: 30px;
+    flex-shrink: 0;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 9px;
+    background: var(--tint-soft);
+    color: var(--tint);
   }
 
   .label {
@@ -560,22 +662,22 @@
   }
 
   .provider-grid label.selected {
-    border-color: var(--invert-surface);
-    background: var(--invert-surface);
-    color: var(--invert-text);
+    border-color: var(--tint);
+    box-shadow: inset 0 0 0 1px var(--tint);
+    background: var(--tint-soft);
+    color: var(--text-strong);
   }
 
   .provider-grid label.selected small {
-    color: var(--invert-text);
-    opacity: 0.7;
+    color: var(--tint);
   }
 
   .provider-detail {
     margin-top: var(--sp-3);
     padding: var(--sp-4);
-    border: 0.5px solid var(--hairline);
-    border-radius: var(--r-block);
-    background: var(--surface-field);
+    border-radius: var(--r-card);
+    background: var(--surface-card);
+    box-shadow: var(--shadow-card);
   }
 
   .provider-title {
@@ -740,14 +842,20 @@
     padding: 0 var(--sp-4);
     border: none;
     border-radius: var(--r-pill);
-    background: var(--invert-surface);
-    color: var(--invert-text);
+    background: var(--tint);
+    color: #fff;
     font-family: var(--font-ui);
     font-size: var(--fs-ui);
-    font-weight: 500;
+    font-weight: 600;
     cursor: pointer;
     flex-shrink: 0;
-    transition: opacity var(--dur-fast) var(--ease-out);
+    transition:
+      opacity var(--dur-fast) var(--ease-out),
+      transform var(--dur-fast) var(--ease-spring);
+  }
+
+  .key-line .save:not(:disabled):active {
+    transform: scale(0.95);
   }
 
   .key-line .save:disabled {
@@ -774,8 +882,10 @@
   }
 
   .chip.ok {
-    border-color: var(--text-mid);
-    color: var(--text-strong);
+    border-color: transparent;
+    background: var(--success-soft);
+    color: var(--success);
+    font-weight: 500;
   }
 
   .remove {
@@ -799,12 +909,14 @@
     margin: 0;
     font-size: var(--fs-label);
     line-height: 1.5;
-    color: var(--text-strong);
+    color: var(--danger);
   }
 
   .status.configured {
-    border-color: var(--text-mid);
-    color: var(--text-strong);
+    border-color: transparent;
+    background: var(--tint-soft);
+    color: var(--tint);
+    font-weight: 500;
   }
 
   .security-note {
@@ -814,30 +926,39 @@
 
   .segment {
     display: flex;
-    border: 0.5px solid var(--hairline);
-    border-radius: var(--r-pill);
+    background: var(--surface-bubble);
+    border-radius: 10px;
     padding: 2px;
     gap: 2px;
   }
 
   .segment button {
-    min-height: 32px;
+    min-height: 30px;
     padding: 0 var(--sp-3);
     border: none;
-    border-radius: var(--r-pill);
+    border-radius: 8px;
     background: transparent;
     color: var(--text-mid);
     font-family: var(--font-ui);
     font-size: var(--fs-label);
+    font-weight: 500;
     cursor: pointer;
     transition:
-      background var(--dur-fast) var(--ease-out),
-      color var(--dur-fast) var(--ease-out);
+      background var(--dur-base) var(--ease-out),
+      color var(--dur-base) var(--ease-out),
+      box-shadow var(--dur-base) var(--ease-out),
+      transform var(--dur-fast) var(--ease-spring);
+  }
+
+  .segment button:active {
+    transform: scale(0.95);
   }
 
   .segment button.active {
-    background: var(--invert-surface);
-    color: var(--invert-text);
+    background: var(--segment-thumb);
+    color: var(--text-strong);
+    font-weight: 600;
+    box-shadow: 0 1px 4px rgba(0, 0, 0, 0.12);
   }
 
   .note {

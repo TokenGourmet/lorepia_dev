@@ -20,6 +20,7 @@
     showHeader: boolean;
     showTime: boolean;
     isTail: boolean;
+    isTyping: boolean;
   }
 
   const entries: ThreadEntry[] = $derived(
@@ -36,6 +37,10 @@
           message.streaming !== true &&
           !(sameRunNext && formatMessageTime(next.sentAt) === time),
         isTail: !sameRunNext,
+        isTyping:
+          message.streaming === true &&
+          message.text.length === 0 &&
+          (message.streamingChunks ?? []).every((chunk) => chunk.length === 0),
       };
     }),
   );
@@ -61,6 +66,11 @@
             {/if}
             <div class="bubble-line">
               <div class="bubble">
+                {#if entry.isTyping}
+                  <span class="typing" role="status" aria-label="응답 작성 중"
+                    ><i></i><i></i><i></i></span
+                  >
+                {:else}
                 <p class="voice">
                   {#if entry.message.narration}
                     <span class="narration">{entry.message.narration}</span>
@@ -76,6 +86,7 @@
                       aria-label="응답 실패"
                     >실패</span>{/if}
                 </p>
+                {/if}
               </div>
               {#if entry.showTime}
                 <time class="stamp" datetime={entry.message.sentAt.toISOString()}
@@ -115,6 +126,11 @@
           >
         {/if}
         {#if entry.message.role === "character"}
+          {#if entry.isTyping}
+            <span class="typing" role="status" aria-label="응답 작성 중"
+              ><i></i><i></i><i></i></span
+            >
+          {:else}
           <p class="voice prose">
             {#if entry.message.narration}
               <span class="narration">{entry.message.narration}</span>
@@ -130,6 +146,7 @@
                 aria-label="응답 실패"
               >실패</span>{/if}
           </p>
+          {/if}
         {:else}
           <div class="note">
             <p>{entry.message.text}</p>
@@ -159,6 +176,12 @@
     gap: var(--sp-4);
   }
 
+  @media (min-width: 700px) {
+    .thread.chat {
+      padding-inline: max(var(--sp-4), calc((100% - 760px) / 2));
+    }
+  }
+
   .chat .row.grouped {
     margin-top: calc(var(--sp-1) - var(--sp-4));
   }
@@ -180,11 +203,11 @@
     width: var(--size-avatar);
     height: var(--size-avatar);
     border-radius: var(--r-pill);
-    background: var(--surface-bubble);
-    color: var(--text-strong);
+    background: var(--tint-soft);
+    color: var(--tint);
     font-family: var(--font-ui);
     font-size: var(--fs-label);
-    font-weight: 500;
+    font-weight: 600;
     display: inline-flex;
     align-items: center;
     justify-content: center;
@@ -224,10 +247,23 @@
   }
 
   .bubble {
-    background: var(--surface-bubble);
+    background: var(--surface-card);
     border-radius: var(--r-bubble);
     padding: 10px 14px;
     min-width: 0;
+    box-shadow: 0 1px 2px rgba(0, 0, 0, 0.05);
+  }
+
+  .chat .row:last-child {
+    animation: lp-pop var(--dur-slow) var(--ease-spring) backwards;
+  }
+
+  .chat .row.user:last-child {
+    transform-origin: bottom right;
+  }
+
+  .chat .row.character:last-child {
+    transform-origin: bottom left;
   }
 
   .delivery-state {
@@ -251,7 +287,11 @@
   }
 
   .bubble.inverted {
-    background: var(--invert-surface);
+    background: linear-gradient(
+      180deg,
+      color-mix(in srgb, var(--tint) 82%, #ffffff) 0%,
+      var(--tint) 100%
+    );
   }
 
   .bubble p {
@@ -264,7 +304,7 @@
   }
 
   .bubble.inverted p {
-    color: var(--invert-text);
+    color: #fff;
   }
 
   .bubble p.voice {
@@ -315,9 +355,14 @@
   }
 
   .note {
-    background: var(--invert-surface);
+    background: linear-gradient(
+      180deg,
+      color-mix(in srgb, var(--tint) 82%, #ffffff) 0%,
+      var(--tint) 100%
+    );
     border-radius: var(--r-block);
     padding: var(--sp-3) var(--sp-4);
+    box-shadow: 0 1px 2px rgba(0, 0, 0, 0.05);
   }
 
   .note p {
@@ -325,7 +370,7 @@
     font-family: var(--font-ui);
     font-size: var(--fs-chat);
     line-height: var(--lh-chat);
-    color: var(--invert-text);
+    color: #fff;
     overflow-wrap: anywhere;
   }
 
@@ -335,6 +380,42 @@
 
   .passage.mine .stamp {
     align-self: flex-end;
+  }
+
+  .typing {
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+    padding: 6px 2px;
+  }
+
+  .typing i {
+    width: 7px;
+    height: 7px;
+    border-radius: var(--r-pill);
+    background: var(--text-faint);
+    animation: typing-bounce 1.2s var(--ease-out) infinite;
+  }
+
+  .typing i:nth-child(2) {
+    animation-delay: 150ms;
+  }
+
+  .typing i:nth-child(3) {
+    animation-delay: 300ms;
+  }
+
+  @keyframes typing-bounce {
+    0%,
+    60%,
+    100% {
+      transform: none;
+      opacity: 0.5;
+    }
+    30% {
+      transform: translateY(-4px);
+      opacity: 1;
+    }
   }
 
   .cursor {
