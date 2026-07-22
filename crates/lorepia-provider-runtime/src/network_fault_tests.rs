@@ -4,6 +4,7 @@ use std::{
     sync::{
         Arc, Mutex,
         atomic::{AtomicUsize, Ordering},
+        mpsc as std_mpsc,
     },
     thread,
     time::Duration as StdDuration,
@@ -538,35 +539,47 @@ async fn content_type_and_content_encoding_are_strict() {
 async fn oversized_declared_stream_is_rejected_before_the_server_sends_one_megabyte() {
     let sent = Arc::new(AtomicUsize::new(0));
     let thread_sent = Arc::clone(&sent);
+    let (permit_sender, permit_receiver) = std_mpsc::channel();
     let server = FaultServer::ipv4(move |mut stream, receipt| {
         capture_request(&mut stream, &receipt);
         stream
             .write_all(b"HTTP/1.1 200 OK\r\nConnection: close\r\nContent-Type: text/event-stream\r\n\r\ndata: ")
             .expect("stream head");
         let block = [b'x'; 4096];
-        for _ in 0..(100 * 1024 * 1024 / block.len()) {
+        while permit_receiver.recv().is_ok() {
             match stream.write_all(&block) {
                 Ok(()) => {
                     thread_sent.fetch_add(block.len(), Ordering::SeqCst);
                     let _ = stream.flush();
-                    // Pace the hostile source so the assertion measures the
-                    // runtime's early close rather than the kernel send buffer.
-                    thread::sleep(StdDuration::from_millis(1));
                 }
                 Err(_) => break,
             }
         }
     });
     let response = request(&server).await;
-    let (result, _) = consume_openai(
-        &ProviderRuntime::new(),
-        response,
-        StdDuration::from_secs(1),
-        StdDuration::from_secs(3),
-    )
-    .await;
-    assert_eq!(result.unwrap_err().code(), "SSE_FRAME_TOO_LARGE");
+    let consume = tokio::spawn(async move {
+        consume_openai(
+            &ProviderRuntime::new(),
+            response,
+            StdDuration::from_secs(1),
+            StdDuration::from_secs(3),
+        )
+        .await
+    });
+    // The 256 KiB frame limit must trip within 65 fixed-size blocks. Permits
+    // make the bound independent of host scheduling and TCP send-buffer size.
+    for _ in 0..65 {
+        if permit_sender.send(()).is_err() {
+            break;
+        }
+    }
+    let outcome = tokio::time::timeout(StdDuration::from_secs(3), consume).await;
+    drop(permit_sender);
     let _ = server.wait();
+    let (result, _) = outcome
+        .expect("oversized frame must be rejected before more data is permitted")
+        .expect("consumer task");
+    assert_eq!(result.unwrap_err().code(), "SSE_FRAME_TOO_LARGE");
     assert!(sent.load(Ordering::SeqCst) < 1024 * 1024);
 }
 
