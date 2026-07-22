@@ -21,7 +21,16 @@ const MAX_ARCHIVE_EXPANDED_BYTES = 2 * 1024 * 1024 * 1024;
 const SEARCH_CHUNK_BYTES = 1024 * 1024;
 const SEARCH_OVERLAP_BYTES = 512;
 
-const WASM_MAGIC = Buffer.from([0x00, 0x61, 0x73, 0x6d]);
+// A runnable WebAssembly v1 module begins with both the four-byte magic and the
+// four-byte version. Searching for the magic alone produces false positives in
+// ordinary native machine code and string/data tables (observed in ELF and
+// Android .so artifacts). Paths ending in .wasm are rejected separately, while
+// this complete header still catches a module hidden in another resource or
+// embedded in a native binary.
+const WASM_V1_HEADER = Buffer.from([
+  0x00, 0x61, 0x73, 0x6d,
+  0x01, 0x00, 0x00, 0x00,
+]);
 const FORBIDDEN_PATH_PATTERNS = Object.freeze([
   ["QuickJS artifact", /(?:^|[\/_-])(?:lib)?quickjs(?:[-_.\/]|$)|quickjs-wasm/iu],
   ["Lua artifact", /(?:^|[\/_-])(?:lib)?lua(?:jit|5[1-4]|[-_.\/]|$)|\.lua(?:c)?$/iu],
@@ -257,7 +266,7 @@ function utf16SearchText(buffer, start) {
 }
 
 export function assertNoForbiddenRuntimeBytes(buffer, label) {
-  if (buffer.indexOf(WASM_MAGIC) !== -1) {
+  if (buffer.indexOf(WASM_V1_HEADER) !== -1) {
     throw new Error(`FORBIDDEN_WASM_MAGIC:${label}`);
   }
   const step = SEARCH_CHUNK_BYTES - SEARCH_OVERLAP_BYTES;

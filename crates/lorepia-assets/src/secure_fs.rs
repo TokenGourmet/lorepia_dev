@@ -123,7 +123,7 @@ impl SecureDirectory {
         let canonical = fs::canonicalize(path)?;
         let metadata = fs::symlink_metadata(&canonical)?;
         reject_unsafe_directory(&canonical, &metadata)?;
-        let identity = DirectoryIdentity::from_metadata(&canonical, &metadata)?;
+        let identity = DirectoryIdentity::from_path(&canonical)?;
         Ok(Self {
             path: canonical,
             identity: Arc::new(identity),
@@ -152,7 +152,7 @@ impl SecureDirectory {
         }
 
         #[cfg(not(unix))]
-        if *self.identity != DirectoryIdentity::from_metadata(&self.path, &metadata)? {
+        if *self.identity != DirectoryIdentity::from_path(&self.path)? {
             return Err(unsafe_path(
                 &self.path,
                 "directory identity changed after the storage boundary was opened",
@@ -272,7 +272,25 @@ impl SecureDirectory {
         Ok(file)
     }
 
-    #[cfg(not(unix))]
+    #[cfg(windows)]
+    pub(crate) fn open_file(&self, name: &OsStr) -> Result<File> {
+        validate_component(name, &self.path)?;
+        self.ensure_path_identity()?;
+        let path = self.path.join(name);
+        let inspected = open_windows_entry_no_follow(&path, false)?;
+        reject_unsafe_file(&path, &inspected.metadata()?)?;
+        let opened = open_windows_entry_no_follow(&path, false)?;
+        reject_unsafe_file(&path, &opened.metadata()?)?;
+        if !same_file_identity(&inspected, &opened)? {
+            return Err(unsafe_path(
+                &path,
+                "entry changed while it was being opened",
+            ));
+        }
+        Ok(opened)
+    }
+
+    #[cfg(not(any(unix, windows)))]
     pub(crate) fn open_file(&self, name: &OsStr) -> Result<File> {
         validate_component(name, &self.path)?;
         self.ensure_path_identity()?;
@@ -280,13 +298,13 @@ impl SecureDirectory {
         let metadata = fs::symlink_metadata(&path)?;
         reject_unsafe_file(&path, &metadata)?;
         let file = File::open(&path)?;
-        let opened = file.metadata()?;
-        if !opened.is_file() || !same_file_identity(&metadata, &opened)? {
+        if !file.metadata()?.is_file() {
             return Err(unsafe_path(
                 &path,
                 "entry changed while it was being opened",
             ));
         }
+        same_file_identity(&file, &file)?;
         Ok(file)
     }
 
@@ -306,7 +324,7 @@ impl SecureDirectory {
     ) -> Result<bool> {
         let first = self.open_file(name)?;
         let second = other.open_file(other_name)?;
-        same_file_identity(&first.metadata()?, &second.metadata()?)
+        same_file_identity(&first, &second)
     }
 
     #[cfg(unix)]
@@ -330,7 +348,7 @@ impl SecureDirectory {
         )
         .map_err(|error| AssetError::Io(error.into()))?;
         let published = target.open_file(target_name)?;
-        if !same_file_identity(&source.metadata()?, &published.metadata()?)? {
+        if !same_file_identity(&source, &published)? {
             return Err(unsafe_path(
                 &target.path.join(target_name),
                 "source entry changed while a no-follow hard link was being published",
@@ -353,7 +371,7 @@ impl SecureDirectory {
         let source = self.open_file(source_name)?;
         fs::hard_link(self.path.join(source_name), target.path.join(target_name))?;
         let published = target.open_file(target_name)?;
-        if !same_file_identity(&source.metadata()?, &published.metadata()?)? {
+        if !same_file_identity(&source, &published)? {
             return Err(unsafe_path(
                 &target.path.join(target_name),
                 "source entry changed while a hard link was being published",
@@ -422,38 +440,56 @@ impl SecureDirectory {
 }
 
 #[cfg(not(unix))]
-#[derive(Debug, Eq, PartialEq)]
+#[derive(Debug)]
 struct DirectoryIdentity {
     canonical: PathBuf,
     #[cfg(windows)]
-    volume: u32,
+    identity: WindowsFileIdentity,
     #[cfg(windows)]
-    index: u64,
+    _handle: File,
 }
 
 #[cfg(not(unix))]
-impl DirectoryIdentity {
-    fn from_metadata(path: &Path, metadata: &fs::Metadata) -> Result<Self> {
+impl PartialEq for DirectoryIdentity {
+    fn eq(&self, other: &Self) -> bool {
+        if self.canonical != other.canonical {
+            return false;
+        }
+
         #[cfg(windows)]
         {
-            use std::os::windows::fs::MetadataExt;
+            self.identity == other.identity
+        }
 
-            let volume = metadata.volume_serial_number().ok_or_else(|| {
-                unsafe_path(path, "Windows did not expose a directory volume identity")
-            })?;
-            let index = metadata.file_index().ok_or_else(|| {
-                unsafe_path(path, "Windows did not expose a directory file identity")
+        #[cfg(not(windows))]
+        {
+            true
+        }
+    }
+}
+
+#[cfg(not(unix))]
+impl Eq for DirectoryIdentity {}
+
+#[cfg(not(unix))]
+impl DirectoryIdentity {
+    fn from_path(path: &Path) -> Result<Self> {
+        #[cfg(windows)]
+        {
+            let handle = open_windows_entry_no_follow(path, true)?;
+            reject_unsafe_directory(path, &handle.metadata()?)?;
+            let identity = query_windows_file_identity(&handle).map_err(|_| {
+                unsafe_path(path, "Windows did not expose a stable directory identity")
             })?;
             Ok(Self {
                 canonical: path.to_path_buf(),
-                volume,
-                index,
+                identity,
+                _handle: handle,
             })
         }
 
         #[cfg(not(windows))]
         {
-            let _ = metadata;
             Err(unsafe_path(
                 path,
                 "this non-Unix platform has no supported no-follow directory identity contract",
@@ -475,28 +511,19 @@ fn map_unix_open_error(error: rustix::io::Errno, path: &Path) -> AssetError {
 }
 
 #[cfg(unix)]
-fn same_file_identity(first: &fs::Metadata, second: &fs::Metadata) -> Result<bool> {
+fn same_file_identity(first: &File, second: &File) -> Result<bool> {
     use std::os::unix::fs::MetadataExt;
 
+    let first = first.metadata()?;
+    let second = second.metadata()?;
     Ok(first.dev() == second.dev() && first.ino() == second.ino())
 }
 
 #[cfg(windows)]
-fn same_file_identity(first: &fs::Metadata, second: &fs::Metadata) -> Result<bool> {
-    use std::os::windows::fs::MetadataExt;
-
-    Ok(first
-        .volume_serial_number()
-        .ok_or_else(windows_identity_unavailable)?
-        == second
-            .volume_serial_number()
-            .ok_or_else(windows_identity_unavailable)?
-        && first
-            .file_index()
-            .ok_or_else(windows_identity_unavailable)?
-            == second
-                .file_index()
-                .ok_or_else(windows_identity_unavailable)?)
+fn same_file_identity(first: &File, second: &File) -> Result<bool> {
+    let first = query_windows_file_identity(first).map_err(|_| windows_identity_unavailable())?;
+    let second = query_windows_file_identity(second).map_err(|_| windows_identity_unavailable())?;
+    Ok(first == second)
 }
 
 #[cfg(windows)]
@@ -508,11 +535,45 @@ fn windows_identity_unavailable() -> AssetError {
 }
 
 #[cfg(not(any(unix, windows)))]
-fn same_file_identity(_first: &fs::Metadata, _second: &fs::Metadata) -> Result<bool> {
+fn same_file_identity(_first: &File, _second: &File) -> Result<bool> {
     Err(unsafe_path(
         Path::new("<opaque directory entry>"),
         "platform cannot prove that two recovery entries are the same file",
     ))
+}
+
+#[cfg(windows)]
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+struct WindowsFileIdentity {
+    volume: u64,
+    index: u64,
+}
+
+#[cfg(windows)]
+fn query_windows_file_identity(file: &File) -> std::io::Result<WindowsFileIdentity> {
+    let information = winapi_util::file::information(file)?;
+    Ok(WindowsFileIdentity {
+        volume: information.volume_serial_number(),
+        index: information.file_index(),
+    })
+}
+
+#[cfg(windows)]
+fn open_windows_entry_no_follow(path: &Path, directory: bool) -> std::io::Result<File> {
+    use std::os::windows::fs::OpenOptionsExt;
+    use windows_sys::Win32::Storage::FileSystem::{
+        FILE_FLAG_BACKUP_SEMANTICS, FILE_FLAG_OPEN_REPARSE_POINT,
+    };
+
+    let directory_flag = if directory {
+        FILE_FLAG_BACKUP_SEMANTICS
+    } else {
+        0
+    };
+    OpenOptions::new()
+        .read(true)
+        .custom_flags(FILE_FLAG_OPEN_REPARSE_POINT | directory_flag)
+        .open(path)
 }
 
 fn reject_unsafe_directory(path: &Path, metadata: &fs::Metadata) -> Result<()> {
@@ -580,8 +641,8 @@ fn reject_unsafe_file(path: &Path, metadata: &fs::Metadata) -> Result<()> {
 #[cfg(windows)]
 fn is_reparse_point(metadata: &fs::Metadata) -> bool {
     use std::os::windows::fs::MetadataExt;
+    use windows_sys::Win32::Storage::FileSystem::FILE_ATTRIBUTE_REPARSE_POINT;
 
-    const FILE_ATTRIBUTE_REPARSE_POINT: u32 = 0x0000_0400;
     metadata.file_attributes() & FILE_ATTRIBUTE_REPARSE_POINT != 0
 }
 
@@ -626,5 +687,42 @@ mod tests {
             b"protected"
         );
         assert!(!temp.path().join("created").exists());
+    }
+
+    #[cfg(windows)]
+    #[test]
+    fn windows_open_handle_identity_matches_hard_links_only() {
+        let temp = tempfile::TempDir::new().expect("tempdir");
+        let first_path = temp.path().join("first.bin");
+        let linked_path = temp.path().join("linked.bin");
+        let distinct_path = temp.path().join("distinct.bin");
+        fs::write(&first_path, b"first").expect("first fixture");
+        fs::hard_link(&first_path, &linked_path).expect("hard-link fixture");
+        fs::write(&distinct_path, b"distinct").expect("distinct fixture");
+
+        let first = open_windows_entry_no_follow(&first_path, false).expect("first handle");
+        let linked = open_windows_entry_no_follow(&linked_path, false).expect("linked handle");
+        let distinct =
+            open_windows_entry_no_follow(&distinct_path, false).expect("distinct handle");
+
+        assert!(same_file_identity(&first, &linked).expect("hard-link identity"));
+        assert!(!same_file_identity(&first, &distinct).expect("distinct identity"));
+    }
+
+    #[cfg(windows)]
+    #[test]
+    fn windows_directory_identity_rejects_path_replacement() {
+        let temp = tempfile::TempDir::new().expect("tempdir");
+        let root_path = temp.path().join("root");
+        let displaced_path = temp.path().join("displaced");
+        let root = SecureDirectory::open_root(&root_path).expect("root");
+
+        fs::rename(&root_path, &displaced_path).expect("displace opened root");
+        fs::create_dir(&root_path).expect("replacement root");
+
+        assert!(matches!(
+            root.ensure_path_identity(),
+            Err(AssetError::UnsafeFilesystem { .. })
+        ));
     }
 }

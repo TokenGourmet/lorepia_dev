@@ -1043,10 +1043,7 @@ fn open_regular_source(path: &Path) -> Result<(File, fs::Metadata)> {
     }
     #[cfg(windows)]
     {
-        use std::os::windows::fs::MetadataExt;
-        use windows_sys::Win32::Storage::FileSystem::FILE_ATTRIBUTE_REPARSE_POINT;
-
-        if before.file_attributes() & FILE_ATTRIBUTE_REPARSE_POINT != 0 {
+        if windows_metadata_is_reparse_point(&before) {
             return Err(ImportError::new(ImportErrorCode::UnsafeEntryType));
         }
     }
@@ -1068,6 +1065,19 @@ fn open_regular_source(path: &Path) -> Result<(File, fs::Metadata)> {
         // symlink/junction between the initial inspection and CreateFile.
         options.custom_flags(FILE_FLAG_OPEN_REPARSE_POINT);
     }
+    #[cfg(windows)]
+    let inspected = {
+        let inspected = options
+            .open(path)
+            .map_err(|_| ImportError::new(ImportErrorCode::UnsafeEntryType))?;
+        let metadata = inspected
+            .metadata()
+            .map_err(|_| ImportError::new(ImportErrorCode::UnsafeEntryType))?;
+        if !metadata.is_file() || windows_metadata_is_reparse_point(&metadata) {
+            return Err(ImportError::new(ImportErrorCode::UnsafeEntryType));
+        }
+        inspected
+    };
     let file = options
         .open(path)
         .map_err(|_| ImportError::new(ImportErrorCode::UnsafeEntryType))?;
@@ -1087,19 +1097,43 @@ fn open_regular_source(path: &Path) -> Result<(File, fs::Metadata)> {
     }
     #[cfg(windows)]
     {
-        use std::os::windows::fs::MetadataExt;
-        use windows_sys::Win32::Storage::FileSystem::FILE_ATTRIBUTE_REPARSE_POINT;
-
-        if after.file_attributes() & FILE_ATTRIBUTE_REPARSE_POINT != 0
-            || before.volume_serial_number().is_none()
-            || before.file_index().is_none()
-            || before.volume_serial_number() != after.volume_serial_number()
-            || before.file_index() != after.file_index()
+        if windows_metadata_is_reparse_point(&after)
+            || !same_windows_file_identity(&inspected, &file)?
         {
             return Err(ImportError::new(ImportErrorCode::UnsafeEntryType));
         }
     }
     Ok((file, after))
+}
+
+#[cfg(windows)]
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+struct WindowsFileIdentity {
+    volume: u64,
+    index: u64,
+}
+
+#[cfg(windows)]
+fn same_windows_file_identity(first: &File, second: &File) -> Result<bool> {
+    Ok(windows_file_identity(first)? == windows_file_identity(second)?)
+}
+
+#[cfg(windows)]
+fn windows_file_identity(file: &File) -> Result<WindowsFileIdentity> {
+    let information = winapi_util::file::information(file)
+        .map_err(|_| ImportError::new(ImportErrorCode::UnsafeEntryType))?;
+    Ok(WindowsFileIdentity {
+        volume: information.volume_serial_number(),
+        index: information.file_index(),
+    })
+}
+
+#[cfg(windows)]
+fn windows_metadata_is_reparse_point(metadata: &fs::Metadata) -> bool {
+    use std::os::windows::fs::MetadataExt;
+    use windows_sys::Win32::Storage::FileSystem::FILE_ATTRIBUTE_REPARSE_POINT;
+
+    metadata.file_attributes() & FILE_ATTRIBUTE_REPARSE_POINT != 0
 }
 
 fn reject_symlink_if_present(path: &Path) -> Result<()> {
@@ -1241,4 +1275,44 @@ fn hex_digest(bytes: &[u8]) -> String {
         output.push(HEX[usize::from(byte & 0x0f)] as char);
     }
     output
+}
+
+#[cfg(all(test, windows))]
+mod windows_tests {
+    use super::*;
+
+    #[test]
+    fn open_handle_identity_matches_hard_links_only() {
+        let temp = tempfile::TempDir::new().expect("tempdir");
+        let first_path = temp.path().join("first.bin");
+        let linked_path = temp.path().join("linked.bin");
+        let distinct_path = temp.path().join("distinct.bin");
+        fs::write(&first_path, b"first").expect("first fixture");
+        fs::hard_link(&first_path, &linked_path).expect("hard-link fixture");
+        fs::write(&distinct_path, b"distinct").expect("distinct fixture");
+
+        let first = File::open(first_path).expect("first handle");
+        let linked = File::open(linked_path).expect("linked handle");
+        let distinct = File::open(distinct_path).expect("distinct handle");
+
+        assert!(same_windows_file_identity(&first, &linked).expect("hard-link identity"));
+        assert!(!same_windows_file_identity(&first, &distinct).expect("distinct identity"));
+    }
+
+    #[test]
+    fn final_file_reparse_point_is_rejected_when_symlink_creation_is_available() {
+        use std::{io::ErrorKind, os::windows::fs::symlink_file};
+
+        let temp = tempfile::TempDir::new().expect("tempdir");
+        let target = temp.path().join("target.bin");
+        let alias = temp.path().join("alias.bin");
+        fs::write(&target, b"target").expect("target fixture");
+        if let Err(error) = symlink_file(&target, &alias) {
+            assert_eq!(error.kind(), ErrorKind::PermissionDenied);
+            return;
+        }
+
+        let error = open_regular_source(&alias).expect_err("reparse source must fail closed");
+        assert_eq!(error.code, ImportErrorCode::UnsafeEntryType);
+    }
 }

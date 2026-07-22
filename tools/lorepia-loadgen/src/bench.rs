@@ -190,22 +190,7 @@ pub fn run(options: BenchOptions) -> Result<()> {
     let object_stats = objects.as_deref().map(asset_stats).transpose()?;
 
     let source = source_state();
-    let mut blockers = Vec::new();
-    match source.dirty {
-        Some(true) => blockers.push("DIRTY_WORKTREE".to_owned()),
-        Some(false) => {}
-        None => blockers.push("WORKTREE_STATE_UNKNOWN".to_owned()),
-    }
-    if source
-        .commit
-        .as_ref()
-        .is_none_or(|commit| commit.len() != 40)
-    {
-        blockers.push("FULL_COMMIT_UNKNOWN".to_owned());
-    }
-    if source.cargo_lock_sha256.is_none() {
-        blockers.push("CARGO_LOCK_DIGEST_UNKNOWN".to_owned());
-    }
+    let blockers = release_evidence_blockers(&source);
 
     let receipt = BenchReceipt {
         artifact_kind: "LOREPIA_DETERMINISTIC_BENCHMARK_RECEIPT",
@@ -258,6 +243,26 @@ pub fn run(options: BenchOptions) -> Result<()> {
         raw_prompt_or_secret_included: false,
     };
     write_json_atomic(&options.output, &receipt)
+}
+
+fn release_evidence_blockers(source: &SourceState) -> Vec<String> {
+    let mut blockers = Vec::new();
+    match source.dirty {
+        Some(true) => blockers.push("DIRTY_WORKTREE".to_owned()),
+        Some(false) => {}
+        None => blockers.push("WORKTREE_STATE_UNKNOWN".to_owned()),
+    }
+    if source
+        .commit
+        .as_ref()
+        .is_none_or(|commit| commit.len() != 40)
+    {
+        blockers.push("FULL_COMMIT_UNKNOWN".to_owned());
+    }
+    if source.cargo_lock_sha256.is_none() {
+        blockers.push("CARGO_LOCK_DIGEST_UNKNOWN".to_owned());
+    }
+    blockers
 }
 
 fn run_recent(connection: &Connection, chat_id: &str) -> Result<()> {
@@ -490,7 +495,7 @@ mod tests {
     }
 
     #[test]
-    fn benchmark_emits_plans_sizes_environment_and_dirty_gate() {
+    fn benchmark_emits_plans_sizes_environment_and_source_gate() {
         let directory = tempfile::tempdir().unwrap();
         let database = directory.path().join("fixture.sqlite3");
         let output = directory.path().join("bench.json");
@@ -519,13 +524,46 @@ mod tests {
         assert_eq!(receipt["cases"][0]["usesOffset"], false);
         assert!(receipt["environment"]["rustc"].is_string());
         assert_eq!(receipt["rawPromptOrSecretIncluded"], false);
-        assert_eq!(receipt["releaseEvidenceEligible"], false);
-        assert!(
-            receipt["releaseEvidenceBlockers"]
-                .as_array()
-                .unwrap()
-                .iter()
-                .any(|blocker| blocker == "DIRTY_WORKTREE")
+        let blockers = receipt["releaseEvidenceBlockers"].as_array().unwrap();
+        let dirty_blocked = blockers.iter().any(|blocker| blocker == "DIRTY_WORKTREE");
+        match receipt["source"]["dirty"].as_bool() {
+            Some(dirty) => assert_eq!(dirty_blocked, dirty),
+            None => assert!(
+                blockers
+                    .iter()
+                    .any(|blocker| blocker == "WORKTREE_STATE_UNKNOWN")
+            ),
+        }
+        assert_eq!(receipt["releaseEvidenceEligible"], blockers.is_empty());
+    }
+
+    #[test]
+    fn source_gate_is_deterministic_for_clean_dirty_and_unknown_states() {
+        let clean = SourceState {
+            commit: Some("a".repeat(40)),
+            dirty: Some(false),
+            cargo_lock_sha256: Some("b".repeat(64)),
+        };
+        assert!(release_evidence_blockers(&clean).is_empty());
+
+        let dirty = SourceState {
+            dirty: Some(true),
+            ..clean.clone()
+        };
+        assert_eq!(release_evidence_blockers(&dirty), ["DIRTY_WORKTREE"]);
+
+        let unknown = SourceState {
+            commit: None,
+            dirty: None,
+            cargo_lock_sha256: None,
+        };
+        assert_eq!(
+            release_evidence_blockers(&unknown),
+            [
+                "WORKTREE_STATE_UNKNOWN",
+                "FULL_COMMIT_UNKNOWN",
+                "CARGO_LOCK_DIGEST_UNKNOWN",
+            ]
         );
     }
 }

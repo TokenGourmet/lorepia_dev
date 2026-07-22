@@ -160,6 +160,35 @@ test("rejects forbidden QuickJS and Lua bytes even when symbols are stripped fro
   );
 });
 
+test("distinguishes an incidental wasm magic substring from a complete embedded module", () => {
+  const root = makeTemporaryDirectory();
+  const incidental = writeFixture(
+    root,
+    "incidental-native",
+    Buffer.concat([
+      fixture("elfClean"),
+      Buffer.from([0x00, 0x61, 0x73, 0x6d, 0x7f, 0x45, 0x4c, 0x46]),
+    ]),
+  );
+  assert.deepEqual(
+    verifyReleaseArtifactBoundary(incidental, { commandRunner: successfulInspector }),
+    { artifacts: 1, formats: ["ELF"], inspectors: ["readelf"], nativeFiles: 1, resources: 0 },
+  );
+
+  const embeddedModule = writeFixture(
+    root,
+    "embedded-module-native",
+    Buffer.concat([
+      fixture("elfClean"),
+      Buffer.from([0x00, 0x61, 0x73, 0x6d, 0x01, 0x00, 0x00, 0x00]),
+    ]),
+  );
+  assert.throws(
+    () => verifyReleaseArtifactBoundary(embeddedModule, { commandRunner: successfulInspector }),
+    /FORBIDDEN_WASM_MAGIC:embedded-module-native/u,
+  );
+});
+
 test("rejects a forbidden linked dependency reported only by the native inspector", () => {
   const root = makeTemporaryDirectory();
   const path = writeFixture(root, "LorePia", fixture("machoClean"));
