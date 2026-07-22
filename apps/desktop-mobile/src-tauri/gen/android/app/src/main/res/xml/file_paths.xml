@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="utf-8"?>
+<paths xmlns:android="http://schemas.android.com/apk/res/android">
+  <!-- Keep URI grants inside purpose-specific app-owned directories. -->
+  <files-path name="imports" path="import/" />
+  <cache-path name="shares" path="share/" />
+</paths>

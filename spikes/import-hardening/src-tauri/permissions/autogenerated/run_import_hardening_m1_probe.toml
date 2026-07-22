@@ -1,0 +1,11 @@
+# Automatically generated - DO NOT EDIT!
+
+[[permission]]
+identifier = "allow-run-import-hardening-m1-probe"
+description = "Enables the run_import_hardening_m1_probe command without any pre-configured scope."
+commands.allow = ["run_import_hardening_m1_probe"]
+
+[[permission]]
+identifier = "deny-run-import-hardening-m1-probe"
+description = "Denies the run_import_hardening_m1_probe command without any pre-configured scope."
+commands.deny = ["run_import_hardening_m1_probe"]

@@ -1,0 +1,31 @@
+{
+  "name": "@lorepia/spike-audio-playback",
+  "version": "0.1.0",
+  "description": "M-1 validation spike for trusted-WebView local audio playback.",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "vite dev",
+    "build": "vite build",
+    "preview": "vite preview",
+    "test": "vitest run",
+    "check": "svelte-kit sync && svelte-check --tsconfig ./tsconfig.json",
+    "check:watch": "svelte-kit sync && svelte-check --tsconfig ./tsconfig.json --watch",
+    "verify:fixture": "node scripts/generate-audio-fixture.mjs --check",
+    "verify:built-fixture": "node scripts/verify-built-fixture.mjs --check build",
+    "tauri": "tauri"
+  },
+  "license": "Apache-2.0",
+  "devDependencies": {
+    "@sveltejs/adapter-static": "^3.0.10",
+    "@sveltejs/kit": "^2.70.0",
+    "@sveltejs/vite-plugin-svelte": "^7.2.0",
+    "@tauri-apps/cli": "^2.11.4",
+    "@types/node": "^22.19.15",
+    "svelte": "^5.56.6",
+    "svelte-check": "^4.3.6",
+    "typescript": "~6.0.3",
+    "vite": "^8.1.5",
+    "vitest": "^4.1.10"
+  }
+}

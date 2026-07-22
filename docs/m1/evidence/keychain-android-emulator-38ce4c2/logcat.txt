@@ -1,0 +1,91 @@
+--------- beginning of main
+07-19 05:12:18.493  9426  9426 I .spike.keychain: Late-enabling -Xcheck:jni
+07-19 05:12:18.528  9426  9426 I .spike.keychain: Using CollectorTypeCMC GC.
+07-19 05:12:18.540  9426  9426 D nativeloader: Load libframework-connectivity-tiramisu-jni.so using APEX ns com_android_tethering for caller /apex/com.android.tethering/javalib/framework-connectivity-t.jar: ok
+07-19 05:12:18.761  9426  9426 D nativeloader: Configuring clns-9 for other apk /data/app/~~nGI-3kElJrQJFmTDT-rxrw==/dev.lorepia.spike.keychain-eM70D7_pSZXpw7knIZY2Hw==/base.apk. target_sdk_version=36, uses_libraries=, library_path=/data/app/~~nGI-3kElJrQJFmTDT-rxrw==/dev.lorepia.spike.keychain-eM70D7_pSZXpw7knIZY2Hw==/lib/arm64:/data/app/~~nGI-3kElJrQJFmTDT-rxrw==/dev.lorepia.spike.keychain-eM70D7_pSZXpw7knIZY2Hw==/base.apk!/lib/arm64-v8a, permitted_path=/data:/mnt/expand:/data/user/0/dev.lorepia.spike.keychain
+07-19 05:12:18.771  9426  9426 I .spike.keychain: AssetManager2(0xb400007125bad8f8) locale list changing from [] to [en-US]
+07-19 05:12:18.773  9426  9426 V GraphicsEnvironment: Currently set values for:
+07-19 05:12:18.773  9426  9426 V GraphicsEnvironment:   angle_gl_driver_selection_pkgs=[]
+07-19 05:12:18.773  9426  9426 V GraphicsEnvironment:   angle_gl_driver_selection_values=[]
+07-19 05:12:18.773  9426  9426 V GraphicsEnvironment: dev.lorepia.spike.keychain is not listed in per-application setting
+07-19 05:12:18.773  9426  9426 V GraphicsEnvironment: ANGLE allowlist from config: com.dreamgames.royalmatch com.dts.freefiremax com.dxx.firenow com.gramgames.mergedragons com.ludo.king com.mojang.minecraftpe com.my.defense com.nintendo.zaka com.os.airforce com.playrix.fishdomdd.gplay io.teslatech.callbreak jp.konami.prospia net.peakgames.toonblast
+07-19 05:12:18.773  9426  9426 V GraphicsEnvironment: dev.lorepia.spike.keychain is not listed in ANGLE allowlist or settings, returning default
+07-19 05:12:18.773  9426  9426 V GraphicsEnvironment: Neither updatable production driver nor prerelease driver is supported.
+--------- beginning of system
+07-19 05:12:18.797  9426  9442 I DisplayManager: Choreographer implicitly registered for the refresh rate.
+07-19 05:12:18.798  9426  9426 I .spike.keychain: AssetManager2(0xb400007125bb1a98) locale list changing from [] to [en-US]
+07-19 05:12:18.820  9426  9426 D AppCompatDelegate: Checking for metadata for AppLocalesMetadataHolderService : Service not found
+07-19 05:12:18.821  9426  9426 I .spike.keychain: AssetManager2(0xb400007125bb23f8) locale list changing from [] to [en-US]
+07-19 05:12:18.828  9426  9426 E ashmem  : Pinning is deprecated since Android Q. Please use trim or other methods.
+07-19 05:12:18.833  9426  9426 D CompatChangeReporter: Compat change id reported: 377864165; UID 10219; state: ENABLED
+07-19 05:12:18.835  9426  9442 I EGL_emulation: Opening libGLESv1_CM_emulation.so
+07-19 05:12:18.836  9426  9442 I EGL_emulation: Opening libGLESv2_emulation.so
+07-19 05:12:18.838  9426  9426 D DesktopModeFlags: Toggle override initialized to: OVERRIDE_UNSET
+07-19 05:12:18.843  9426  9442 W HWUI    : Failed to choose config with EGL_SWAP_BEHAVIOR_PRESERVED, retrying without...
+07-19 05:12:18.844  9426  9442 W HWUI    : Failed to initialize 101010-2 format, error = EGL_SUCCESS
+07-19 05:12:18.896  9426  9426 D nativeloader: Load /data/app/~~nGI-3kElJrQJFmTDT-rxrw==/dev.lorepia.spike.keychain-eM70D7_pSZXpw7knIZY2Hw==/base.apk!/lib/arm64-v8a/libspikeskeychain_lib.so using class loader ns clns-9 (caller=/data/app/~~nGI-3kElJrQJFmTDT-rxrw==/dev.lorepia.spike.keychain-eM70D7_pSZXpw7knIZY2Hw==/base.apk!classes6.dex): ok
+07-19 05:12:18.962  9426  9426 I .spike.keychain: hiddenapi: Accessing hidden method Landroid/view/ViewGroup;->makeOptionalFitsSystemWindows()V (runtime_flags=0, domain=platform, api=unsupported) from Landroidx/appcompat/widget/ViewUtils; (domain=app) using reflection: allowed
+07-19 05:12:18.978  9426  9426 W HWUI    : Unknown dataspace 0
+07-19 05:12:19.048  9426  9426 I .spike.keychain: AssetManager2(0xb400007125bacc78) locale list changing from [] to [en-US]
+07-19 05:12:19.048  9426  9426 I WebViewFactory: Loading com.google.android.webview version 133.0.6943.137 (code 694313732)
+07-19 05:12:19.048  9426  9426 I .spike.keychain: AssetManager2(0xb400007125baf838) locale list changing from [] to [en-US]
+07-19 05:12:19.048  9426  9426 I .spike.keychain: AssetManager2(0xb400007125bad2b8) locale list changing from [] to [en-US]
+07-19 05:12:19.049  9426  9426 I .spike.keychain: AssetManager2(0xb400007125bb1458) locale list changing from [] to [en-US]
+07-19 05:12:19.049  9426  9426 I .spike.keychain: AssetManager2(0xb400007125baebb8) locale list changing from [] to [en-US]
+07-19 05:12:19.049  9426  9426 V ResourcesManager: The following library key has been added: ResourcesKey{ mHash=bf96b9dd mResDir=null mSplitDirs=[] mOverlayDirs=[] mLibDirs=[/data/app/~~gpmFUbSJsE3j6CR1TKNPvA==/com.google.android.webview-I6rLLB_FXSA9WeiobqWXGQ==/WebViewGoogle.apk,/data/app/~~isMGCVgJ7GK-A4CwEwbgSA==/com.google.android.trichromelibrary_694313732-wfZnONLsvqF7ALIh0W09nQ==/TrichromeLibrary.apk,/system_ext/framework/androidx.window.extensions.jar] mDisplayId=0 mOverrideConfig=v36 mCompatInfo={420dpi always-compat} mLoaders=[]}
+07-19 05:12:19.050  9426  9426 W .spike.keychain: Failed to find entry 'classes.dex': Entry not found
+07-19 05:12:19.050  9426  9426 D nativeloader: Configuring clns-10 for other apk /data/app/~~isMGCVgJ7GK-A4CwEwbgSA==/com.google.android.trichromelibrary_694313732-wfZnONLsvqF7ALIh0W09nQ==/TrichromeLibrary.apk. target_sdk_version=34, uses_libraries=ALL, library_path=/data/app/~~gpmFUbSJsE3j6CR1TKNPvA==/com.google.android.webview-I6rLLB_FXSA9WeiobqWXGQ==/lib/arm64:/data/app/~~gpmFUbSJsE3j6CR1TKNPvA==/com.google.android.webview-I6rLLB_FXSA9WeiobqWXGQ==/WebViewGoogle.apk!/lib/arm64-v8a:/data/app/~~isMGCVgJ7GK-A4CwEwbgSA==/com.google.android.trichromelibrary_694313732-wfZnONLsvqF7ALIh0W09nQ==/TrichromeLibrary.apk!/lib/arm64-v8a, permitted_path=/data:/mnt/expand
+07-19 05:12:19.051  9426  9426 D ApplicationLoaders: Returning zygote-cached class loader: /system_ext/framework/androidx.window.extensions.jar
+07-19 05:12:19.110  9426  9426 D nativeloader: Configuring clns-11 for other apk /data/app/~~gpmFUbSJsE3j6CR1TKNPvA==/com.google.android.webview-I6rLLB_FXSA9WeiobqWXGQ==/WebViewGoogle.apk. target_sdk_version=34, uses_libraries=, library_path=/data/app/~~gpmFUbSJsE3j6CR1TKNPvA==/com.google.android.webview-I6rLLB_FXSA9WeiobqWXGQ==/lib/arm64:/data/app/~~gpmFUbSJsE3j6CR1TKNPvA==/com.google.android.webview-I6rLLB_FXSA9WeiobqWXGQ==/WebViewGoogle.apk!/lib/arm64-v8a:/data/app/~~isMGCVgJ7GK-A4CwEwbgSA==/com.google.android.trichromelibrary_694313732-wfZnONLsvqF7ALIh0W09nQ==/TrichromeLibrary.apk!/lib/arm64-v8a, permitted_path=/data:/mnt/expand
+07-19 05:12:19.127  9426  9426 I cr_WVCFactoryProvider: version=133.0.6943.137 (694313732) minSdkVersion=29 isBundle=false multiprocess=true packageId=2
+07-19 05:12:19.128  9426  9426 I .spike.keychain: AssetManager2(0xb400007125babff8) locale list changing from [] to [en-US]
+07-19 05:12:19.132  9426  9426 D nativeloader: Load /data/app/~~isMGCVgJ7GK-A4CwEwbgSA==/com.google.android.trichromelibrary_694313732-wfZnONLsvqF7ALIh0W09nQ==/TrichromeLibrary.apk!/lib/arm64-v8a/libmonochrome_64.so using class loader ns clns-11 (caller=/data/app/~~gpmFUbSJsE3j6CR1TKNPvA==/com.google.android.webview-I6rLLB_FXSA9WeiobqWXGQ==/WebViewGoogle.apk): ok
+07-19 05:12:19.137  9426  9426 D nativeloader: Load /system/lib64/libwebviewchromium_plat_support.so using class loader ns clns-11 (caller=/data/app/~~gpmFUbSJsE3j6CR1TKNPvA==/com.google.android.webview-I6rLLB_FXSA9WeiobqWXGQ==/WebViewGoogle.apk): ok
+07-19 05:12:19.141  9426  9455 I chromium: [0719/051219.140904:INFO:variations_seed_loader.cc(67)] Failed to open file for reading.: No such file or directory (2)
+07-19 05:12:19.146  9426  9455 I cr_VariationsUtils: Failed reading seed file "/data/user/0/dev.lorepia.spike.keychain/app_webview/variations_seed_new"
+07-19 05:12:19.147  9426  9444 I RustStdoutStderr: [0719/051219.140904:INFO:variations_seed_loader.cc(67)] Failed to open file for reading.: No such file or directory (2)
+07-19 05:12:19.150  9426  9426 I cr_LibraryLoader: Successfully loaded native library
+07-19 05:12:19.150  9426  9426 I cr_CachingUmaRecorder: Flushed 6 samples from 6 histograms, 0 samples were dropped.
+07-19 05:12:19.152  9426  9426 I cr_VariationsUtils: Loaded seed with age 13437s
+07-19 05:12:19.154  9426  9426 I cr_CombinedPProvider: #registerProvider() provider:WV.C8@af9949c isPolicyCacheEnabled:false policyProvidersSize:0
+07-19 05:12:19.155  9426  9426 I cr_PolicyProvider: #setManagerAndSource() 0
+07-19 05:12:19.160  9426  9426 I cr_CombinedPProvider: #linkNativeInternal() 1
+07-19 05:12:19.160  9426  9426 I cr_AppResProvider: #getApplicationRestrictionsFromUserManager() Bundle[EMPTY_PARCEL]
+07-19 05:12:19.162  9426  9426 I cr_PolicyProvider: #notifySettingsAvailable() 0
+07-19 05:12:19.162  9426  9426 I cr_CombinedPProvider: #onSettingsAvailable() 0
+07-19 05:12:19.162  9426  9426 I cr_CombinedPProvider: #flushPolicies()
+07-19 05:12:19.222  9426  9471 W chromium: [WARNING:dns_config_service_android.cc(81)] Failed to read DnsConfig.
+07-19 05:12:19.223  9426  9444 I RustStdoutStderr: [WARNING:dns_config_service_android.cc(81)] Failed to read DnsConfig.
+07-19 05:12:19.232  9426  9426 I .spike.keychain: AssetManager2(0xb400007125bac318) locale list changing from [] to [en-US]
+07-19 05:12:19.236  9426  9426 I .spike.keychain: AssetManager2(0xb400007125bad5d8) locale list changing from [] to [en-US]
+07-19 05:12:19.391  9426  9491 I CameraManagerGlobal: Connecting to camera service
+07-19 05:12:19.399  9426  9426 W libc    : Access denied finding property "vendor.mesa.log"
+07-19 05:12:19.399  9426  9426 W libc    : Access denied finding property "vendor.mesa.log.file"
+07-19 05:12:19.399  9426  9426 E MESA    : Failed to open rendernode: No such file or directory
+07-19 05:12:19.420  9426  9426 D vulkan  : searching for layers in '/data/app/~~nGI-3kElJrQJFmTDT-rxrw==/dev.lorepia.spike.keychain-eM70D7_pSZXpw7knIZY2Hw==/lib/arm64'
+07-19 05:12:19.421  9426  9426 D vulkan  : searching for layers in '/data/app/~~nGI-3kElJrQJFmTDT-rxrw==/dev.lorepia.spike.keychain-eM70D7_pSZXpw7knIZY2Hw==/base.apk!/lib/arm64-v8a'
+07-19 05:12:19.430  9426  9426 W libc    : Access denied finding property "vendor.mesa.vk.trace.per.submit"
+07-19 05:12:19.430  9426  9426 W libc    : Access denied finding property "vendor.mesa.gallium.print.optio"
+07-19 05:12:19.430  9426  9426 W libc    : Access denied finding property "vendor.mesa.vk.trace.frame"
+07-19 05:12:19.435  9426  9426 W libc    : Access denied finding property "vendor.mesa.vk.wsi.headless.swa"
+07-19 05:12:19.470  9426  9494 W chromium: [WARNING:viz_main_impl.cc(85)] VizNullHypothesis is disabled (not a warning)
+07-19 05:12:19.470  9426  9444 I RustStdoutStderr: [WARNING:viz_main_impl.cc(85)] VizNullHypothesis is disabled (not a warning)
+07-19 05:12:19.479  9426  9477 W cr_media: BLUETOOTH_CONNECT permission is missing.
+07-19 05:12:19.480  9426  9477 W cr_media: getBluetoothAdapter() requires BLUETOOTH permission
+07-19 05:12:19.480  9426  9477 W cr_media: registerBluetoothIntentsIfNeeded: Requires BLUETOOTH permission
+07-19 05:12:19.481  9426  9426 D InsetsController: hide(ime(), fromIme=false)
+07-19 05:12:19.481  9426  9426 I ImeTracker: dev.lorepia.spike.keychain:6709b8ac: onCancelled at PHASE_CLIENT_ALREADY_HIDDEN
+07-19 05:12:19.612  9426  9431 I .spike.keychain: Compiler allocated 5111KB to compile void android.view.ViewRootImpl.performTraversals()
+07-19 05:12:19.664  9426  9444 I RustStdoutStderr: s_glBindAttribLocation: bind attrib 0 name inPosition
+07-19 05:12:19.665  9426  9444 I RustStdoutStderr: s_glBindAttribLocation: bind attrib 1 name inColor
+07-19 05:12:19.665  9426  9444 I RustStdoutStderr: s_glBindAttribLocation: bind attrib 2 name inCircleEdge
+07-19 05:12:19.667  9426  9444 I RustStdoutStderr: s_glBindAttribLocation: bind attrib 0 name inPosition
+07-19 05:12:19.668  9426  9444 I RustStdoutStderr: s_glBindAttribLocation: bind attrib 1 name inColor
+07-19 05:12:19.668  9426  9444 I RustStdoutStderr: s_glBindAttribLocation: bind attrib 2 name inTextureCoords
+07-19 05:12:19.672  9426  9444 I RustStdoutStderr: s_glBindAttribLocation: bind attrib 0 name position
+07-19 05:12:19.672  9426  9444 I RustStdoutStderr: s_glBindAttribLocation: bind attrib 1 name localCoord
+07-19 05:12:23.963  9426  9516 D ProfileInstaller: Installing profile for dev.lorepia.spike.keychain
+07-19 05:12:32.530  9426  9426 I cr_A11yState: Enabled accessibility services list updated. []
+07-19 05:12:32.531  9426  9426 D AutofillManager: Fill dialog is enabled:false, hints=[]
+07-19 05:12:32.532  9426  9426 I cr_A11yState: Informing listeners of changes.
+07-19 05:12:32.533  9426  9426 I cr_A11yState: New AccessibilityState: State{isScreenReaderEnabled=false, isTouchExplorationEnabled=false, isPerformGesturesEnabled=false, isAnyAccessibilityServiceEnabled=false, isAccessibilityToolPresent=false, isSpokenFeedbackServicePresent=false, isTextShowPasswordEnabled=true, isOnlyPasswordManagersEnabled=false}

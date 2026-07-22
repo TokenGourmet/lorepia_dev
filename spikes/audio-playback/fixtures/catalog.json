@@ -1,0 +1,43 @@
+{
+  "protocolVersion": "m1-audio-fixture-v1",
+  "fixtureId": "m1-audio-v1",
+  "file": "m1-audio-v1.wav",
+  "sourcePath": "static/fixtures/m1-audio-v1.wav",
+  "publicPath": "/fixtures/m1-audio-v1.wav",
+  "origin": "self-authored",
+  "license": "CC0-1.0",
+  "sha256": "8559ab4de943a983094b3e27af499ee5fbff80d48263a36fa3c0d1e1339ead25",
+  "bytes": 1152044,
+  "format": "wav-pcm-s16le",
+  "durationMs": 12000,
+  "sampleRateHz": 48000,
+  "channels": 1,
+  "bitsPerSample": 16,
+  "frameCount": 576000,
+  "dataBytes": 1152000,
+  "seekCheckpointMs": 6000,
+  "fadeMs": 20,
+  "peakAmplitude": 8192,
+  "segments": [
+    {
+      "startMs": 0,
+      "endMs": 3000,
+      "frequencyHz": 440
+    },
+    {
+      "startMs": 3000,
+      "endMs": 6000,
+      "frequencyHz": 660
+    },
+    {
+      "startMs": 6000,
+      "endMs": 9000,
+      "frequencyHz": 880
+    },
+    {
+      "startMs": 9000,
+      "endMs": 12000,
+      "frequencyHz": 1100
+    }
+  ]
+}

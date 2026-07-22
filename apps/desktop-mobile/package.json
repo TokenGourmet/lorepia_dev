@@ -1,0 +1,43 @@
+{
+  "name": "@lorepia/desktop-mobile",
+  "version": "0.1.0",
+  "description": "LorePia desktop and mobile product shell",
+  "private": true,
+  "type": "module",
+  "engines": {
+    "node": ">=22 <23",
+    "npm": ">=10 <11"
+  },
+  "packageManager": "npm@10.9.8",
+  "scripts": {
+    "dev": "vite dev",
+    "build": "npm run build:web && npm run verify:built-boundary",
+    "build:web": "vite build",
+    "verify:built-boundary": "node scripts/verify-built-executable-boundary.mjs",
+    "verify:android-wrapper-security": "node scripts/verify-android-wrapper-security.mjs",
+    "verify:native-security-boundary": "node scripts/verify-native-security-boundary.mjs",
+    "verify:native-product-dependency-boundary": "node scripts/verify-native-product-dependency-boundary.mjs",
+    "verify:release-artifact-boundary": "node scripts/verify-release-artifact-boundary.mjs",
+    "preview": "vite preview",
+    "test": "vitest run && node --test scripts/strict-csp-svelte-preprocess.node-test.mjs scripts/verify-android-wrapper-security.node-test.mjs scripts/verify-native-product-dependency-boundary.node-test.mjs scripts/verify-native-security-boundary.node-test.mjs scripts/verify-release-artifact-boundary.node-test.mjs",
+    "check": "svelte-kit sync && svelte-check --tsconfig ./tsconfig.json",
+    "check:watch": "svelte-kit sync && svelte-check --tsconfig ./tsconfig.json --watch",
+    "tauri": "tauri"
+  },
+  "license": "Apache-2.0",
+  "dependencies": {
+    "@tauri-apps/api": "2.11.1"
+  },
+  "devDependencies": {
+    "@sveltejs/adapter-static": "3.0.10",
+    "@sveltejs/kit": "2.70.0",
+    "@sveltejs/vite-plugin-svelte": "7.2.0",
+    "@tauri-apps/cli": "2.11.4",
+    "@types/node": "22.19.15",
+    "svelte": "5.56.6",
+    "svelte-check": "4.3.6",
+    "typescript": "6.0.3",
+    "vite": "8.1.5",
+    "vitest": "4.1.10"
+  }
+}

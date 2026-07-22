@@ -1,0 +1,43 @@
+[package]
+name = "lorepia-app"
+description = "LorePia Tauri product shell"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+authors.workspace = true
+repository.workspace = true
+build = "build.rs"
+
+[lib]
+name = "lorepia_app_lib"
+crate-type = ["staticlib", "cdylib", "rlib"]
+
+[build-dependencies]
+tauri-build.workspace = true
+
+[dependencies]
+lorepia-assets = { path = "../../../crates/lorepia-assets" }
+lorepia-credential-vault = { path = "../../../crates/lorepia-credential-vault" }
+lorepia-core = { path = "../../../crates/lorepia-core" }
+lorepia-provider-runtime = { path = "../../../crates/lorepia-provider-runtime" }
+lorepia-providers = { path = "../../../crates/lorepia-providers" }
+lorepia-safety = { path = "../../../crates/lorepia-safety" }
+lorepia-storage = { path = "../../../crates/lorepia-storage" }
+serde.workspace = true
+serde_json.workspace = true
+subtle = "=2.6.1"
+tauri.workspace = true
+tokio = { version = "=1.53.0", features = ["rt", "sync", "time"] }
+tokio-util = { version = "=0.7.18", features = ["rt"] }
+url = "=2.5.8"
+uuid = { version = "=1.24.0", features = ["v4"] }
+zeroize = "=1.9.0"
+
+[dev-dependencies]
+rusqlite = { version = "=0.40.1", default-features = false, features = ["bundled"] }
+tempfile = "=3.27.0"
+tokio = { version = "=1.53.0", features = ["macros", "rt", "test-util"] }
+
+[target.'cfg(target_os = "android")'.dependencies]
+jni = "=0.21.1"
+ndk-context = "=0.1.1"

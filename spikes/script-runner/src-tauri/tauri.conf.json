@@ -1,0 +1,63 @@
+{
+  "$schema": "https://schema.tauri.app/config/2",
+  "productName": "LorePia Script Runner Spike",
+  "version": "0.1.0",
+  "identifier": "dev.lorepia.spike.scriptrunner",
+  "build": {
+    "beforeDevCommand": "npm run dev",
+    "devUrl": "http://localhost:1423",
+    "beforeBuildCommand": "npm run build",
+    "frontendDist": "../build"
+  },
+  "app": {
+    "windows": [
+      {
+        "label": "main",
+        "title": "LorePia M-1 Script Runner Probe",
+        "width": 820,
+        "height": 720
+      }
+    ],
+    "security": {
+      "capabilities": ["default"],
+      "csp": {
+        "default-src": "'self' customprotocol: asset:",
+        "base-uri": "'none'",
+        "connect-src": "'self'",
+        "form-action": "'none'",
+        "frame-src": "'none'",
+        "img-src": "'none'",
+        "media-src": "'none'",
+        "object-src": "'none'",
+        "script-src": "'self' 'wasm-unsafe-eval'",
+        "style-src": "'self' 'unsafe-inline'",
+        "worker-src": "'self'"
+      },
+      "devCsp": {
+        "default-src": "'self' http://localhost:1423",
+        "base-uri": "'none'",
+        "connect-src": "'self' http://localhost:1423 ws://localhost:1424",
+        "form-action": "'none'",
+        "frame-src": "'none'",
+        "img-src": "'none'",
+        "media-src": "'none'",
+        "object-src": "'none'",
+        "script-src": "'self' 'wasm-unsafe-eval' http://localhost:1423",
+        "style-src": "'self' 'unsafe-inline' http://localhost:1423",
+        "worker-src": "'self' http://localhost:1423"
+      },
+      "freezePrototype": true
+    }
+  },
+  "bundle": {
+    "active": true,
+    "targets": "all",
+    "icon": [
+      "icons/32x32.png",
+      "icons/128x128.png",
+      "icons/128x128@2x.png",
+      "icons/icon.icns",
+      "icons/icon.ico"
+    ]
+  }
+}

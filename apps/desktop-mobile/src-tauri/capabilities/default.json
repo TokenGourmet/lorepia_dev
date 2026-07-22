@@ -1,0 +1,29 @@
+{
+  "$schema": "../gen/schemas/desktop-schema.json",
+  "identifier": "default",
+  "description": "Exact LorePia product capability for the trusted main WebView",
+  "webviews": ["main"],
+  "permissions": [
+    "core:window:allow-destroy",
+    "allow-get-product-bootstrap",
+    "allow-get-provider-credential-status",
+    "allow-save-provider-api-key",
+    "allow-delete-provider-credential",
+    "allow-start-provider-stream",
+    "allow-ack-provider-stream",
+    "allow-cancel-provider-stream",
+    "allow-reset-provider-stream-owner",
+    "allow-get-provider-stream-snapshot",
+    "allow-get-storage-status",
+    "allow-get-asset-store-status",
+    "allow-create-chat",
+    "allow-list-chats",
+    "allow-load-chat-messages",
+    "allow-delete-chat",
+    "allow-get-app-preferences",
+    "allow-update-app-preferences",
+    "allow-get-product-safety-contract",
+    "allow-prepare-ai-output-report",
+    "allow-export-redacted-diagnostics"
+  ]
+}

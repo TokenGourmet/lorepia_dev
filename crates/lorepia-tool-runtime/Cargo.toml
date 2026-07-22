@@ -1,0 +1,16 @@
+[package]
+name = "lorepia-tool-runtime"
+description = "UI-independent, deny-by-default tool and remote MCP policy contracts"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+authors.workspace = true
+repository.workspace = true
+
+[dependencies]
+hmac = "=0.12.1"
+serde.workspace = true
+serde_json.workspace = true
+sha2 = "=0.10.9"
+url = "=2.5.8"
+zeroize = "=1.9.0"

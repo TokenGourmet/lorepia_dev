@@ -1,8 +1,12 @@
 import { describe, expect, it } from "vitest";
 
 import {
+  createTextReceipt,
   createStreamContractState,
+  isValidStreamSnapshotPayload,
+  validateReleaseStreamResponse,
   validateStreamEvent,
+  validateTerminalRecoverySnapshot,
   validateTerminalSnapshot,
   type EventValidation,
   type StreamContractState,
@@ -70,7 +74,6 @@ describe("stream event contract", () => {
       type: "completed",
       requestId,
       seq: 3,
-      text: "하나둘",
     };
     const terminalResult = accept(state, completed);
     state = terminalResult.nextState;
@@ -79,7 +82,7 @@ describe("stream event contract", () => {
       requestId,
       status: "completed",
       lastSeq: 3,
-      text: "하나둘",
+      acceptedText: "하나둘",
       error: null,
     });
     expect(state.terminalSeen).toBe(true);
@@ -89,7 +92,6 @@ describe("stream event contract", () => {
       type: "cancelled",
       requestId,
       seq: 4,
-      partialText: "하나둘",
     });
     expect(secondTerminal.error).toContain("종료 이벤트 이후");
   });
@@ -139,7 +141,6 @@ describe("stream event contract", () => {
       type: "cancelled",
       requestId,
       seq: 2,
-      partialText: "일부",
     }).nextState;
 
     const result = reject(terminal, delta(3));
@@ -159,6 +160,15 @@ describe("stream event contract", () => {
 
     expect(result.shouldAcknowledge).toBe(false);
     expect(result.error).toContain("배칭 설정");
+  });
+
+  it("rejects an empty delta without advancing or acknowledging it", () => {
+    const afterStart = accept(createStreamContractState(), started()).nextState;
+    const result = reject(afterStart, delta(1, requestId, ""));
+
+    expect(result.error).toContain("비어 있지 않은 문자열");
+    expect(result.nextState).toBe(afterStart);
+    expect(result.shouldAcknowledge).toBe(false);
   });
 
   it.each([
@@ -184,11 +194,15 @@ describe("stream event contract", () => {
   it.each([
     {
       name: "completed",
-      terminal: { type: "completed", requestId, seq: 2, text: "다른 값" },
+      terminal: { type: "completed", requestId, seq: 2 },
+      status: "completed",
+      error: null,
     },
     {
       name: "cancelled",
-      terminal: { type: "cancelled", requestId, seq: 2, partialText: "다른 값" },
+      terminal: { type: "cancelled", requestId, seq: 2 },
+      status: "cancelled",
+      error: null,
     },
     {
       name: "failed",
@@ -196,22 +210,93 @@ describe("stream event contract", () => {
         type: "failed",
         requestId,
         seq: 2,
-        partialText: "다른 값",
+        error: { code: "MOCK_FAILURE", message: "의도된 실패" },
+      },
+      status: "failed",
+      error: { code: "MOCK_FAILURE", message: "의도된 실패" },
+    },
+  ] as const)(
+    "derives the $name snapshot text from accepted deltas",
+    ({ terminal, status, error }) => {
+      const afterStart = accept(createStreamContractState(), started()).nextState;
+      const afterDelta = accept(afterStart, delta(1, requestId, "누적값")).nextState;
+      const result = accept(afterDelta, terminal);
+
+      expect(result.terminalExpectation).toEqual({
+        requestId,
+        status,
+        lastSeq: 2,
+        acceptedText: "누적값",
+        error,
+      });
+      expect(result.nextState).toMatchObject({
+        text: "누적값",
+        terminalSeen: true,
+        expectedTerminal: result.terminalExpectation,
+      });
+    },
+  );
+
+  it.each([
+    {
+      name: "completed.text",
+      terminal: { type: "completed", requestId, seq: 2, text: "누적값" },
+    },
+    {
+      name: "cancelled.partialText",
+      terminal: { type: "cancelled", requestId, seq: 2, partialText: "누적값" },
+    },
+    {
+      name: "failed.partialText",
+      terminal: {
+        type: "failed",
+        requestId,
+        seq: 2,
+        partialText: "누적값",
         error: { code: "MOCK_FAILURE", message: "의도된 실패" },
       },
     },
-  ] as const)(
-    "rejects $name when terminal text differs from accepted delta text",
-    ({ terminal }) => {
-      const afterStart = accept(createStreamContractState(), started()).nextState;
-      const afterDelta = accept(afterStart, delta(1, requestId, "누적값")).nextState;
-      const result = reject(afterDelta, terminal);
+  ])("rejects legacy terminal payload field $name", ({ terminal }) => {
+    const afterStart = accept(createStreamContractState(), started()).nextState;
+    const afterDelta = accept(afterStart, delta(1, requestId, "누적값")).nextState;
+    const result = reject(afterDelta, terminal);
 
-      expect(result.shouldAcknowledge).toBe(false);
-      expect(result.error).toContain("accepted delta 누적값과 일치하지 않습니다");
-      expect(result.nextState.text).toBe("누적값");
+    expect(result.error).toContain("허용되지 않은 필드");
+    expect(result.nextState.text).toBe("누적값");
+  });
+
+  it("uses an empty accepted-delta value for a terminal with no deltas", () => {
+    const afterStart = accept(createStreamContractState(), started()).nextState;
+    const result = accept(afterStart, {
+      type: "completed",
+      requestId,
+      seq: 1,
+    });
+
+    expect(result.terminalExpectation?.acceptedText).toBe("");
+  });
+});
+
+describe("text receipt", () => {
+  it.each([
+    {
+      text: "",
+      textBytes: 0,
+      textSha256:
+        "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
     },
-  );
+    {
+      text: "하나둘",
+      textBytes: 9,
+      textSha256:
+        "28377ce0871248295ea61e8deb878de0cbc9b66b68d64437149928da276e8ada",
+    },
+  ])("calculates the UTF-8 SHA-256 receipt for '$text'", async (expected) => {
+    await expect(createTextReceipt(expected.text)).resolves.toEqual({
+      textBytes: expected.textBytes,
+      textSha256: expected.textSha256,
+    });
+  });
 });
 
 describe("terminal snapshot contract", () => {
@@ -219,7 +304,7 @@ describe("terminal snapshot contract", () => {
     requestId,
     status: "completed" as const,
     lastSeq: 3,
-    text: "하나둘",
+    acceptedText: "하나둘",
     error: null,
   };
 
@@ -229,29 +314,32 @@ describe("terminal snapshot contract", () => {
     lastSeq: 3,
     lastAckedSeq: 3,
     inFlight: 0,
-    text: "하나둘",
+    textBytes: 9,
+    textSha256:
+      "28377ce0871248295ea61e8deb878de0cbc9b66b68d64437149928da276e8ada",
     error: null,
     batchWindowMs: 32,
     effectiveBatchWindowMs: 50,
     maxInFlight: 2,
   };
 
-  it("accepts an exact terminal snapshot", () => {
-    const result = validateTerminalSnapshot(snapshot, expected);
+  it("accepts an exact terminal snapshot receipt", async () => {
+    const result = await validateTerminalSnapshot(snapshot, expected);
 
     expect(result).toEqual({ accepted: true, snapshot });
   });
 
-  it("reports every terminal-field mismatch", () => {
-    const result = validateTerminalSnapshot(
+  it("reports every terminal-field mismatch", async () => {
+    const result = await validateTerminalSnapshot(
       {
         ...snapshot,
         requestId: "request-2",
         status: "failed",
         lastSeq: 4,
         lastAckedSeq: 2,
-        inFlight: 1,
-        text: "다름",
+        inFlight: 2,
+        textBytes: 3,
+        textSha256: "0".repeat(64),
         error: { code: "MOCK_FAILURE", message: "failed" },
       },
       expected,
@@ -260,21 +348,22 @@ describe("terminal snapshot contract", () => {
     expect(result).toEqual({
       accepted: false,
       error:
-        "최종 스냅샷 불일치: requestId, status, lastSeq, lastAckedSeq, inFlight, text, error",
+        "최종 스냅샷 불일치: requestId, status, lastSeq, lastAckedSeq, inFlight, textBytes, textSha256, error",
       mismatches: [
         "requestId",
         "status",
         "lastSeq",
         "lastAckedSeq",
         "inFlight",
-        "text",
+        "textBytes",
+        "textSha256",
         "error",
       ],
     });
   });
 
-  it("rejects a malformed snapshot payload", () => {
-    const result = validateTerminalSnapshot(
+  it("rejects a malformed snapshot payload", async () => {
+    const result = await validateTerminalSnapshot(
       { ...snapshot, effectiveBatchWindowMs: -1 },
       expected,
     );
@@ -287,15 +376,16 @@ describe("terminal snapshot contract", () => {
   });
 
   it.each([
-    { batchWindowMs: 15 },
-    { batchWindowMs: 51 },
-    { batchWindowMs: 40, effectiveBatchWindowMs: 39 },
-    { effectiveBatchWindowMs: 51 },
-    { maxInFlight: 0 },
-    { maxInFlight: 65 },
-    { maxInFlight: 2, inFlight: 3 },
-  ])("rejects snapshot bounds outside the stream contract: %o", (change) => {
-    const result = validateTerminalSnapshot({ ...snapshot, ...change }, expected);
+    { name: "negative textBytes", change: { textBytes: -1 } },
+    { name: "fractional textBytes", change: { textBytes: 1.5 } },
+    { name: "short textSha256", change: { textSha256: "abc" } },
+    { name: "uppercase textSha256", change: { textSha256: "A".repeat(64) } },
+    { name: "legacy raw text", change: { text: "하나둘" } },
+  ])("rejects malformed or raw-text receipt payload: $name", async ({ change }) => {
+    const result = await validateTerminalSnapshot(
+      { ...snapshot, ...change },
+      expected,
+    );
 
     expect(result).toMatchObject({
       accepted: false,
@@ -303,12 +393,32 @@ describe("terminal snapshot contract", () => {
     });
   });
 
-  it("matches failed terminal error data exactly", () => {
+  it.each([
+    { batchWindowMs: 15 },
+    { batchWindowMs: 51 },
+    { batchWindowMs: 40, effectiveBatchWindowMs: 39 },
+    { effectiveBatchWindowMs: 51 },
+    { maxInFlight: 0 },
+    { maxInFlight: 65 },
+    { maxInFlight: 2, inFlight: 3 },
+  ])("rejects snapshot bounds outside the stream contract: %o", async (change) => {
+    const result = await validateTerminalSnapshot(
+      { ...snapshot, ...change },
+      expected,
+    );
+
+    expect(result).toMatchObject({
+      accepted: false,
+      mismatches: ["payload"],
+    });
+  });
+
+  it("matches failed terminal error data exactly", async () => {
     const failedExpected = {
       requestId,
       status: "failed" as const,
       lastSeq: 2,
-      text: "일부",
+      acceptedText: "일부",
       error: { code: "MOCK_FAILURE", message: "의도된 실패" },
     };
     const failedSnapshot: StreamSnapshot = {
@@ -316,13 +426,17 @@ describe("terminal snapshot contract", () => {
       status: "failed",
       lastSeq: 2,
       lastAckedSeq: 2,
-      text: "일부",
+      textBytes: 6,
+      textSha256:
+        "32555f5ba712b1fdaf7403eff6d1a96ae377fd2bf903937b5ac1adc275c9b0e8",
       error: { code: "MOCK_FAILURE", message: "의도된 실패" },
     };
 
-    expect(validateTerminalSnapshot(failedSnapshot, failedExpected).accepted).toBe(true);
+    await expect(
+      validateTerminalSnapshot(failedSnapshot, failedExpected),
+    ).resolves.toMatchObject({ accepted: true });
     expect(
-      validateTerminalSnapshot(
+      await validateTerminalSnapshot(
         {
           ...failedSnapshot,
           error: { code: "MOCK_FAILURE", message: "다른 오류" },
@@ -330,5 +444,230 @@ describe("terminal snapshot contract", () => {
         failedExpected,
       ),
     ).toMatchObject({ accepted: false, mismatches: ["error"] });
+  });
+
+  it("fails closed when Web Crypto cannot calculate the expected receipt", async () => {
+    const rejectingDigest = {
+      digest: () => Promise.reject(new Error("digest unavailable")),
+    } as Pick<SubtleCrypto, "digest">;
+
+    await expect(
+      validateTerminalSnapshot(snapshot, expected, rejectingDigest),
+    ).rejects.toThrow("digest unavailable");
+  });
+});
+
+describe("snapshot lifecycle and recovery contract", () => {
+  const emptySha =
+    "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855";
+  const textSha =
+    "28377ce0871248295ea61e8deb878de0cbc9b66b68d64437149928da276e8ada";
+  const base = {
+    requestId,
+    textBytes: 9,
+    textSha256: textSha,
+    batchWindowMs: 32,
+    effectiveBatchWindowMs: 32,
+    maxInFlight: 2,
+  };
+
+  function stateAfterAcceptedText(): StreamContractState {
+    const afterStart = accept(createStreamContractState(), started()).nextState;
+    return accept(afterStart, delta(1, requestId, "하나둘")).nextState;
+  }
+
+  it("accepts a queued null/null snapshot and rejects phantom sequence state", () => {
+    const queued: StreamSnapshot = {
+      requestId,
+      status: "queued",
+      lastSeq: null,
+      lastAckedSeq: null,
+      inFlight: 0,
+      textBytes: 0,
+      textSha256: emptySha,
+      error: null,
+      batchWindowMs: 32,
+      effectiveBatchWindowMs: 32,
+      maxInFlight: 2,
+    };
+
+    expect(isValidStreamSnapshotPayload(queued)).toBe(true);
+    expect(isValidStreamSnapshotPayload({ ...queued, lastSeq: 0 })).toBe(false);
+    expect(
+      isValidStreamSnapshotPayload({
+        ...queued,
+        status: "streaming",
+      }),
+    ).toBe(false);
+  });
+
+  it("enforces sequence accounting and status/error coupling", () => {
+    const completed: StreamSnapshot = {
+      ...base,
+      status: "completed",
+      lastSeq: 2,
+      lastAckedSeq: 1,
+      inFlight: 1,
+      error: null,
+    };
+
+    expect(isValidStreamSnapshotPayload(completed)).toBe(true);
+    expect(isValidStreamSnapshotPayload({ ...completed, inFlight: 0 })).toBe(false);
+    expect(
+      isValidStreamSnapshotPayload({
+        ...completed,
+        error: { code: "UNEXPECTED", message: "not allowed" },
+      }),
+    ).toBe(false);
+    expect(
+      isValidStreamSnapshotPayload({ ...completed, status: "failed" }),
+    ).toBe(false);
+    expect(
+      isValidStreamSnapshotPayload({
+        ...completed,
+        lastSeq: Number.MAX_SAFE_INTEGER + 1,
+      }),
+    ).toBe(false);
+  });
+
+  it("recovers an omitted terminal event only at the next contiguous sequence", async () => {
+    const state = stateAfterAcceptedText();
+    const snapshot: StreamSnapshot = {
+      ...base,
+      status: "completed",
+      lastSeq: 2,
+      lastAckedSeq: 1,
+      inFlight: 1,
+      error: null,
+    };
+
+    await expect(validateTerminalRecoverySnapshot(snapshot, state)).resolves.toEqual({
+      accepted: true,
+      snapshot,
+      terminalEventDelivered: true,
+      expected: {
+        requestId,
+        status: "completed",
+        lastSeq: 2,
+        acceptedText: "하나둘",
+        error: null,
+      },
+    });
+  });
+
+  it("accepts an already observed terminal without requiring its ACK first", async () => {
+    const beforeTerminal = stateAfterAcceptedText();
+    const terminalState = accept(beforeTerminal, {
+      type: "completed",
+      requestId,
+      seq: 2,
+    }).nextState;
+    const snapshot: StreamSnapshot = {
+      ...base,
+      status: "completed",
+      lastSeq: 2,
+      lastAckedSeq: 1,
+      inFlight: 1,
+      error: null,
+    };
+
+    await expect(
+      validateTerminalRecoverySnapshot(snapshot, terminalState),
+    ).resolves.toMatchObject({ accepted: true, terminalEventDelivered: true });
+  });
+
+  it("recovers a control-plane-only failure without inventing a terminal sequence", async () => {
+    const state = stateAfterAcceptedText();
+    const error = { code: "CHANNEL_DELIVERY_FAILED", message: "closed channel" };
+    const snapshot: StreamSnapshot = {
+      ...base,
+      status: "failed",
+      lastSeq: 1,
+      lastAckedSeq: 1,
+      inFlight: 0,
+      error,
+    };
+
+    await expect(validateTerminalRecoverySnapshot(snapshot, state)).resolves.toEqual({
+      accepted: true,
+      snapshot,
+      terminalEventDelivered: false,
+      expected: {
+        requestId,
+        status: "failed",
+        lastSeq: 1,
+        acceptedText: "하나둘",
+        error,
+      },
+    });
+  });
+
+  it.each([
+    {
+      name: "missed delta sequence gap",
+      change: { lastSeq: 3, lastAckedSeq: 1, inFlight: 2 },
+      mismatch: "lastSeq",
+    },
+    {
+      name: "text receipt mismatch",
+      change: { textSha256: "0".repeat(64) },
+      mismatch: "textSha256",
+    },
+    {
+      name: "wrong request",
+      change: { requestId: "request-2" },
+      mismatch: "requestId",
+    },
+  ])("fails closed for $name", async ({ change, mismatch }) => {
+    const state = stateAfterAcceptedText();
+    const snapshot = {
+      ...base,
+      status: "completed",
+      lastSeq: 2,
+      lastAckedSeq: 1,
+      inFlight: 1,
+      error: null,
+      ...change,
+    };
+
+    await expect(validateTerminalRecoverySnapshot(snapshot, state)).resolves.toMatchObject({
+      accepted: false,
+      mismatches: expect.arrayContaining([mismatch]),
+    });
+  });
+
+  it("rejects a nonterminal recovery snapshot", async () => {
+    const state = stateAfterAcceptedText();
+    await expect(
+      validateTerminalRecoverySnapshot(
+        {
+          ...base,
+          status: "streaming",
+          lastSeq: 1,
+          lastAckedSeq: 1,
+          inFlight: 0,
+          error: null,
+        },
+        state,
+      ),
+    ).resolves.toMatchObject({ accepted: false, mismatches: ["status"] });
+  });
+
+  it("validates the exact release response schema", () => {
+    expect(
+      validateReleaseStreamResponse({ requestId, released: true }, requestId),
+    ).toEqual({ accepted: true });
+    expect(
+      validateReleaseStreamResponse(
+        { requestId, released: true, ignored: true },
+        requestId,
+      ),
+    ).toMatchObject({ accepted: false });
+    expect(
+      validateReleaseStreamResponse(
+        { requestId: "request-2", released: true },
+        requestId,
+      ),
+    ).toMatchObject({ accepted: false });
   });
 });

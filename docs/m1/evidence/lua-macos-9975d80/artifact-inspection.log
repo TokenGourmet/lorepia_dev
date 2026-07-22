@@ -1,0 +1,86 @@
++zsh:2> date -u +%Y-%m-%dT%H:%M:%SZ
+2026-07-18T23:03:16Z
++zsh:3> lua_app_path='/private/tmp/lorepia-lua-fix-macos.qMTSNB/spikes/lua-limits/src-tauri/target/debug/bundle/macos/LorePia Lua Limits Spike.app'
++zsh:4> lua_executable='/private/tmp/lorepia-lua-fix-macos.qMTSNB/spikes/lua-limits/src-tauri/target/debug/bundle/macos/LorePia Lua Limits Spike.app/Contents/MacOS/lorepia-lua-limits-spike'
++zsh:5> test -d '/private/tmp/lorepia-lua-fix-macos.qMTSNB/spikes/lua-limits/src-tauri/target/debug/bundle/macos/LorePia Lua Limits Spike.app'
++zsh:6> test -f '/private/tmp/lorepia-lua-fix-macos.qMTSNB/spikes/lua-limits/src-tauri/target/debug/bundle/macos/LorePia Lua Limits Spike.app/Contents/MacOS/lorepia-lua-limits-spike'
++zsh:7> du -sk '/private/tmp/lorepia-lua-fix-macos.qMTSNB/spikes/lua-limits/src-tauri/target/debug/bundle/macos/LorePia Lua Limits Spike.app'
+30136	/private/tmp/lorepia-lua-fix-macos.qMTSNB/spikes/lua-limits/src-tauri/target/debug/bundle/macos/LorePia Lua Limits Spike.app
++zsh:8> find '/private/tmp/lorepia-lua-fix-macos.qMTSNB/spikes/lua-limits/src-tauri/target/debug/bundle/macos/LorePia Lua Limits Spike.app' -type f
++zsh:8> wc -l
+       3
++zsh:9> stat -f '%z %N' '/private/tmp/lorepia-lua-fix-macos.qMTSNB/spikes/lua-limits/src-tauri/target/debug/bundle/macos/LorePia Lua Limits Spike.app/Contents/MacOS/lorepia-lua-limits-spike' '/private/tmp/lorepia-lua-fix-macos.qMTSNB/spikes/lua-limits/src-tauri/target/debug/bundle/macos/LorePia Lua Limits Spike.app/Contents/Info.plist'
+30749992 /private/tmp/lorepia-lua-fix-macos.qMTSNB/spikes/lua-limits/src-tauri/target/debug/bundle/macos/LorePia Lua Limits Spike.app/Contents/MacOS/lorepia-lua-limits-spike
+1021 /private/tmp/lorepia-lua-fix-macos.qMTSNB/spikes/lua-limits/src-tauri/target/debug/bundle/macos/LorePia Lua Limits Spike.app/Contents/Info.plist
++zsh:10> shasum -a 256 '/private/tmp/lorepia-lua-fix-macos.qMTSNB/spikes/lua-limits/src-tauri/target/debug/bundle/macos/LorePia Lua Limits Spike.app/Contents/MacOS/lorepia-lua-limits-spike' '/private/tmp/lorepia-lua-fix-macos.qMTSNB/spikes/lua-limits/src-tauri/target/debug/bundle/macos/LorePia Lua Limits Spike.app/Contents/Info.plist'
+02785a6cfd66ca0d5eae80bad3933c8c478ba561a5efb8a8c8f623cfb4b69684  /private/tmp/lorepia-lua-fix-macos.qMTSNB/spikes/lua-limits/src-tauri/target/debug/bundle/macos/LorePia Lua Limits Spike.app/Contents/MacOS/lorepia-lua-limits-spike
+4c60322f9011f5c13f7a904010f263adffd643b9261ea3a8de45b78ca95daf04  /private/tmp/lorepia-lua-fix-macos.qMTSNB/spikes/lua-limits/src-tauri/target/debug/bundle/macos/LorePia Lua Limits Spike.app/Contents/Info.plist
++zsh:11> file '/private/tmp/lorepia-lua-fix-macos.qMTSNB/spikes/lua-limits/src-tauri/target/debug/bundle/macos/LorePia Lua Limits Spike.app/Contents/MacOS/lorepia-lua-limits-spike'
+/private/tmp/lorepia-lua-fix-macos.qMTSNB/spikes/lua-limits/src-tauri/target/debug/bundle/macos/LorePia Lua Limits Spike.app/Contents/MacOS/lorepia-lua-limits-spike: Mach-O 64-bit executable arm64
++zsh:12> plutil -p '/private/tmp/lorepia-lua-fix-macos.qMTSNB/spikes/lua-limits/src-tauri/target/debug/bundle/macos/LorePia Lua Limits Spike.app/Contents/Info.plist'
+{
+  "CFBundleDevelopmentRegion" => "English"
+  "CFBundleDisplayName" => "LorePia Lua Limits Spike"
+  "CFBundleExecutable" => "lorepia-lua-limits-spike"
+  "CFBundleIconFile" => "icon.icns"
+  "CFBundleIdentifier" => "dev.lorepia.spike.lualimits"
+  "CFBundleInfoDictionaryVersion" => "6.0"
+  "CFBundleName" => "LorePia Lua Limits Spike"
+  "CFBundlePackageType" => "APPL"
+  "CFBundleShortVersionString" => "0.1.0"
+  "CFBundleVersion" => "0.1.0"
+  "CSResourcesFileMapped" => true
+  "LSMinimumSystemVersion" => "10.13"
+  "LSRequiresCarbon" => true
+  "NSHighResolutionCapable" => true
+}
++zsh:13> /usr/bin/codesign -dv '--verbose=4' '/private/tmp/lorepia-lua-fix-macos.qMTSNB/spikes/lua-limits/src-tauri/target/debug/bundle/macos/LorePia Lua Limits Spike.app'
+Executable=/private/tmp/lorepia-lua-fix-macos.qMTSNB/spikes/lua-limits/src-tauri/target/debug/bundle/macos/LorePia Lua Limits Spike.app/Contents/MacOS/lorepia-lua-limits-spike
+Identifier=lorepia_lua_limits_spike-c21b4c2d51426571
+Format=app bundle with Mach-O thin (arm64)
+CodeDirectory v=20400 size=238530 flags=0x20002(adhoc,linker-signed) hashes=7450+0 location=embedded
+VersionPlatform=1
+VersionMin=720896
+VersionSDK=1705216
+Hash type=sha256 size=32
+CandidateCDHash sha256=0328ee293f3f1cd9b41d38434976f06ece5326d8
+CandidateCDHashFull sha256=0328ee293f3f1cd9b41d38434976f06ece5326d8e135a95446eb355f2426ebfd
+Hash choices=sha256
+CMSDigest=0328ee293f3f1cd9b41d38434976f06ece5326d8e135a95446eb355f2426ebfd
+CMSDigestType=2
+Executable Segment base=0
+Executable Segment limit=9298004
+Executable Segment flags=0x1
+Page size=4096
+CDHash=0328ee293f3f1cd9b41d38434976f06ece5326d8
+Signature=adhoc
+Info.plist=not bound
+TeamIdentifier=not set
+Sealed Resources=none
+Internal requirements=none
++zsh:14> set +e
++zsh:15> /usr/bin/codesign --verify --deep --strict '--verbose=4' '/private/tmp/lorepia-lua-fix-macos.qMTSNB/spikes/lua-limits/src-tauri/target/debug/bundle/macos/LorePia Lua Limits Spike.app'
+/private/tmp/lorepia-lua-fix-macos.qMTSNB/spikes/lua-limits/src-tauri/target/debug/bundle/macos/LorePia Lua Limits Spike.app: code has no resources but signature indicates they must be present
++zsh:16> lua_codesign_exit=1
++zsh:17> set -e
++zsh:18> printf 'strict_deep_codesign_exit=%s\n' 1
+strict_deep_codesign_exit=1
++zsh:19> cd '/private/tmp/lorepia-lua-fix-macos.qMTSNB/spikes/lua-limits/src-tauri/target/debug/bundle/macos/LorePia Lua Limits Spike.app'
++zsh:20> find Contents -type f -print
++zsh:20> LC_ALL=C sort
++zsh:20> IFS='' +zsh:20> read -r lua_file
++zsh:20> tee /private/tmp/lorepia-lua-fix-macos-evidence.U7uFKc/bundle-manifest.sha256
++zsh:20> shasum -a 256 Contents/Info.plist
+4c60322f9011f5c13f7a904010f263adffd643b9261ea3a8de45b78ca95daf04  Contents/Info.plist
++zsh:20> IFS='' +zsh:20> read -r lua_file
++zsh:20> shasum -a 256 Contents/MacOS/lorepia-lua-limits-spike
+02785a6cfd66ca0d5eae80bad3933c8c478ba561a5efb8a8c8f623cfb4b69684  Contents/MacOS/lorepia-lua-limits-spike
++zsh:20> IFS='' +zsh:20> read -r lua_file
++zsh:20> shasum -a 256 Contents/Resources/icon.icns
+3dc10493b7de48a61de58f768f8a5708d3a44a068c148cedf0502b9b9b71ba5d  Contents/Resources/icon.icns
++zsh:20> IFS='' +zsh:20> read -r lua_file
++zsh:21> cd /private/tmp/lorepia-lua-fix-macos-evidence.U7uFKc
++zsh:22> shasum -a 256 bundle-manifest.sha256
+4590ed35b39c012dff47ea8afbb0c9333775a1abc1e3cc0f256995665b3d1903  bundle-manifest.sha256
++zsh:23> date -u +%Y-%m-%dT%H:%M:%SZ
+2026-07-18T23:03:16Z

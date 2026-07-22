@@ -1,0 +1,89 @@
+
+> @lorepia/spike-lua-limits@0.1.0 tauri
+> tauri ios build --debug --target aarch64-sim --ci --no-sign
+
+        Warn No code signing certificates found. You must add one and set the certificate development team ID on the `bundle > iOS > developmentTeam` config value or the `APPLE_DEVELOPMENT_TEAM` environment variable. To list the available certificates, run `tauri info`.
+        Info Looking up installed tauri packages to check mismatched versions...
+     Running beforeBuildCommand `npm run build`
+
+> @lorepia/spike-lua-limits@0.1.0 build
+> vite build
+
+vite v8.1.5 building ssr environment for production...
+transforming...✓ 148 modules transformed.
+rendering chunks...
+vite v8.1.5 building client environment for production...
+transforming...✓ 159 modules transformed.
+rendering chunks...
+computing gzip size...
+.svelte-kit/output/client/_app/version.json                        0.02 kB │ gzip:  0.04 kB
+.svelte-kit/output/client/.vite/manifest.json                      2.28 kB │ gzip:  0.48 kB
+.svelte-kit/output/client/_app/immutable/chunks/xihTtKlq.js        0.06 kB │ gzip:  0.08 kB
+.svelte-kit/output/client/_app/immutable/entry/start.BxhjZQXd.js   0.07 kB │ gzip:  0.08 kB
+.svelte-kit/output/client/_app/immutable/nodes/0.DuWwUfcX.js       0.21 kB │ gzip:  0.18 kB
+.svelte-kit/output/client/_app/immutable/nodes/1.DRXKSJEl.js       0.62 kB │ gzip:  0.35 kB
+.svelte-kit/output/client/_app/immutable/chunks/Bjy-W4x2.js        1.36 kB │ gzip:  0.65 kB
+.svelte-kit/output/client/_app/immutable/entry/app.DGhKB1WC.js     3.92 kB │ gzip:  1.82 kB
+.svelte-kit/output/client/_app/immutable/nodes/2.DZmmu01Z.js       6.29 kB │ gzip:  2.81 kB
+.svelte-kit/output/client/_app/immutable/chunks/d-bMJCkh.js       26.68 kB │ gzip: 10.32 kB
+.svelte-kit/output/client/_app/immutable/chunks/C4DT2ZEi.js       36.72 kB │ gzip: 14.06 kB
+
+✓ built in 145ms
+computing gzip size...
+.svelte-kit/output/server/.vite/manifest.json                   2.94 kB │ gzip:  0.51 kB
+.svelte-kit/output/server/entries/pages/_layout.ts.js           0.07 kB │ gzip:  0.09 kB
+.svelte-kit/output/server/env.js                                0.22 kB │ gzip:  0.14 kB
+.svelte-kit/output/server/entries/fallbacks/layout.svelte.js    0.28 kB │ gzip:  0.21 kB
+.svelte-kit/output/server/chunks/env.js                         0.28 kB │ gzip:  0.17 kB
+.svelte-kit/output/server/internal.js                           0.40 kB │ gzip:  0.19 kB
+.svelte-kit/output/server/entries/pages/_page.svelte.js         0.72 kB │ gzip:  0.46 kB
+.svelte-kit/output/server/chunks/internal2.js                   0.87 kB │ gzip:  0.38 kB
+.svelte-kit/output/server/entries/fallbacks/error.svelte.js     5.12 kB │ gzip:  1.97 kB
+.svelte-kit/output/server/chunks/exports.js                     9.00 kB │ gzip:  2.96 kB
+.svelte-kit/output/server/chunks/shared.js                     10.57 kB │ gzip:  3.38 kB
+.svelte-kit/output/server/chunks/internal.js                   25.41 kB │ gzip:  7.86 kB
+.svelte-kit/output/server/chunks/utils.js                      31.76 kB │ gzip:  9.35 kB
+.svelte-kit/output/server/remote-entry.js                      54.47 kB │ gzip: 12.01 kB
+.svelte-kit/output/server/index.js                            125.81 kB │ gzip: 31.88 kB
+.svelte-kit/output/server/chunks/server.js                    126.32 kB │ gzip: 32.77 kB
+
+[PLUGIN_TIMINGS] Your build spent significant time in plugins. Here is a breakdown:
+  - vite-plugin-sveltekit-guard (82%)
+  - vite-plugin-sveltekit-compile (13%)
+See https://rolldown.rs/reference/InputOptions.checks#plugintimings for more details.
+
+✓ built in 3.33s
+
+Run npm run preview to preview your production build locally.
+
+> Using @sveltejs/adapter-static
+  Wrote site to "build"
+  ✔ done
+Setting version of project lorepia-lua-limits-spike to:
+    0.1.0.
+
+Also setting CFBundleVersion key (assuming it exists)
+
+Updating CFBundleVersion in Info.plist(s)...
+
+Updated CFBundleVersion in "lorepia-lua-limits-spike.xcodeproj/../lorepia-lua-limits-spike_iOS/Info.plist" to 0.1.0
+
+
+--- xcodebuild: WARNING: Using the first of multiple matching destinations:
+{ platform:iOS Simulator, id:dvtdevice-DVTiOSDeviceSimulatorPlaceholder-iphonesimulator:placeholder, name:Any iOS Simulator Device }
+{ platform:iOS, id:dvtdevice-DVTiPhonePlaceholder-iphoneos:placeholder, name:Any iOS Device }
+{ platform:iOS Simulator, arch:arm64, id:[REDACTED_DEVICE_ID], OS:26.5, name:iPad (A16) }
+{ platform:iOS Simulator, arch:arm64, id:[REDACTED_DEVICE_ID], OS:26.5, name:iPad Air 11-inch (M4) }
+{ platform:iOS Simulator, arch:arm64, id:[REDACTED_DEVICE_ID], OS:26.5, name:iPad Air 13-inch (M4) }
+{ platform:iOS Simulator, arch:arm64, id:[REDACTED_DEVICE_ID], OS:26.5, name:iPad Pro 11-inch (M5) }
+{ platform:iOS Simulator, arch:arm64, id:[REDACTED_DEVICE_ID], OS:26.5, name:iPad Pro 13-inch (M5) }
+{ platform:iOS Simulator, arch:arm64, id:[REDACTED_DEVICE_ID], OS:26.5, name:iPad mini (A17 Pro) }
+{ platform:iOS Simulator, arch:arm64, id:[REDACTED_DEVICE_ID], OS:26.5, name:iPhone 17 }
+{ platform:iOS Simulator, arch:arm64, id:[REDACTED_DEVICE_ID], OS:26.5, name:iPhone 17 Pro }
+{ platform:iOS Simulator, arch:arm64, id:[REDACTED_DEVICE_ID], OS:26.5, name:iPhone 17 Pro Max }
+{ platform:iOS Simulator, arch:arm64, id:[REDACTED_DEVICE_ID], OS:26.5, name:iPhone 17e }
+{ platform:iOS Simulator, arch:arm64, id:[REDACTED_DEVICE_ID], OS:26.5, name:iPhone Air }
+{ platform:macOS, arch:arm64, variant:Designed for [iPad,iPhone], id:[REDACTED_DEVICE_ID], name:My Mac }
+        Info connection; remote_addr=127.0.0.1:53339 conn_id=0
+    Finished 1 iOS Bundle at:
+        [WORKTREE]/spikes/lua-limits/src-tauri/gen/apple/build/arm64-sim/LorePia Lua Limits Spike.app

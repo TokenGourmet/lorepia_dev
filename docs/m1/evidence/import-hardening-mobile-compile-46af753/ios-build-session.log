@@ -1,0 +1,158 @@
+IOS_SESSION_START=2026-07-18T22:21:53Z
+46af7539dfc564ba2fc4c8009401878965799fc3
+rustc 1.97.1 (8bab26f4f 2026-07-14)
+binary: rustc
+commit-hash: 8bab26f4f68e0e26f0bb7960be334d5b520ea452
+commit-date: 2026-07-14
+host: aarch64-apple-darwin
+release: 1.97.1
+LLVM version: 22.1.6
+Xcode 26.6
+Build version 17F113
+1.16.2
+
+added 87 packages, and audited 88 packages in 1s
+
+21 packages are looking for funding
+  run `npm fund` for details
+
+3 low severity vulnerabilities
+
+To address all issues (including breaking changes), run:
+  npm audit fix --force
+
+Run `npm audit` for details.
+
+> @lorepia/spike-import-hardening@0.1.0 tauri
+> tauri ios init --ci
+
+        Warn No code signing certificates found. You must add one and set the certificate development team ID on the `bundle > iOS > developmentTeam` config value or the `APPLE_DEVELOPMENT_TEAM` environment variable. To list the available certificates, run `tauri info`.
+/opt/homebrew/bin/xcodegen
+/opt/homebrew/bin/idevicesyslog
+/opt/homebrew/bin/pod
+Outdated dependencies:
+  - `cocoapods` is at 1.16.2_2; latest version is 1.17.0
+  - `xcodegen` is at 2.45.4; latest version is 2.46.0
+        Info "/private/tmp/lorepia-import-evidence.DTpYl8/worktree/spikes/import-hardening/src-tauri" relative to "/private/tmp/lorepia-import-evidence.DTpYl8/worktree/spikes/import-hardening/src-tauri/gen/apple" is "../../"
+Generating Xcode project...
+⚙️  Generating plists...
+⚙️  Generating project...
+⚙️  Writing project...
+Created project at /tmp/lorepia-import-evidence.DTpYl8/worktree/spikes/import-hardening/src-tauri/gen/apple/lorepia-import-hardening-spike.xcodeproj
+victory: Project generated successfully!
+    Make cool apps! 🌻 🐕 🎉
+
+> @lorepia/spike-import-hardening@0.1.0 tauri
+> tauri ios build --debug --target aarch64-sim --ci --no-sign
+
+        Warn No code signing certificates found. You must add one and set the certificate development team ID on the `bundle > iOS > developmentTeam` config value or the `APPLE_DEVELOPMENT_TEAM` environment variable. To list the available certificates, run `tauri info`.
+        Info Looking up installed tauri packages to check mismatched versions...
+     Running beforeBuildCommand `npm run build`
+
+> @lorepia/spike-import-hardening@0.1.0 build
+> vite build
+
+vite v8.1.5 building ssr environment for production...
+
+✓ 148 modules transformed.
+
+rendering chunks (1)...
+rendering chunks (2)...
+rendering chunks (3)...
+rendering chunks (4)...
+rendering chunks (5)...
+rendering chunks (6)...
+rendering chunks (7)...
+rendering chunks (8)...
+rendering chunks (9)...
+rendering chunks (10)...
+rendering chunks (11)...
+rendering chunks (12)...
+rendering chunks (13)...
+rendering chunks (14)...
+rendering chunks (15)...
+vite v8.1.5 building client environment for production...
+
+✓ 159 modules transformed.
+
+rendering chunks (1)...
+rendering chunks (2)...
+rendering chunks (3)...
+rendering chunks (4)...
+rendering chunks (5)...
+rendering chunks (6)...
+rendering chunks (7)...
+rendering chunks (8)...
+rendering chunks (9)...
+computing gzip size...
+
+.svelte-kit/output/client/_app/version.json                        0.02 kB │ gzip:  0.04 kB
+.svelte-kit/output/client/.vite/manifest.json                      2.28 kB │ gzip:  0.47 kB
+.svelte-kit/output/client/_app/immutable/chunks/xihTtKlq.js        0.06 kB │ gzip:  0.08 kB
+.svelte-kit/output/client/_app/immutable/entry/start.CfnXrSDc.js   0.07 kB │ gzip:  0.08 kB
+.svelte-kit/output/client/_app/immutable/nodes/0.DuWwUfcX.js       0.21 kB │ gzip:  0.18 kB
+.svelte-kit/output/client/_app/immutable/nodes/1.BPdF80ZW.js       0.62 kB │ gzip:  0.35 kB
+.svelte-kit/output/client/_app/immutable/chunks/Bjy-W4x2.js        1.36 kB │ gzip:  0.65 kB
+.svelte-kit/output/client/_app/immutable/entry/app.dmmP8goc.js     3.92 kB │ gzip:  1.82 kB
+.svelte-kit/output/client/_app/immutable/nodes/2.BNUF49-s.js      11.03 kB │ gzip:  4.23 kB
+.svelte-kit/output/client/_app/immutable/chunks/ImOTa4t8.js       26.68 kB │ gzip: 10.32 kB
+.svelte-kit/output/client/_app/immutable/chunks/C4DT2ZEi.js       36.72 kB │ gzip: 14.06 kB
+
+✓ built in 58ms
+computing gzip size...
+
+.svelte-kit/output/server/.vite/manifest.json                   2.94 kB │ gzip:  0.51 kB
+.svelte-kit/output/server/entries/pages/_layout.ts.js           0.07 kB │ gzip:  0.09 kB
+.svelte-kit/output/server/env.js                                0.22 kB │ gzip:  0.14 kB
+.svelte-kit/output/server/entries/fallbacks/layout.svelte.js    0.28 kB │ gzip:  0.21 kB
+.svelte-kit/output/server/chunks/env.js                         0.28 kB │ gzip:  0.17 kB
+.svelte-kit/output/server/internal.js                           0.40 kB │ gzip:  0.19 kB
+.svelte-kit/output/server/chunks/internal2.js                   0.87 kB │ gzip:  0.38 kB
+.svelte-kit/output/server/entries/pages/_page.svelte.js         1.17 kB │ gzip:  0.70 kB
+.svelte-kit/output/server/entries/fallbacks/error.svelte.js     5.12 kB │ gzip:  1.97 kB
+.svelte-kit/output/server/chunks/exports.js                     9.00 kB │ gzip:  2.96 kB
+.svelte-kit/output/server/chunks/shared.js                     10.57 kB │ gzip:  3.38 kB
+.svelte-kit/output/server/chunks/internal.js                   25.42 kB │ gzip:  7.86 kB
+.svelte-kit/output/server/chunks/utils.js                      31.76 kB │ gzip:  9.35 kB
+.svelte-kit/output/server/remote-entry.js                      54.47 kB │ gzip: 12.01 kB
+.svelte-kit/output/server/index.js                            125.81 kB │ gzip: 31.88 kB
+.svelte-kit/output/server/chunks/server.js                    126.32 kB │ gzip: 32.77 kB
+
+✓ built in 842ms
+
+Run npm run preview to preview your production build locally.
+
+> Using @sveltejs/adapter-static
+  Wrote site to "build"
+  ✔ done
+Setting version of project lorepia-import-hardening-spike to:
+    0.1.0.
+
+Also setting CFBundleVersion key (assuming it exists)
+
+Updating CFBundleVersion in Info.plist(s)...
+
+Updated CFBundleVersion in "lorepia-import-hardening-spike.xcodeproj/../lorepia-import-hardening-spike_iOS/Info.plist" to 0.1.0
+
+
+--- xcodebuild: WARNING: Using the first of multiple matching destinations:
+{ platform:iOS Simulator, id:[REDACTED_DEVICE_ID], name:Any iOS Simulator Device }
+{ platform:iOS, id:[REDACTED_DEVICE_ID], name:Any iOS Device }
+{ platform:iOS Simulator, arch:arm64, id:[REDACTED_DEVICE_ID], OS:26.5, name:iPad (A16) }
+{ platform:iOS Simulator, arch:arm64, id:[REDACTED_DEVICE_ID], OS:26.5, name:iPad Air 11-inch (M4) }
+{ platform:iOS Simulator, arch:arm64, id:[REDACTED_DEVICE_ID], OS:26.5, name:iPad Air 13-inch (M4) }
+{ platform:iOS Simulator, arch:arm64, id:[REDACTED_DEVICE_ID], OS:26.5, name:iPad Pro 11-inch (M5) }
+{ platform:iOS Simulator, arch:arm64, id:[REDACTED_DEVICE_ID], OS:26.5, name:iPad Pro 13-inch (M5) }
+{ platform:iOS Simulator, arch:arm64, id:[REDACTED_DEVICE_ID], OS:26.5, name:iPad mini (A17 Pro) }
+{ platform:iOS Simulator, arch:arm64, id:[REDACTED_DEVICE_ID], OS:26.5, name:iPhone 17 }
+{ platform:iOS Simulator, arch:arm64, id:[REDACTED_DEVICE_ID], OS:26.5, name:iPhone 17 Pro }
+{ platform:iOS Simulator, arch:arm64, id:[REDACTED_DEVICE_ID], OS:26.5, name:iPhone 17 Pro Max }
+{ platform:iOS Simulator, arch:arm64, id:[REDACTED_DEVICE_ID], OS:26.5, name:iPhone 17e }
+{ platform:iOS Simulator, arch:arm64, id:[REDACTED_DEVICE_ID], OS:26.5, name:iPhone Air }
+{ platform:macOS, arch:arm64, variant:Designed for [iPad,iPhone], id:[REDACTED_DEVICE_ID], name:My Mac }
+        Info connection; remote_addr=127.0.0.1:51386 conn_id=0
+    Finished 1 iOS Bundle at:
+        /private/tmp/lorepia-import-evidence.DTpYl8/worktree/spikes/import-hardening/src-tauri/gen/apple/build/arm64-sim/LorePia Import Hardening Spike.app
+
+IOS_SESSION_END=2026-07-18T22:23:11Z
+IOS_SESSION_EXIT=0

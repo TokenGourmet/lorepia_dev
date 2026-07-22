@@ -1,14 +1,38 @@
+mod host_broker;
+
+include!("app_commands.rs");
+
+macro_rules! generate_lorepia_handler {
+    ($($command:ident),+ $(,)?) => {
+        tauri::generate_handler![$($command),+]
+    };
+}
+
+macro_rules! lorepia_command_names {
+    ($($command:ident),+ $(,)?) => {
+        &[$(stringify!($command)),+]
+    };
+}
+
+const APP_COMMAND_NAMES: &[&str] = with_lorepia_app_commands!(lorepia_command_names);
+const COMMAND_SURFACE_VERSION: u32 = 3;
+
+use host_broker::{
+    AuthorizedAction, BrokerAction, BrokerError, HostBroker, RegistrationOutcome,
+    RegistrationPolicy, RotationOutcome, SystemMonotonicClock,
+};
 use serde::{Deserialize, Serialize};
+use sha2::{Digest, Sha256};
 use std::{
-    collections::{HashMap, VecDeque},
+    collections::{HashMap, HashSet, VecDeque},
     sync::{
         atomic::{AtomicBool, AtomicU64, Ordering},
         Arc, Mutex,
     },
-    time::Duration,
+    time::{Duration, Instant},
 };
 use tauri::{ipc::Channel, State};
-use tokio::sync::{Mutex as AsyncMutex, Notify};
+use tokio::sync::{watch, Mutex as AsyncMutex, Notify};
 
 const MIN_BATCH_WINDOW_MS: u64 = 16;
 const MAX_BATCH_WINDOW_MS: u64 = 50;
@@ -17,7 +41,27 @@ const DEFAULT_MAX_IN_FLIGHT: usize = 4;
 const DEFAULT_CHUNK_INTERVAL_MS: u64 = 8;
 const DEFAULT_ACK_TIMEOUT_MS: u64 = 1_000;
 const MAX_REQUESTS: usize = 128;
+const TERMINAL_RETENTION_TTL: Duration = Duration::from_secs(5 * 60);
 const NO_TERMINAL_SEQ: u64 = u64::MAX;
+const MAX_SEQUENCE: u64 = 9_007_199_254_740_991;
+const STREAM_REQUEST_ID_PREFIX: &str = "m1-channel-";
+const STREAM_REQUEST_ID_HEX_BYTES: usize = 16;
+const MAX_PLUGIN_HTML_BYTES: usize = host_broker::MAX_SANITIZE_HTML_BYTES;
+// Tauri 2.11 sends JSON Channel payloads smaller than 8192 bytes directly by
+// evaluating them in the destination WebView. Larger payloads are placed in a
+// process-global, numerically indexed fetch queue whose fetch command bypasses
+// normal ACL resolution. Keep every LorePia Channel event on the direct path so
+// an untrusted same-process WebView cannot race that queue.
+const TAURI_CHANNEL_JSON_DIRECT_THRESHOLD_BYTES: usize = 8_192;
+const LOREPIA_DIRECT_JSON_BUDGET_BYTES: usize = 4_096;
+const MAX_CHANNEL_REQUEST_ID: &str = "m1-channel-ffffffffffffffff";
+const _: () = assert!(LOREPIA_DIRECT_JSON_BUDGET_BYTES < TAURI_CHANNEL_JSON_DIRECT_THRESHOLD_BYTES);
+const _: () = assert!(
+    MAX_CHANNEL_REQUEST_ID.len() == STREAM_REQUEST_ID_PREFIX.len() + STREAM_REQUEST_ID_HEX_BYTES
+);
+
+static HOST_BROKER_PROBE_CALLS: AtomicU64 = AtomicU64::new(0);
+static HOST_BROKER_SANITIZE_CALLS: AtomicU64 = AtomicU64::new(0);
 
 #[derive(Debug, Clone, Serialize, PartialEq, Eq)]
 #[serde(rename_all = "camelCase")]
@@ -29,10 +73,23 @@ struct StreamFailure {
 impl StreamFailure {
     fn new(code: impl Into<String>, message: impl Into<String>) -> Self {
         Self {
-            code: code.into(),
-            message: message.into(),
+            code: truncate_utf8(code.into(), 64),
+            message: truncate_utf8(message.into(), 512),
         }
     }
+}
+
+fn truncate_utf8(mut value: String, max_bytes: usize) -> String {
+    if value.len() <= max_bytes {
+        return value;
+    }
+
+    let mut end = max_bytes;
+    while !value.is_char_boundary(end) {
+        end -= 1;
+    }
+    value.truncate(end);
+    value
 }
 
 #[derive(Debug, Clone, Serialize, PartialEq, Eq)]
@@ -56,19 +113,55 @@ enum StreamEvent {
     Completed {
         request_id: String,
         seq: u64,
-        text: String,
     },
     Cancelled {
         request_id: String,
         seq: u64,
-        partial_text: String,
     },
     Failed {
         request_id: String,
         seq: u64,
-        partial_text: String,
         error: StreamFailure,
     },
+}
+
+fn serialized_json_len(value: &impl Serialize) -> Option<usize> {
+    serde_json::to_vec(value).ok().map(|encoded| encoded.len())
+}
+
+fn serialized_channel_event_len(event: &StreamEvent) -> Option<usize> {
+    serialized_json_len(event)
+}
+
+fn json_value_uses_direct_path(value: &impl Serialize) -> bool {
+    serialized_json_len(value).is_some_and(|len| len <= LOREPIA_DIRECT_JSON_BUDGET_BYTES)
+}
+
+fn channel_event_uses_direct_path(event: &StreamEvent) -> bool {
+    json_value_uses_direct_path(event)
+}
+
+fn direct_delta_fits(text: &str) -> bool {
+    channel_event_uses_direct_path(&StreamEvent::Delta {
+        request_id: MAX_CHANNEL_REQUEST_ID.to_owned(),
+        seq: MAX_SEQUENCE,
+        text: text.to_owned(),
+    })
+}
+
+fn send_direct_channel_event(
+    channel: &Channel<StreamEvent>,
+    event: StreamEvent,
+) -> Result<(), String> {
+    let Some(encoded_len) = serialized_channel_event_len(&event) else {
+        return Err("failed to serialize Channel event".to_owned());
+    };
+    if encoded_len > LOREPIA_DIRECT_JSON_BUDGET_BYTES {
+        return Err(format!(
+            "Channel event is {encoded_len} bytes; LorePia direct-execute budget is {LOREPIA_DIRECT_JSON_BUDGET_BYTES} bytes"
+        ));
+    }
+    channel.send(event).map_err(|error| error.to_string())
 }
 
 #[derive(Debug, Clone, Deserialize, Default)]
@@ -121,6 +214,11 @@ impl TryFrom<StreamConfig> for ValidatedConfig {
         if chunks.is_empty() || chunks.len() > 4_096 {
             return Err(CommandError::invalid_config(
                 "chunks must contain between 1 and 4096 entries",
+            ));
+        }
+        if chunks.iter().any(String::is_empty) {
+            return Err(CommandError::invalid_config(
+                "chunks must not contain empty strings",
             ));
         }
         if chunks.iter().any(|chunk| chunk.len() > 16_384) {
@@ -205,8 +303,8 @@ impl StreamStatus {
 struct StreamMachine {
     request_id: String,
     status: StreamStatus,
-    last_seq: u64,
-    last_acked_seq: i64,
+    last_seq: Option<u64>,
+    last_acked_seq: Option<u64>,
     text: String,
     error: Option<StreamFailure>,
     batch_window_ms: u64,
@@ -220,8 +318,8 @@ impl StreamMachine {
         Self {
             request_id,
             status: StreamStatus::Queued,
-            last_seq: 0,
-            last_acked_seq: -1,
+            last_seq: None,
+            last_acked_seq: None,
             text: String::new(),
             error: None,
             batch_window_ms: config.batch_window_ms,
@@ -232,7 +330,9 @@ impl StreamMachine {
     }
 
     fn in_flight(&self) -> usize {
-        (self.last_seq as i64 - self.last_acked_seq).max(0) as usize
+        let emitted = self.last_seq.map_or(0, |seq| seq + 1);
+        let acknowledged = self.last_acked_seq.map_or(0, |seq| seq + 1);
+        usize::try_from(emitted.saturating_sub(acknowledged)).unwrap_or(usize::MAX)
     }
 
     fn has_data_capacity(&self) -> bool {
@@ -245,28 +345,46 @@ impl StreamMachine {
         self.in_flight() < self.max_in_flight
     }
 
+    fn advance_sequence(&mut self) -> Result<u64, CommandError> {
+        let next = match self.last_seq {
+            Some(last) => last
+                .checked_add(1)
+                .ok_or_else(CommandError::sequence_exhausted)?,
+            None => 0,
+        };
+        if next > MAX_SEQUENCE {
+            return Err(CommandError::sequence_exhausted());
+        }
+        self.last_seq = Some(next);
+        Ok(next)
+    }
+
     fn start(&mut self) -> Result<StreamEvent, CommandError> {
         if self.status != StreamStatus::Queued {
             return Err(CommandError::invalid_state("stream already started"));
         }
+        let seq = self.advance_sequence()?;
         self.status = StreamStatus::Streaming;
         Ok(StreamEvent::Started {
             request_id: self.request_id.clone(),
-            seq: 0,
+            seq,
             batch_window_ms: self.batch_window_ms,
             max_in_flight: self.max_in_flight,
         })
     }
 
-    fn acknowledge(&mut self, seq: u64) -> Result<(), CommandError> {
-        if seq > self.last_seq {
+    fn acknowledge(&mut self, seq: u64) -> Result<u64, CommandError> {
+        let last_seq = self.last_seq.ok_or_else(|| {
+            CommandError::invalid_ack("cannot acknowledge before the first event is emitted")
+        })?;
+        if seq > last_seq {
             return Err(CommandError::invalid_ack(format!(
-                "seq {seq} has not been emitted; last emitted seq is {}",
-                self.last_seq
+                "seq {seq} has not been emitted; last emitted seq is {last_seq}"
             )));
         }
-        self.last_acked_seq = self.last_acked_seq.max(seq as i64);
-        Ok(())
+        let acknowledged_through = self.last_acked_seq.map_or(seq, |last| last.max(seq));
+        self.last_acked_seq = Some(acknowledged_through);
+        Ok(acknowledged_through)
     }
 
     fn apply_pressure(&mut self) {
@@ -283,14 +401,17 @@ impl StreamMachine {
 
     fn delta(&mut self, text: String) -> Result<StreamEvent, CommandError> {
         self.ensure_data_allowed()?;
+        if text.is_empty() {
+            return Err(CommandError::invalid_state("delta text must not be empty"));
+        }
         if !self.has_data_capacity() {
             return Err(CommandError::backpressure());
         }
-        self.last_seq += 1;
+        let seq = self.advance_sequence()?;
         self.text.push_str(&text);
         Ok(StreamEvent::Delta {
             request_id: self.request_id.clone(),
-            seq: self.last_seq,
+            seq,
             text,
         })
     }
@@ -302,23 +423,21 @@ impl StreamMachine {
                 "completion is not allowed after cancellation is accepted",
             ));
         }
+        let seq = self.advance_sequence()?;
         self.status = StreamStatus::Completed;
-        self.last_seq += 1;
         Ok(StreamEvent::Completed {
             request_id: self.request_id.clone(),
-            seq: self.last_seq,
-            text: self.text.clone(),
+            seq,
         })
     }
 
     fn cancel(&mut self) -> Result<StreamEvent, CommandError> {
         self.ensure_terminal_allowed()?;
+        let seq = self.advance_sequence()?;
         self.status = StreamStatus::Cancelled;
-        self.last_seq += 1;
         Ok(StreamEvent::Cancelled {
             request_id: self.request_id.clone(),
-            seq: self.last_seq,
-            partial_text: self.text.clone(),
+            seq,
         })
     }
 
@@ -329,13 +448,12 @@ impl StreamMachine {
                 "failure is not allowed after cancellation is accepted",
             ));
         }
+        let seq = self.advance_sequence()?;
         self.status = StreamStatus::Failed;
         self.error = Some(failure.clone());
-        self.last_seq += 1;
         Ok(StreamEvent::Failed {
             request_id: self.request_id.clone(),
-            seq: self.last_seq,
-            partial_text: self.text.clone(),
+            seq,
             error: failure,
         })
     }
@@ -368,7 +486,8 @@ impl StreamMachine {
             last_seq: self.last_seq,
             last_acked_seq: self.last_acked_seq,
             in_flight: self.in_flight(),
-            text: self.text.clone(),
+            text_bytes: self.text.len(),
+            text_sha256: format!("{:x}", Sha256::digest(self.text.as_bytes())),
             error: self.error.clone(),
             batch_window_ms: self.batch_window_ms,
             effective_batch_window_ms: self.effective_batch_window_ms,
@@ -380,59 +499,102 @@ impl StreamMachine {
 struct StreamRequest {
     machine: AsyncMutex<StreamMachine>,
     notify: Notify,
+    terminal_signal: watch::Sender<bool>,
+    terminal_waiter_active: AtomicBool,
     terminal_seq: AtomicU64,
     terminal_acked: AtomicBool,
     terminal_snapshot_returned: AtomicBool,
-    channel_delivery_impossible: AtomicBool,
+    control_plane_only_terminal: AtomicBool,
+    terminal_reached_at: Mutex<Option<Instant>>,
     evictable: AtomicBool,
 }
 
 impl StreamRequest {
     fn new(machine: StreamMachine) -> Self {
+        let (terminal_signal, _terminal_receiver) = watch::channel(false);
         Self {
             machine: AsyncMutex::new(machine),
             notify: Notify::new(),
+            terminal_signal,
+            terminal_waiter_active: AtomicBool::new(false),
             terminal_seq: AtomicU64::new(NO_TERMINAL_SEQ),
             terminal_acked: AtomicBool::new(false),
             terminal_snapshot_returned: AtomicBool::new(false),
-            channel_delivery_impossible: AtomicBool::new(false),
+            control_plane_only_terminal: AtomicBool::new(false),
+            terminal_reached_at: Mutex::new(None),
             evictable: AtomicBool::new(false),
         }
     }
 
     fn record_terminal_delivery(&self, seq: u64) {
         self.terminal_seq.store(seq, Ordering::Release);
+        self.signal_terminal();
     }
 
-    fn record_acknowledged_through(&self, acknowledged_through: i64) {
+    fn record_acknowledged_through(&self, acknowledged_through: u64) {
         let terminal_seq = self.terminal_seq.load(Ordering::Acquire);
-        if terminal_seq != NO_TERMINAL_SEQ && acknowledged_through >= terminal_seq as i64 {
+        if terminal_seq != NO_TERMINAL_SEQ && acknowledged_through >= terminal_seq {
             self.terminal_acked.store(true, Ordering::Release);
             self.refresh_evictable();
         }
     }
 
-    fn record_channel_delivery_impossible(&self) {
-        // No terminal sequence can be ACKed after the Channel handoff itself
-        // fails. This explicit state selects the snapshot-only cleanup policy;
-        // normal delivered terminals still require both ACK and snapshot.
-        self.channel_delivery_impossible
+    fn record_control_plane_only_terminal(&self) {
+        // No terminal Channel event exists when handoff or an internal stream
+        // transition fails. This explicit state selects the control-plane-only
+        // cleanup policy; delivered terminals still require ACK plus snapshot.
+        self.control_plane_only_terminal
             .store(true, Ordering::Release);
         self.refresh_evictable();
+        self.signal_terminal();
+    }
+
+    fn signal_terminal(&self) {
+        if let Ok(mut terminal_reached_at) = self.terminal_reached_at.lock() {
+            terminal_reached_at.get_or_insert_with(Instant::now);
+        }
+        let _previous = self.terminal_signal.send_replace(true);
+        self.notify.notify_waiters();
+    }
+
+    fn terminal_retention_expired(&self, now: Instant) -> bool {
+        self.terminal_reached_at
+            .lock()
+            .ok()
+            .and_then(|reached_at| *reached_at)
+            .is_some_and(|reached_at| {
+                now.saturating_duration_since(reached_at) >= TERMINAL_RETENTION_TTL
+            })
+    }
+
+    async fn wait_for_terminal(&self) -> Result<(), CommandError> {
+        let mut receiver = self.terminal_signal.subscribe();
+        loop {
+            if *receiver.borrow_and_update() {
+                return Ok(());
+            }
+            receiver
+                .changed()
+                .await
+                .map_err(|_| CommandError::internal("terminal signal closed unexpectedly"))?;
+        }
+    }
+
+    fn acquire_terminal_waiter(&self) -> Result<TerminalWaitLease<'_>, CommandError> {
+        self.terminal_waiter_active
+            .compare_exchange(false, true, Ordering::AcqRel, Ordering::Acquire)
+            .map_err(|_| CommandError::terminal_waiter_busy())?;
+        Ok(TerminalWaitLease { request: self })
     }
 
     fn record_terminal_snapshot_returned(&self, snapshot: &StreamSnapshot) {
         let terminal_seq = self.terminal_seq.load(Ordering::Acquire);
         let delivered_terminal = terminal_seq != NO_TERMINAL_SEQ
             && snapshot.status.is_terminal()
-            && snapshot.last_seq == terminal_seq;
+            && snapshot.last_seq == Some(terminal_seq);
         let undeliverable_failure = terminal_seq == NO_TERMINAL_SEQ
-            && self.channel_delivery_impossible.load(Ordering::Acquire)
-            && snapshot.status == StreamStatus::Failed
-            && snapshot
-                .error
-                .as_ref()
-                .is_some_and(|error| error.code == "CHANNEL_DELIVERY_FAILED");
+            && self.control_plane_only_terminal.load(Ordering::Acquire)
+            && snapshot.status == StreamStatus::Failed;
 
         if delivered_terminal || undeliverable_failure {
             self.terminal_snapshot_returned
@@ -446,13 +608,25 @@ impl StreamRequest {
         let delivered_terminal_is_releasable =
             terminal_seq != NO_TERMINAL_SEQ && self.terminal_acked.load(Ordering::Acquire);
         let undeliverable_failure_is_releasable = terminal_seq == NO_TERMINAL_SEQ
-            && self.channel_delivery_impossible.load(Ordering::Acquire);
+            && self.control_plane_only_terminal.load(Ordering::Acquire);
 
         if self.terminal_snapshot_returned.load(Ordering::Acquire)
             && (delivered_terminal_is_releasable || undeliverable_failure_is_releasable)
         {
             self.evictable.store(true, Ordering::Release);
         }
+    }
+}
+
+struct TerminalWaitLease<'a> {
+    request: &'a StreamRequest,
+}
+
+impl Drop for TerminalWaitLease<'_> {
+    fn drop(&mut self) {
+        self.request
+            .terminal_waiter_active
+            .store(false, Ordering::Release);
     }
 }
 
@@ -469,9 +643,14 @@ struct StreamRegistry {
 }
 
 impl StreamRegistry {
-    fn next_request_id(&self) -> String {
-        let id = self.next_id.fetch_add(1, Ordering::Relaxed) + 1;
-        format!("m1-channel-{id:016x}")
+    fn next_request_id(&self) -> Result<String, CommandError> {
+        let previous = self
+            .next_id
+            .fetch_update(Ordering::Relaxed, Ordering::Relaxed, |current| {
+                current.checked_add(1)
+            })
+            .map_err(|_| CommandError::internal("request ID space exhausted"))?;
+        Ok(format!("m1-channel-{:016x}", previous + 1))
     }
 
     fn insert(&self, request_id: String, request: Arc<StreamRequest>) -> Result<(), CommandError> {
@@ -480,14 +659,21 @@ impl StreamRegistry {
             .lock()
             .map_err(|_| CommandError::internal("stream registry lock poisoned"))?;
 
+        if inner.requests.contains_key(&request_id) {
+            return Err(CommandError::internal(format!(
+                "duplicate stream requestId {request_id}"
+            )));
+        }
+
         while inner.requests.len() >= MAX_REQUESTS {
-            let evictable = inner.order.iter().position(|id| {
+            let now = Instant::now();
+            let expired_terminal = inner.order.iter().position(|id| {
                 inner
                     .requests
                     .get(id)
-                    .is_some_and(|entry| entry.evictable.load(Ordering::Acquire))
+                    .is_some_and(|entry| entry.terminal_retention_expired(now))
             });
-            let Some(index) = evictable else {
+            let Some(index) = expired_terminal else {
                 return Err(CommandError::capacity());
             };
             if let Some(id) = inner.order.remove(index) {
@@ -509,14 +695,27 @@ impl StreamRegistry {
             .requests
             .get(request_id)
             .cloned()
-            .ok_or_else(|| CommandError::not_found(request_id))
+            .ok_or_else(CommandError::not_found)
     }
 
-    fn remove(&self, request_id: &str) {
-        if let Ok(mut inner) = self.inner.lock() {
+    fn remove_exact(
+        &self,
+        request_id: &str,
+        expected: &Arc<StreamRequest>,
+    ) -> Result<bool, CommandError> {
+        let mut inner = self
+            .inner
+            .lock()
+            .map_err(|_| CommandError::internal("stream registry lock poisoned"))?;
+        let matches = inner
+            .requests
+            .get(request_id)
+            .is_some_and(|registered| Arc::ptr_eq(registered, expected));
+        if matches {
             inner.requests.remove(request_id);
             inner.order.retain(|id| id != request_id);
         }
+        Ok(matches)
     }
 }
 
@@ -530,7 +729,7 @@ struct StartStreamResponse {
 #[serde(rename_all = "camelCase")]
 struct AckStreamResponse {
     request_id: String,
-    acknowledged_through: i64,
+    acknowledged_through: u64,
     in_flight: usize,
 }
 
@@ -543,17 +742,90 @@ struct CancelStreamResponse {
 
 #[derive(Debug, Clone, Serialize, PartialEq, Eq)]
 #[serde(rename_all = "camelCase")]
+struct ReleaseStreamResponse {
+    request_id: String,
+    released: bool,
+}
+
+#[derive(Debug, Clone, Serialize, PartialEq, Eq)]
+#[serde(rename_all = "camelCase")]
 struct StreamSnapshot {
     request_id: String,
     status: StreamStatus,
-    last_seq: u64,
-    last_acked_seq: i64,
+    last_seq: Option<u64>,
+    last_acked_seq: Option<u64>,
     in_flight: usize,
-    text: String,
+    text_bytes: usize,
+    text_sha256: String,
     error: Option<StreamFailure>,
     batch_window_ms: u64,
     effective_batch_window_ms: u64,
     max_in_flight: usize,
+}
+
+#[derive(Debug, Clone, Serialize, PartialEq, Eq)]
+#[serde(rename_all = "camelCase")]
+struct SanitizedHtmlResponse {
+    html: String,
+    input_bytes: usize,
+    output_bytes: usize,
+}
+
+#[derive(Debug, Clone, Serialize, PartialEq, Eq)]
+#[serde(rename_all = "camelCase")]
+struct RegisterHostBrokerSessionResponse {
+    outcome: RegistrationOutcome,
+    generation: u64,
+    module_id: String,
+    network_policy: &'static str,
+}
+
+#[derive(Debug, Clone, Serialize, PartialEq, Eq)]
+#[serde(rename_all = "camelCase")]
+struct RotateHostBrokerSessionResponse {
+    outcome: RotationOutcome,
+    generation: u64,
+    module_id: String,
+    network_policy: &'static str,
+}
+
+#[derive(Debug, Clone, Serialize, PartialEq, Eq)]
+#[serde(rename_all = "camelCase")]
+struct HostBrokerRequestResponse {
+    request_id: String,
+    module_id: String,
+    result: HostBrokerResult,
+}
+
+#[derive(Debug, Clone, Serialize, PartialEq, Eq)]
+#[serde(
+    tag = "type",
+    rename_all = "snake_case",
+    rename_all_fields = "camelCase"
+)]
+enum HostBrokerResult {
+    StateRead {
+        state: &'static str,
+    },
+    RenderSanitize {
+        html: String,
+        input_bytes: usize,
+        output_bytes: usize,
+    },
+    ProbeIncrement {
+        sentinel: &'static str,
+        call_count: u64,
+    },
+}
+
+#[derive(Debug, Clone, Serialize, PartialEq, Eq)]
+#[serde(rename_all = "camelCase")]
+struct HostBrokerProbeCountResponse {
+    probe_call_count: u64,
+    sanitize_call_count: u64,
+    command_surface_version: u32,
+    command_names: &'static [&'static str],
+    command_sha256: String,
 }
 
 #[derive(Debug, Clone, Serialize, PartialEq, Eq)]
@@ -582,26 +854,219 @@ impl CommandError {
         Self::new("INVALID_ACK", message)
     }
 
+    fn invalid_release(message: impl Into<String>) -> Self {
+        Self::new("INVALID_RELEASE", message)
+    }
+
     fn backpressure() -> Self {
         Self::new("BACKPRESSURE", "maxInFlight limit reached")
     }
 
-    fn not_found(request_id: &str) -> Self {
+    fn sequence_exhausted() -> Self {
         Self::new(
-            "STREAM_NOT_FOUND",
-            format!("unknown requestId {request_id}"),
+            "SEQUENCE_EXHAUSTED",
+            "stream sequence exceeded JavaScript's safe integer range",
         )
+    }
+
+    fn invalid_request_id() -> Self {
+        Self::new(
+            "INVALID_REQUEST_ID",
+            "requestId must use the server-issued stream identifier format",
+        )
+    }
+
+    fn terminal_waiter_busy() -> Self {
+        Self::new(
+            "TERMINAL_WAITER_BUSY",
+            "one terminal waiter is already active for this stream",
+        )
+    }
+
+    fn not_found() -> Self {
+        Self::new("STREAM_NOT_FOUND", "stream request was not found")
     }
 
     fn capacity() -> Self {
         Self::new(
             "REGISTRY_CAPACITY",
-            "too many retained streams; ACK and snapshot a delivered terminal or snapshot a channel delivery failure before retrying",
+            "too many retained streams; finish the terminal snapshot/release handshake or wait for terminal TTL cleanup before retrying",
         )
     }
 
     fn internal(message: impl Into<String>) -> Self {
         Self::new("INTERNAL", message)
+    }
+
+    fn html_too_large() -> Self {
+        Self::new(
+            "HTML_TOO_LARGE",
+            format!("plugin HTML must be at most {MAX_PLUGIN_HTML_BYTES} bytes"),
+        )
+    }
+}
+
+fn validate_stream_request_id(request_id: &str) -> Result<(), CommandError> {
+    let Some(suffix) = request_id.strip_prefix(STREAM_REQUEST_ID_PREFIX) else {
+        return Err(CommandError::invalid_request_id());
+    };
+    if suffix.len() != STREAM_REQUEST_ID_HEX_BYTES
+        || !suffix
+            .bytes()
+            .all(|byte| byte.is_ascii_digit() || (b'a'..=b'f').contains(&byte))
+    {
+        return Err(CommandError::invalid_request_id());
+    }
+    Ok(())
+}
+
+fn sanitize_plugin_html_value(input: &str) -> Result<SanitizedHtmlResponse, CommandError> {
+    if input.len() > MAX_PLUGIN_HTML_BYTES {
+        return Err(CommandError::html_too_large());
+    }
+
+    // This is an intentionally small presentation-only vocabulary. In
+    // particular there are no links, media, style-bearing attributes, form
+    // controls, SVG/MathML, or URL-bearing elements.
+    let allowed_tags = HashSet::from([
+        "p",
+        "br",
+        "strong",
+        "em",
+        "code",
+        "pre",
+        "ul",
+        "ol",
+        "li",
+        "blockquote",
+        "span",
+    ]);
+    let clean_content_tags = HashSet::from([
+        "script", "style", "iframe", "object", "embed", "svg", "math", "template", "form",
+        "noscript",
+    ]);
+
+    let mut builder = ammonia::Builder::default();
+    builder
+        .tags(allowed_tags)
+        .tag_attributes(HashMap::new())
+        .generic_attributes(HashSet::new())
+        .url_schemes(HashSet::new())
+        .url_relative(ammonia::UrlRelative::Deny)
+        .clean_content_tags(clean_content_tags);
+
+    let html = builder.clean(input).to_string();
+    Ok(SanitizedHtmlResponse {
+        input_bytes: input.len(),
+        output_bytes: html.len(),
+        html,
+    })
+}
+
+#[tauri::command]
+fn register_host_broker_session(
+    host_token: Option<String>,
+    policy: RegistrationPolicy,
+    broker: State<'_, HostBroker<SystemMonotonicClock>>,
+) -> Result<RegisterHostBrokerSessionResponse, BrokerError> {
+    let receipt = broker.register(host_token.as_deref(), policy)?;
+    Ok(RegisterHostBrokerSessionResponse {
+        outcome: receipt.outcome,
+        generation: receipt.generation,
+        module_id: receipt.module_id,
+        network_policy: "deny",
+    })
+}
+
+#[tauri::command]
+fn rotate_host_broker_session(
+    current_host_token: Option<String>,
+    next_host_token: Option<String>,
+    expected_generation: u64,
+    broker: State<'_, HostBroker<SystemMonotonicClock>>,
+) -> Result<RotateHostBrokerSessionResponse, BrokerError> {
+    let receipt = broker.rotate(
+        current_host_token.as_deref(),
+        next_host_token.as_deref(),
+        expected_generation,
+    )?;
+    Ok(RotateHostBrokerSessionResponse {
+        outcome: receipt.outcome,
+        generation: receipt.generation,
+        module_id: receipt.module_id,
+        network_policy: "deny",
+    })
+}
+
+#[tauri::command]
+fn host_broker_request(
+    host_token: Option<String>,
+    request_json: String,
+    broker: State<'_, HostBroker<SystemMonotonicClock>>,
+) -> Result<HostBrokerRequestResponse, BrokerError> {
+    broker.execute_json(
+        host_token.as_deref(),
+        &request_json,
+        execute_host_broker_action,
+    )
+}
+
+fn execute_host_broker_action(
+    authorized: AuthorizedAction<'_>,
+) -> Result<HostBrokerRequestResponse, BrokerError> {
+    let AuthorizedAction {
+        request_id,
+        module_id,
+        action,
+    } = authorized;
+    let result = match action {
+        BrokerAction::StateRead => HostBrokerResult::StateRead { state: "ready" },
+        BrokerAction::RenderSanitize { html } => {
+            let sanitized = sanitize_plugin_html_value(&html)
+                .map_err(|_| BrokerError::action_failed(&request_id))?;
+            HOST_BROKER_SANITIZE_CALLS.fetch_add(1, Ordering::SeqCst);
+            HostBrokerResult::RenderSanitize {
+                html: sanitized.html,
+                input_bytes: sanitized.input_bytes,
+                output_bytes: sanitized.output_bytes,
+            }
+        }
+        BrokerAction::ProbeIncrement => {
+            let call_count = HOST_BROKER_PROBE_CALLS.fetch_add(1, Ordering::SeqCst) + 1;
+            HostBrokerResult::ProbeIncrement {
+                sentinel: "LOREPIA_HOST_BROKER_PROBE_REACHED",
+                call_count,
+            }
+        }
+    };
+
+    let response = HostBrokerRequestResponse {
+        request_id,
+        module_id: module_id.to_owned(),
+        result,
+    };
+    ensure_direct_broker_response(response)
+}
+
+fn ensure_direct_broker_response(
+    response: HostBrokerRequestResponse,
+) -> Result<HostBrokerRequestResponse, BrokerError> {
+    if json_value_uses_direct_path(&response) {
+        Ok(response)
+    } else {
+        Err(BrokerError::action_failed(&response.request_id))
+    }
+}
+
+#[tauri::command]
+fn host_broker_probe_count() -> HostBrokerProbeCountResponse {
+    let command_manifest = format!("{}\n", APP_COMMAND_NAMES.join("\n"));
+    HostBrokerProbeCountResponse {
+        probe_call_count: HOST_BROKER_PROBE_CALLS.load(Ordering::SeqCst),
+        sanitize_call_count: HOST_BROKER_SANITIZE_CALLS.load(Ordering::SeqCst),
+        command_surface_version: COMMAND_SURFACE_VERSION,
+        command_names: APP_COMMAND_NAMES,
+        command_sha256: format!("{:x}", Sha256::digest(command_manifest.as_bytes())),
     }
 }
 
@@ -612,7 +1077,7 @@ async fn start_mock_stream(
     registry: State<'_, StreamRegistry>,
 ) -> Result<StartStreamResponse, CommandError> {
     let config = ValidatedConfig::try_from(config.unwrap_or_default())?;
-    let request_id = registry.next_request_id();
+    let request_id = registry.next_request_id()?;
     let request = Arc::new(StreamRequest::new(StreamMachine::new(
         request_id.clone(),
         &config,
@@ -621,10 +1086,25 @@ async fn start_mock_stream(
 
     let started = {
         let mut machine = request.machine.lock().await;
-        machine.start()?
+        machine.start()
     };
-    if let Err(error) = on_event.send(started) {
-        registry.remove(&request_id);
+    let started = match started {
+        Ok(started) => started,
+        Err(error) => {
+            if !registry.remove_exact(&request_id, &request)? {
+                return Err(CommandError::internal(
+                    "failed to remove a stream after start transition failure",
+                ));
+            }
+            return Err(error);
+        }
+    };
+    if let Err(error) = send_direct_channel_event(&on_event, started) {
+        if !registry.remove_exact(&request_id, &request)? {
+            return Err(CommandError::internal(
+                "failed to remove a stream after started-event delivery failure",
+            ));
+        }
         return Err(CommandError::internal(format!(
             "failed to deliver started event: {error}"
         )));
@@ -640,14 +1120,15 @@ async fn ack_stream(
     seq: u64,
     registry: State<'_, StreamRegistry>,
 ) -> Result<AckStreamResponse, CommandError> {
+    validate_stream_request_id(&request_id)?;
     let request = registry.get(&request_id)?;
     let response = {
         let mut machine = request.machine.lock().await;
-        machine.acknowledge(seq)?;
-        request.record_acknowledged_through(machine.last_acked_seq);
+        let acknowledged_through = machine.acknowledge(seq)?;
+        request.record_acknowledged_through(acknowledged_through);
         AckStreamResponse {
             request_id,
-            acknowledged_through: machine.last_acked_seq,
+            acknowledged_through,
             in_flight: machine.in_flight(),
         }
     };
@@ -660,6 +1141,7 @@ async fn cancel_stream(
     request_id: String,
     registry: State<'_, StreamRegistry>,
 ) -> Result<CancelStreamResponse, CommandError> {
+    validate_stream_request_id(&request_id)?;
     let request = registry.get(&request_id)?;
     let accepted = {
         let mut machine = request.machine.lock().await;
@@ -679,8 +1161,35 @@ async fn get_stream_snapshot(
     request_id: String,
     registry: State<'_, StreamRegistry>,
 ) -> Result<StreamSnapshot, CommandError> {
+    validate_stream_request_id(&request_id)?;
     let request = registry.get(&request_id)?;
-    Ok(clone_snapshot_for_return(&request).await)
+    let snapshot = clone_snapshot_for_return(&request).await;
+    if !json_value_uses_direct_path(&snapshot) {
+        return Err(CommandError::internal(
+            "stream snapshot receipt exceeded the direct IPC response budget",
+        ));
+    }
+    Ok(snapshot)
+}
+
+#[tauri::command]
+async fn wait_stream_terminal(
+    request_id: String,
+    registry: State<'_, StreamRegistry>,
+) -> Result<StreamSnapshot, CommandError> {
+    validate_stream_request_id(&request_id)?;
+    let request = registry.get(&request_id)?;
+    wait_for_terminal_snapshot(&request).await
+}
+
+#[tauri::command]
+async fn release_stream(
+    request_id: String,
+    snapshot_seq: u64,
+    registry: State<'_, StreamRegistry>,
+) -> Result<ReleaseStreamResponse, CommandError> {
+    validate_stream_request_id(&request_id)?;
+    release_request(&registry, request_id, snapshot_seq).await
 }
 
 async fn clone_snapshot_for_return(request: &StreamRequest) -> StreamSnapshot {
@@ -691,6 +1200,96 @@ async fn clone_snapshot_for_return(request: &StreamRequest) -> StreamSnapshot {
     // cannot invalidate the request while this snapshot is being assembled.
     request.record_terminal_snapshot_returned(&snapshot);
     snapshot
+}
+
+async fn wait_for_terminal_snapshot(
+    request: &StreamRequest,
+) -> Result<StreamSnapshot, CommandError> {
+    let _waiter_lease = request.acquire_terminal_waiter()?;
+    request.wait_for_terminal().await?;
+    let snapshot = request.machine.lock().await.snapshot();
+    if !snapshot.status.is_terminal() {
+        return Err(CommandError::internal(
+            "terminal signal was set before the stream reached a terminal state",
+        ));
+    }
+    if !json_value_uses_direct_path(&snapshot) {
+        return Err(CommandError::internal(
+            "terminal snapshot receipt exceeded the direct IPC response budget",
+        ));
+    }
+    Ok(snapshot)
+}
+
+async fn release_request(
+    registry: &StreamRegistry,
+    request_id: String,
+    snapshot_seq: u64,
+) -> Result<ReleaseStreamResponse, CommandError> {
+    let request = registry.get(&request_id)?;
+    {
+        let machine = request.machine.lock().await;
+        if !machine.status.is_terminal() {
+            return Err(CommandError::invalid_release(
+                "stream must be terminal before it can be released",
+            ));
+        }
+        if machine.last_seq != Some(snapshot_seq) {
+            return Err(CommandError::invalid_release(format!(
+                "snapshotSeq {snapshot_seq} does not match current lastSeq {:?}",
+                machine.last_seq
+            )));
+        }
+        if !request.evictable.load(Ordering::Acquire) {
+            return Err(CommandError::invalid_release(
+                "terminal snapshot must be returned and any delivered terminal must be acknowledged before release",
+            ));
+        }
+    }
+
+    if !registry.remove_exact(&request_id, &request)? {
+        return Err(CommandError::not_found());
+    }
+    Ok(ReleaseStreamResponse {
+        request_id,
+        released: true,
+    })
+}
+
+fn split_direct_delta_text(text: &str) -> Option<Vec<String>> {
+    if direct_delta_fits(text) {
+        return Some(vec![text.to_owned()]);
+    }
+
+    let mut boundaries = Vec::with_capacity(text.chars().count() + 1);
+    boundaries.push(0);
+    boundaries.extend(text.char_indices().skip(1).map(|(index, _)| index));
+    boundaries.push(text.len());
+
+    let mut parts = Vec::new();
+    let mut start_index = 0usize;
+    while start_index + 1 < boundaries.len() {
+        let mut low = start_index + 1;
+        let mut high = boundaries.len() - 1;
+        let mut best = start_index;
+
+        while low <= high {
+            let middle = low + (high - low) / 2;
+            if direct_delta_fits(&text[boundaries[start_index]..boundaries[middle]]) {
+                best = middle;
+                low = middle + 1;
+            } else {
+                high = middle - 1;
+            }
+        }
+
+        if best == start_index {
+            return None;
+        }
+        parts.push(text[boundaries[start_index]..boundaries[best]].to_owned());
+        start_index = best;
+    }
+    Some(parts)
 }
 
 async fn run_stream(
@@ -723,14 +1322,16 @@ async fn run_stream(
             let machine = request.machine.lock().await;
             machine.effective_batch_window_ms
         };
-        let mut batch_size = (effective_window_ms / config.chunk_interval_ms).max(1) as usize;
-        batch_size = batch_size.min(config.chunks.len() - source_index);
+        let mut desired_batch_size =
+            (effective_window_ms / config.chunk_interval_ms).max(1) as usize;
+        desired_batch_size = desired_batch_size.min(config.chunks.len() - source_index);
         if let Some(fail_after) = config.fail_after_chunks {
-            batch_size = batch_size.min(fail_after.saturating_sub(source_index).max(1));
+            desired_batch_size =
+                desired_batch_size.min(fail_after.saturating_sub(source_index).max(1));
         }
 
         let mut delta = String::new();
-        for chunk in &config.chunks[source_index..source_index + batch_size] {
+        for chunk in &config.chunks[source_index..source_index + desired_batch_size] {
             if !sleep_unless_cancelled(&request, config.chunk_interval_ms).await {
                 emit_cancelled(&request, &channel).await;
                 return;
@@ -738,20 +1339,53 @@ async fn run_stream(
             delta.push_str(chunk);
         }
 
-        if !wait_for_data_capacity(&request, config.ack_timeout_ms).await {
-            emit_cancelled(&request, &channel).await;
+        let Some(fragments) = split_direct_delta_text(&delta) else {
+            emit_failed(
+                &request,
+                &channel,
+                StreamFailure::new(
+                    "CHANNEL_EVENT_TOO_LARGE",
+                    "a Unicode scalar could not fit the direct Channel transport budget",
+                ),
+            )
+            .await;
             return;
-        }
+        };
 
-        match emit_delta(&request, &channel, delta).await {
-            DeltaDelivery::Sent => {}
-            DeltaDelivery::Cancelled => {
-                emit_cancelled(&request, &channel).await;
-                return;
+        for fragment in fragments {
+            match wait_for_data_capacity(&request, config.ack_timeout_ms).await {
+                CapacityWait::Ready => {}
+                CapacityWait::Cancelled => {
+                    emit_cancelled(&request, &channel).await;
+                    return;
+                }
+                CapacityWait::TimedOut => {
+                    emit_failed(
+                        &request,
+                        &channel,
+                        StreamFailure::new(
+                            "ACK_TIMEOUT",
+                            format!(
+                                "frontend did not free stream capacity within {} ms",
+                                config.ack_timeout_ms
+                            ),
+                        ),
+                    )
+                    .await;
+                    return;
+                }
             }
-            DeltaDelivery::Failed => return,
+
+            match emit_delta(&request, &channel, fragment).await {
+                DeltaDelivery::Sent => {}
+                DeltaDelivery::Cancelled => {
+                    emit_cancelled(&request, &channel).await;
+                    return;
+                }
+                DeltaDelivery::Failed => return,
+            }
         }
-        source_index += batch_size;
+        source_index += desired_batch_size;
     }
 
     if config.fail_after_chunks == Some(source_index) {
@@ -798,23 +1432,36 @@ async fn sleep_unless_cancelled(request: &StreamRequest, duration_ms: u64) -> bo
     }
 }
 
-async fn wait_for_data_capacity(request: &StreamRequest, poll_ms: u64) -> bool {
+enum CapacityWait {
+    Ready,
+    Cancelled,
+    TimedOut,
+}
+
+async fn wait_for_data_capacity(request: &StreamRequest, timeout_ms: u64) -> CapacityWait {
+    let deadline = tokio::time::Instant::now() + Duration::from_millis(timeout_ms);
     loop {
         {
             let mut machine = request.machine.lock().await;
-            if machine.status.is_terminal() {
-                return false;
-            }
-            if machine.cancel_requested {
-                return false;
+            if machine.status.is_terminal() || machine.cancel_requested {
+                return CapacityWait::Cancelled;
             }
             if machine.has_data_capacity() {
-                return true;
+                return CapacityWait::Ready;
             }
             machine.apply_pressure();
         }
-        let _ =
-            tokio::time::timeout(Duration::from_millis(poll_ms), request.notify.notified()).await;
+
+        let remaining = deadline.saturating_duration_since(tokio::time::Instant::now());
+        if remaining.is_zero() {
+            return CapacityWait::TimedOut;
+        }
+        if tokio::time::timeout(remaining, request.notify.notified())
+            .await
+            .is_err()
+        {
+            return CapacityWait::TimedOut;
+        }
     }
 }
 
@@ -855,10 +1502,17 @@ async fn emit_delta(
     let event = match machine.delta(text) {
         Ok(event) => event,
         Err(_) if machine.cancel_requested => return DeltaDelivery::Cancelled,
-        Err(_) => return DeltaDelivery::Failed,
+        Err(error) => {
+            if machine.status == StreamStatus::Streaming {
+                machine.status = StreamStatus::Failed;
+                machine.error = Some(StreamFailure::new(error.code, error.message));
+                request.record_control_plane_only_terminal();
+            }
+            return DeltaDelivery::Failed;
+        }
     };
 
-    if let Err(error) = channel.send(event) {
+    if let Err(error) = send_direct_channel_event(channel, event) {
         machine.text.truncate(previous_len);
         machine.last_seq = previous_seq;
         machine.status = StreamStatus::Failed;
@@ -866,7 +1520,7 @@ async fn emit_delta(
             "CHANNEL_DELIVERY_FAILED",
             error.to_string(),
         ));
-        request.record_channel_delivery_impossible();
+        request.record_control_plane_only_terminal();
         request.notify.notify_one();
         return DeltaDelivery::Failed;
     }
@@ -900,6 +1554,7 @@ async fn deliver_terminal(
     let previous_seq = machine.last_seq;
     let previous_error = machine.error.clone();
 
+    let is_cancel_transition = matches!(&transition, TerminalTransition::Cancel);
     let event = match transition {
         TerminalTransition::Complete => machine.complete(),
         TerminalTransition::Cancel => machine.cancel(),
@@ -907,14 +1562,33 @@ async fn deliver_terminal(
     };
     let event = match event {
         Ok(event) => event,
-        Err(_) if machine.cancel_requested && machine.status == StreamStatus::Streaming => {
+        Err(_)
+            if !is_cancel_transition
+                && machine.cancel_requested
+                && machine.status == StreamStatus::Streaming =>
+        {
             return TerminalDelivery::CancellationRequested;
         }
-        Err(_) => return TerminalDelivery::Failed,
+        Err(error) => {
+            if !machine.status.is_terminal() {
+                machine.status = StreamStatus::Failed;
+                machine.error = Some(StreamFailure::new(error.code, error.message));
+                request.record_control_plane_only_terminal();
+            }
+            return TerminalDelivery::Failed;
+        }
     };
-    let terminal_seq = machine.last_seq;
+    let Some(terminal_seq) = machine.last_seq else {
+        machine.status = StreamStatus::Failed;
+        machine.error = Some(StreamFailure::new(
+            "INTERNAL",
+            "terminal transition did not publish a sequence",
+        ));
+        request.record_control_plane_only_terminal();
+        return TerminalDelivery::Failed;
+    };
 
-    if let Err(error) = channel.send(event) {
+    if let Err(error) = send_direct_channel_event(channel, event) {
         // Roll back the undelivered terminal transition before publishing the
         // local delivery failure. Both changes happen under the same lock, so a
         // concurrent snapshot sees only the final failed snapshot.
@@ -926,7 +1600,7 @@ async fn deliver_terminal(
             "CHANNEL_DELIVERY_FAILED",
             error.to_string(),
         ));
-        request.record_channel_delivery_impossible();
+        request.record_control_plane_only_terminal();
         request.notify.notify_one();
         return TerminalDelivery::Failed;
     }
@@ -940,12 +1614,8 @@ async fn deliver_terminal(
 pub fn run() {
     tauri::Builder::default()
         .manage(StreamRegistry::default())
-        .invoke_handler(tauri::generate_handler![
-            start_mock_stream,
-            ack_stream,
-            cancel_stream,
-            get_stream_snapshot
-        ])
+        .manage(HostBroker::<SystemMonotonicClock>::production())
+        .invoke_handler(with_lorepia_app_commands!(generate_lorepia_handler))
         .run(tauri::generate_context!())
         .expect("error while running LorePia Channel spike");
 }
@@ -953,6 +1623,246 @@ pub fn run() {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    fn assert_snapshot_text_receipt(snapshot: &StreamSnapshot, expected: &str) {
+        assert_eq!(snapshot.text_bytes, expected.len());
+        assert_eq!(
+            snapshot.text_sha256,
+            format!("{:x}", Sha256::digest(expected.as_bytes()))
+        );
+    }
+
+    #[test]
+    fn plugin_html_sanitizer_keeps_only_the_presentation_subset() {
+        let input = concat!(
+            "<!--marker--><p id='x' class='y' style='color:red' onclick='attack()'>safe ",
+            "<strong data-x='1'>bold</strong><a href='javascript:attack()'>link</a></p>",
+            "<script>attack()</script><style>body{display:none}</style>",
+            "<svg><script>svgAttack()</script><text>svg text</text></svg>",
+            "<math><mtext>math text</mtext></math>",
+            "<iframe srcdoc='<script>frameAttack()</script>'>frame text</iframe>",
+            "<form action='https://example.invalid'><input name='secret'>form text</form>",
+            "<img src='data:text/html,attack' onerror='attack()'>",
+            "<blockquote><em>quoted</em><br><code>code</code></blockquote>"
+        );
+
+        let result = sanitize_plugin_html_value(input).unwrap();
+
+        assert_eq!(result.input_bytes, input.len());
+        assert_eq!(result.output_bytes, result.html.len());
+        assert!(result
+            .html
+            .contains("<p>safe <strong>bold</strong>link</p>"));
+        assert!(result
+            .html
+            .contains("<blockquote><em>quoted</em><br><code>code</code></blockquote>"));
+        for forbidden in [
+            "<!--",
+            "onclick",
+            "style=",
+            "class=",
+            "href=",
+            "javascript:",
+            "data:",
+            "<script",
+            "attack()",
+            "<style",
+            "<svg",
+            "svg text",
+            "<math",
+            "math text",
+            "<iframe",
+            "frame text",
+            "<form",
+            "form text",
+            "<input",
+            "<img",
+        ] {
+            assert!(
+                !result.html.contains(forbidden),
+                "sanitized HTML retained forbidden content {forbidden:?}: {}",
+                result.html
+            );
+        }
+    }
+
+    #[test]
+    fn plugin_html_sanitizer_enforces_the_utf8_byte_limit() {
+        let exact_ascii_limit = "x".repeat(MAX_PLUGIN_HTML_BYTES);
+        let accepted = sanitize_plugin_html_value(&exact_ascii_limit).unwrap();
+        assert_eq!(accepted.input_bytes, MAX_PLUGIN_HTML_BYTES);
+
+        let oversized_ascii = "x".repeat(MAX_PLUGIN_HTML_BYTES + 1);
+        let error = sanitize_plugin_html_value(&oversized_ascii).unwrap_err();
+        assert_eq!(error.code, "HTML_TOO_LARGE");
+
+        let exact_multibyte_floor = "한".repeat(MAX_PLUGIN_HTML_BYTES / "한".len());
+        assert!(exact_multibyte_floor.len() <= MAX_PLUGIN_HTML_BYTES);
+        sanitize_plugin_html_value(&exact_multibyte_floor).unwrap();
+
+        let oversized_multibyte = format!("{exact_multibyte_floor}한");
+        assert!(oversized_multibyte.len() > MAX_PLUGIN_HTML_BYTES);
+        assert_eq!(
+            sanitize_plugin_html_value(&oversized_multibyte)
+                .unwrap_err()
+                .code,
+            "HTML_TOO_LARGE"
+        );
+    }
+
+    #[test]
+    fn host_broker_executor_maps_authorized_actions_and_uses_dedicated_probe_counter() {
+        HOST_BROKER_PROBE_CALLS.store(0, Ordering::SeqCst);
+        HOST_BROKER_SANITIZE_CALLS.store(0, Ordering::SeqCst);
+
+        let state = execute_host_broker_action(AuthorizedAction {
+            request_id: "state-action".into(),
+            module_id: "module.alpha",
+            action: BrokerAction::StateRead,
+        })
+        .unwrap();
+        assert_eq!(state.request_id, "state-action");
+        assert_eq!(state.module_id, "module.alpha");
+        assert_eq!(state.result, HostBrokerResult::StateRead { state: "ready" });
+
+        let sanitized = execute_host_broker_action(AuthorizedAction {
+            request_id: "sanitize-action".into(),
+            module_id: "module.alpha",
+            action: BrokerAction::RenderSanitize {
+                html: "<p onclick='attack()'>safe<script>attack()</script></p>".into(),
+            },
+        })
+        .unwrap();
+        assert!(matches!(
+            sanitized.result,
+            HostBrokerResult::RenderSanitize { ref html, .. }
+                if html == "<p>safe</p>"
+        ));
+
+        let probe = execute_host_broker_action(AuthorizedAction {
+            request_id: "probe-action".into(),
+            module_id: "module.alpha",
+            action: BrokerAction::ProbeIncrement,
+        })
+        .unwrap();
+        assert!(matches!(
+            &probe.result,
+            HostBrokerResult::ProbeIncrement {
+                sentinel: "LOREPIA_HOST_BROKER_PROBE_REACHED",
+                call_count: 1
+            }
+        ));
+        let audit = host_broker_probe_count();
+        assert_eq!(audit.probe_call_count, 1);
+        assert_eq!(audit.sanitize_call_count, 1);
+        assert_eq!(audit.command_surface_version, 3);
+        assert_eq!(
+            audit.command_names,
+            [
+                "ack_stream",
+                "cancel_stream",
+                "get_stream_snapshot",
+                "host_broker_probe_count",
+                "host_broker_request",
+                "register_host_broker_session",
+                "release_stream",
+                "rotate_host_broker_session",
+                "start_mock_stream",
+                "wait_stream_terminal",
+            ]
+        );
+        assert_eq!(
+            audit.command_sha256,
+            "679411179e22a191fe48f8fdc503c62d6d302a888aba93fe1606c9a553bc57ce"
+        );
+
+        let serialized = serde_json::to_value(probe).unwrap();
+        assert_eq!(serialized["requestId"], "probe-action");
+        assert_eq!(serialized["moduleId"], "module.alpha");
+        assert_eq!(serialized["result"]["type"], "probe_increment");
+        assert_eq!(serialized["result"]["callCount"], 1);
+    }
+
+    #[test]
+    fn oversized_broker_results_fail_before_entering_tauri_response_queue() {
+        let error = ensure_direct_broker_response(HostBrokerRequestResponse {
+            request_id: "oversized-render".to_owned(),
+            module_id: "module.alpha".to_owned(),
+            result: HostBrokerResult::RenderSanitize {
+                html: "x".repeat(LOREPIA_DIRECT_JSON_BUDGET_BYTES),
+                input_bytes: LOREPIA_DIRECT_JSON_BUDGET_BYTES,
+                output_bytes: LOREPIA_DIRECT_JSON_BUDGET_BYTES,
+            },
+        })
+        .unwrap_err();
+
+        assert_eq!(error.code, host_broker::BrokerErrorCode::ActionFailed);
+        assert_eq!(error.request_id.as_deref(), Some("oversized-render"));
+    }
+
+    #[test]
+    fn bounded_app_command_response_shapes_stay_on_the_direct_path() {
+        fn assert_direct(value: &impl Serialize) {
+            let len = serialized_json_len(value).expect("response must serialize");
+            assert!(
+                len <= LOREPIA_DIRECT_JSON_BUDGET_BYTES,
+                "response was {len} bytes"
+            );
+        }
+
+        let request_id = MAX_CHANNEL_REQUEST_ID.to_owned();
+        let maximum_failure = StreamFailure::new("c".repeat(65), "m".repeat(513));
+        assert_eq!(maximum_failure.code.len(), 64);
+        assert_eq!(maximum_failure.message.len(), 512);
+
+        assert_direct(&StartStreamResponse {
+            request_id: request_id.clone(),
+        });
+        assert_direct(&AckStreamResponse {
+            request_id: request_id.clone(),
+            acknowledged_through: MAX_SEQUENCE,
+            in_flight: 64,
+        });
+        assert_direct(&CancelStreamResponse {
+            request_id: request_id.clone(),
+            accepted: true,
+        });
+        assert_direct(&ReleaseStreamResponse {
+            request_id: request_id.clone(),
+            released: true,
+        });
+        assert_direct(&StreamSnapshot {
+            request_id: request_id.clone(),
+            status: StreamStatus::Failed,
+            last_seq: Some(MAX_SEQUENCE),
+            last_acked_seq: Some(MAX_SEQUENCE),
+            in_flight: 64,
+            text_bytes: 1_048_576,
+            text_sha256: "f".repeat(64),
+            error: Some(maximum_failure),
+            batch_window_ms: MAX_BATCH_WINDOW_MS,
+            effective_batch_window_ms: MAX_BATCH_WINDOW_MS,
+            max_in_flight: 64,
+        });
+        assert_direct(&RegisterHostBrokerSessionResponse {
+            outcome: RegistrationOutcome::Registered,
+            generation: u64::MAX,
+            module_id: "m".repeat(128),
+            network_policy: "deny",
+        });
+        assert_direct(&RotateHostBrokerSessionResponse {
+            outcome: RotationOutcome::Rotated,
+            generation: u64::MAX,
+            module_id: "m".repeat(128),
+            network_policy: "deny",
+        });
+        assert_direct(&HostBrokerRequestResponse {
+            request_id,
+            module_id: "m".repeat(128),
+            result: HostBrokerResult::StateRead { state: "ready" },
+        });
+        assert_direct(&host_broker_probe_count());
+    }
 
     fn config(batch_window_ms: u64, max_in_flight: usize) -> ValidatedConfig {
         ValidatedConfig {
@@ -984,9 +1894,8 @@ mod tests {
         assert!(matches!(second, StreamEvent::Delta { seq: 2, .. }));
         machine.acknowledge(2).unwrap();
         let terminal = machine.complete().unwrap();
-        assert!(
-            matches!(terminal, StreamEvent::Completed { seq: 3, ref text, .. } if text == "ABC")
-        );
+        assert!(matches!(terminal, StreamEvent::Completed { seq: 3, .. }));
+        assert_snapshot_text_receipt(&machine.snapshot(), "ABC");
         assert_eq!(machine.status, StreamStatus::Completed);
         assert!(machine.complete().is_err());
         assert!(machine.cancel().is_err());
@@ -1027,10 +1936,8 @@ mod tests {
         assert!(machine.delta(" late".into()).is_err());
         assert!(machine.complete().is_err());
         let terminal = machine.cancel().unwrap();
-        assert!(
-            matches!(terminal, StreamEvent::Cancelled { seq: 2, ref partial_text, .. } if partial_text == "partial")
-        );
-        assert_eq!(machine.snapshot().text, "partial");
+        assert!(matches!(terminal, StreamEvent::Cancelled { seq: 2, .. }));
+        assert_snapshot_text_receipt(&machine.snapshot(), "partial");
         assert!(machine.delta(" later".into()).is_err());
         assert!(!machine.request_cancel());
     }
@@ -1043,12 +1950,10 @@ mod tests {
         machine.acknowledge(1).unwrap();
         let failure = StreamFailure::new("MOCK_FAILURE", "after 2 chunks");
         let terminal = machine.fail(failure.clone()).unwrap();
-        assert!(
-            matches!(terminal, StreamEvent::Failed { seq: 2, ref partial_text, error, .. } if partial_text == "AB" && error == failure)
-        );
+        assert!(matches!(terminal, StreamEvent::Failed { seq: 2, error, .. } if error == failure));
         let snapshot = machine.snapshot();
         assert_eq!(snapshot.status, StreamStatus::Failed);
-        assert_eq!(snapshot.text, "AB");
+        assert_snapshot_text_receipt(&snapshot, "AB");
         assert_eq!(snapshot.error, Some(failure));
         assert!(machine.complete().is_err());
     }
@@ -1070,6 +1975,10 @@ mod tests {
             },
             StreamConfig {
                 chunks: Some(vec![]),
+                ..Default::default()
+            },
+            StreamConfig {
+                chunks: Some(vec![String::new()]),
                 ..Default::default()
             },
             StreamConfig {
@@ -1105,10 +2014,103 @@ mod tests {
         let mut machine = started_machine(2);
         let error = machine.acknowledge(1).unwrap_err();
         assert_eq!(error.code, "INVALID_ACK");
-        assert_eq!(machine.last_acked_seq, -1);
+        assert_eq!(machine.last_acked_seq, None);
         machine.acknowledge(0).unwrap();
         machine.acknowledge(0).unwrap();
-        assert_eq!(machine.last_acked_seq, 0);
+        assert_eq!(machine.last_acked_seq, Some(0));
+    }
+
+    #[test]
+    fn queued_snapshot_has_no_phantom_sequence_and_rejects_early_ack() {
+        let config = config(24, 2);
+        let mut machine = StreamMachine::new("request-queued".into(), &config);
+
+        let snapshot = machine.snapshot();
+        assert_eq!(snapshot.status, StreamStatus::Queued);
+        assert_eq!(snapshot.last_seq, None);
+        assert_eq!(snapshot.last_acked_seq, None);
+        assert_eq!(snapshot.in_flight, 0);
+        assert_snapshot_text_receipt(&snapshot, "");
+
+        let error = machine.acknowledge(0).unwrap_err();
+        assert_eq!(error.code, "INVALID_ACK");
+        assert_eq!(machine.snapshot(), snapshot);
+    }
+
+    #[test]
+    fn sequence_limit_allows_the_last_safe_value_then_fails_without_mutation() {
+        let mut machine = started_machine(2);
+        machine.last_seq = Some(MAX_SEQUENCE - 1);
+        machine.last_acked_seq = Some(MAX_SEQUENCE - 1);
+
+        let final_safe_event = machine.delta("A".into()).unwrap();
+        assert!(matches!(
+            final_safe_event,
+            StreamEvent::Delta {
+                seq: MAX_SEQUENCE,
+                ref text,
+                ..
+            } if text == "A"
+        ));
+        machine.last_acked_seq = Some(MAX_SEQUENCE);
+        let before = machine.snapshot();
+
+        let error = machine.delta("B".into()).unwrap_err();
+        assert_eq!(error.code, "SEQUENCE_EXHAUSTED");
+        assert_eq!(machine.snapshot(), before);
+    }
+
+    #[test]
+    fn request_id_counter_never_wraps_or_reuses_an_id() {
+        let registry = StreamRegistry::default();
+        registry.next_id.store(u64::MAX - 1, Ordering::Relaxed);
+
+        assert_eq!(
+            registry.next_request_id().unwrap(),
+            "m1-channel-ffffffffffffffff"
+        );
+        let error = registry.next_request_id().unwrap_err();
+        assert_eq!(error.code, "INTERNAL");
+        assert!(error.message.contains("request ID space exhausted"));
+        assert_eq!(registry.next_id.load(Ordering::Relaxed), u64::MAX);
+    }
+
+    #[test]
+    fn stream_command_request_ids_are_exact_and_errors_never_reflect_input() {
+        for valid in [
+            "m1-channel-0000000000000001",
+            "m1-channel-0123456789abcdef",
+            MAX_CHANNEL_REQUEST_ID,
+        ] {
+            validate_stream_request_id(valid).unwrap();
+        }
+
+        let oversized = format!("m1-channel-{}", "a".repeat(1_048_576));
+        for invalid in [
+            "",
+            "m1-channel-",
+            "m1-channel-000000000000001",
+            "m1-channel-00000000000000000",
+            "m1-channel-0123456789abcdeF",
+            "m1-channel-0123456789abcdeg",
+            "m1-channel-0123456789abcde한",
+            oversized.as_str(),
+        ] {
+            let error = validate_stream_request_id(invalid).unwrap_err();
+            assert_eq!(error.code, "INVALID_REQUEST_ID");
+            assert_eq!(
+                error.message,
+                "requestId must use the server-issued stream identifier format"
+            );
+            if !invalid.is_empty() {
+                assert!(!error.message.contains(invalid));
+            }
+            assert!(json_value_uses_direct_path(&error));
+        }
+
+        let missing = CommandError::not_found();
+        assert_eq!(missing.message, "stream request was not found");
+        assert!(json_value_uses_direct_path(&missing));
     }
 
     #[test]
@@ -1130,13 +2132,11 @@ mod tests {
             serde_json::to_value(StreamEvent::Cancelled {
                 request_id: "r1".into(),
                 seq: 2,
-                partial_text: "A".into(),
             })
             .unwrap(),
             serde_json::to_value(StreamEvent::Failed {
                 request_id: "r1".into(),
                 seq: 2,
-                partial_text: "A".into(),
                 error: StreamFailure::new("MOCK_FAILURE", "expected"),
             })
             .unwrap(),
@@ -1148,8 +2148,11 @@ mod tests {
         assert_eq!(values[0]["maxInFlight"], 3);
         assert_eq!(values[1]["type"], "delta");
         assert_eq!(values[2]["type"], "cancelled");
-        assert_eq!(values[2]["partialText"], "A");
+        assert!(values[2].get("partialText").is_none());
+        assert!(values[2].get("text").is_none());
         assert_eq!(values[3]["type"], "failed");
+        assert!(values[3].get("partialText").is_none());
+        assert!(values[3].get("text").is_none());
         assert_eq!(values[3]["error"]["code"], "MOCK_FAILURE");
 
         for value in values {
@@ -1161,20 +2164,85 @@ mod tests {
 
         let snapshot = serde_json::to_value(started_machine(2).snapshot()).unwrap();
         assert_eq!(snapshot["status"], "streaming");
-        assert_eq!(snapshot["lastAckedSeq"], -1);
+        assert_eq!(snapshot["lastAckedSeq"], serde_json::Value::Null);
         assert_eq!(snapshot["effectiveBatchWindowMs"], 24);
+        assert_eq!(snapshot["textBytes"], 0);
+        assert_eq!(
+            snapshot["textSha256"],
+            "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        );
+        assert!(snapshot.get("text").is_none());
         assert!(snapshot.get("last_acked_seq").is_none());
     }
 
     #[test]
     fn total_chunk_byte_limit_is_enforced() {
         let invalid = StreamConfig {
-            chunks: Some(vec!["x".repeat(16_384); 65]),
+            chunks: Some(vec!["x".repeat(2_048); 513]),
             ..Default::default()
         };
         let error = ValidatedConfig::try_from(invalid).unwrap_err();
         assert_eq!(error.code, "INVALID_CONFIG");
         assert!(error.message.contains("total"));
+    }
+
+    #[test]
+    fn every_channel_event_is_forced_below_tauri_fetch_queue_threshold() {
+        let empty_delta = StreamEvent::Delta {
+            request_id: MAX_CHANNEL_REQUEST_ID.to_owned(),
+            seq: MAX_SEQUENCE,
+            text: String::new(),
+        };
+        let overhead = serialized_channel_event_len(&empty_delta).unwrap();
+        let largest_ascii_text = "x".repeat(
+            LOREPIA_DIRECT_JSON_BUDGET_BYTES
+                .checked_sub(overhead)
+                .unwrap(),
+        );
+
+        assert!(direct_delta_fits(&largest_ascii_text));
+        assert!(!direct_delta_fits(&format!("{largest_ascii_text}x")));
+
+        let config = ValidatedConfig::try_from(StreamConfig {
+            chunks: Some(vec![format!("{largest_ascii_text}x")]),
+            ..Default::default()
+        })
+        .unwrap();
+        assert_eq!(config.chunks.len(), 1);
+
+        let terminal_events = [
+            StreamEvent::Completed {
+                request_id: MAX_CHANNEL_REQUEST_ID.to_owned(),
+                seq: MAX_SEQUENCE,
+            },
+            StreamEvent::Cancelled {
+                request_id: MAX_CHANNEL_REQUEST_ID.to_owned(),
+                seq: MAX_SEQUENCE,
+            },
+            StreamEvent::Failed {
+                request_id: MAX_CHANNEL_REQUEST_ID.to_owned(),
+                seq: MAX_SEQUENCE,
+                error: StreamFailure::new("MOCK_FAILURE", "bounded fixture failure"),
+            },
+        ];
+        assert!(terminal_events.iter().all(channel_event_uses_direct_path));
+    }
+
+    #[test]
+    fn delta_fragmentation_preserves_ascii_unicode_and_json_escaping_exactly() {
+        let samples = [
+            "x".repeat(16_384),
+            "한글🙂".repeat(1_500),
+            "\0\n\r\t\u{0008}\u{000c}\"\\".repeat(1_000),
+        ];
+
+        for original in samples {
+            let parts = split_direct_delta_text(&original).unwrap();
+            assert!(parts.len() > 1);
+            assert!(parts.iter().all(|part| direct_delta_fits(part)));
+            assert_eq!(parts.concat().as_bytes(), original.as_bytes());
+            assert!(parts.iter().all(|part| part.is_char_boundary(part.len())));
+        }
     }
 
     #[tokio::test(flavor = "current_thread")]
@@ -1234,13 +2302,93 @@ mod tests {
 
         let snapshot = request.machine.lock().await.snapshot();
         assert_eq!(snapshot.status, StreamStatus::Completed);
-        assert_eq!(snapshot.text, "ABC");
+        assert_snapshot_text_receipt(&snapshot, "ABC");
         assert!((snapshot.batch_window_ms..=MAX_BATCH_WINDOW_MS)
             .contains(&snapshot.effective_batch_window_ms));
         assert_ne!(
             request.terminal_seq.load(Ordering::Acquire),
             NO_TERMINAL_SEQ
         );
+    }
+
+    #[tokio::test(flavor = "current_thread")]
+    async fn one_mib_stream_never_uses_the_tauri_channel_fetch_queue() {
+        use tauri::ipc::InvokeResponseBody;
+
+        let chunks = vec!["x".repeat(16_384); 64];
+        let expected = "x".repeat(1_048_576);
+        let config = ValidatedConfig::try_from(StreamConfig {
+            batch_window_ms: Some(16),
+            max_in_flight: Some(64),
+            chunk_interval_ms: Some(1),
+            chunks: Some(chunks),
+            ack_timeout_ms: Some(100),
+            ..Default::default()
+        })
+        .unwrap();
+        let mut machine = StreamMachine::new("request-one-mib".into(), &config);
+        let started = machine.start().unwrap();
+        machine.acknowledge(0).unwrap();
+        let request = Arc::new(StreamRequest::new(machine));
+        let received = Arc::new(Mutex::new(String::with_capacity(expected.len())));
+        let sequences = Arc::new(Mutex::new(Vec::<u64>::new()));
+        let callback_request = Arc::clone(&request);
+        let callback_received = Arc::clone(&received);
+        let callback_sequences = Arc::clone(&sequences);
+
+        let channel = Channel::new(move |body| {
+            let InvokeResponseBody::Json(json) = body else {
+                return Err(std::io::Error::other("unexpected raw channel body").into());
+            };
+            if json.len() > LOREPIA_DIRECT_JSON_BUDGET_BYTES {
+                return Err(std::io::Error::other("event exceeded direct budget").into());
+            }
+            let value: serde_json::Value = serde_json::from_str(&json)?;
+            let seq = value["seq"]
+                .as_u64()
+                .ok_or_else(|| std::io::Error::other("missing seq"))?;
+            callback_sequences.lock().unwrap().push(seq);
+            if value["type"] == "delta" {
+                callback_received
+                    .lock()
+                    .unwrap()
+                    .push_str(value["text"].as_str().unwrap());
+            }
+
+            let ack_request = Arc::clone(&callback_request);
+            tokio::spawn(async move {
+                let acknowledged_through = {
+                    let mut machine = ack_request.machine.lock().await;
+                    machine.acknowledge(seq).unwrap()
+                };
+                ack_request.record_acknowledged_through(acknowledged_through);
+                ack_request.notify.notify_one();
+            });
+            Ok(())
+        });
+
+        send_direct_channel_event(&channel, started).unwrap();
+        // This is a transport-integrity regression, not a performance gate.
+        // Hosted Windows debug runners compile and execute several spike jobs
+        // concurrently, so keep a bounded but scheduling-tolerant deadline.
+        tokio::time::timeout(
+            Duration::from_secs(30),
+            run_stream(Arc::clone(&request), config, channel),
+        )
+        .await
+        .expect("one MiB stream should complete without queue fallback");
+        tokio::time::sleep(Duration::from_millis(10)).await;
+
+        assert_eq!(received.lock().unwrap().as_bytes(), expected.as_bytes());
+        {
+            let sequences = sequences.lock().unwrap();
+            assert!(sequences.windows(2).all(|pair| pair[1] == pair[0] + 1));
+            assert!(sequences.len() > 2);
+        }
+        let snapshot = request.machine.lock().await.snapshot();
+        assert_eq!(snapshot.status, StreamStatus::Completed);
+        assert_snapshot_text_receipt(&snapshot, &expected);
+        assert!(json_value_uses_direct_path(&snapshot));
     }
 
     #[tokio::test(flavor = "current_thread")]
@@ -1256,7 +2404,7 @@ mod tests {
         ));
         let snapshot = request.machine.lock().await.snapshot();
         assert_eq!(snapshot.status, StreamStatus::Failed);
-        assert_eq!(snapshot.last_seq, 0);
+        assert_eq!(snapshot.last_seq, Some(0));
         assert_eq!(
             snapshot.error.as_ref().map(|error| error.code.as_str()),
             Some("CHANNEL_DELIVERY_FAILED")
@@ -1266,7 +2414,7 @@ mod tests {
             request.terminal_seq.load(Ordering::Acquire),
             NO_TERMINAL_SEQ
         );
-        assert!(request.channel_delivery_impossible.load(Ordering::Acquire));
+        assert!(request.control_plane_only_terminal.load(Ordering::Acquire));
         assert!(!request.evictable.load(Ordering::Acquire));
 
         let returned_snapshot = clone_snapshot_for_return(&request).await;
@@ -1287,8 +2435,8 @@ mod tests {
         ));
         let snapshot = request.machine.lock().await.snapshot();
         assert_eq!(snapshot.status, StreamStatus::Failed);
-        assert_eq!(snapshot.last_seq, 0);
-        assert_eq!(snapshot.text, "");
+        assert_eq!(snapshot.last_seq, Some(0));
+        assert_snapshot_text_receipt(&snapshot, "");
         assert_eq!(
             snapshot.error.as_ref().map(|error| error.code.as_str()),
             Some("CHANNEL_DELIVERY_FAILED")
@@ -1297,7 +2445,7 @@ mod tests {
             request.terminal_seq.load(Ordering::Acquire),
             NO_TERMINAL_SEQ
         );
-        assert!(request.channel_delivery_impossible.load(Ordering::Acquire));
+        assert!(request.control_plane_only_terminal.load(Ordering::Acquire));
         assert!(!request.evictable.load(Ordering::Acquire));
 
         let returned_snapshot = clone_snapshot_for_return(&request).await;
@@ -1347,8 +2495,8 @@ mod tests {
 
         let snapshot = request.machine.lock().await.snapshot();
         assert_eq!(snapshot.status, StreamStatus::Cancelled);
-        assert_eq!(snapshot.last_seq, 1);
-        assert_eq!(snapshot.last_acked_seq, -1);
+        assert_eq!(snapshot.last_seq, Some(1));
+        assert_eq!(snapshot.last_acked_seq, None);
         assert_eq!(snapshot.in_flight, 2);
         assert!(snapshot.in_flight <= snapshot.max_in_flight);
     }
@@ -1425,6 +2573,207 @@ mod tests {
         assert_eq!(failed_events[1]["type"], "failed");
     }
 
+    #[tokio::test(flavor = "current_thread")]
+    async fn terminal_wait_wakes_early_and_late_subscribers_without_marking_cleanup() {
+        let mut machine = started_machine(2);
+        machine.acknowledge(0).unwrap();
+        let request = Arc::new(StreamRequest::new(machine));
+        let waiting_request = Arc::clone(&request);
+        let waiter =
+            tokio::spawn(
+                async move { wait_for_terminal_snapshot(&waiting_request).await.unwrap() },
+            );
+
+        while !request.terminal_waiter_active.load(Ordering::Acquire) {
+            tokio::task::yield_now().await;
+        }
+        let duplicate = wait_for_terminal_snapshot(&request).await.unwrap_err();
+        assert_eq!(duplicate.code, "TERMINAL_WAITER_BUSY");
+        assert!(json_value_uses_direct_path(&duplicate));
+
+        let channel = Channel::new(|_| Ok(()));
+        assert!(matches!(
+            deliver_terminal(&request, &channel, TerminalTransition::Complete).await,
+            TerminalDelivery::Sent
+        ));
+
+        let early = waiter.await.unwrap();
+        assert!(!request.terminal_waiter_active.load(Ordering::Acquire));
+        let late = wait_for_terminal_snapshot(&request).await.unwrap();
+        assert_eq!(early, late);
+        assert_eq!(early.status, StreamStatus::Completed);
+        assert_eq!(early.last_seq, Some(1));
+        assert!(json_value_uses_direct_path(&early));
+        assert!(!request.terminal_snapshot_returned.load(Ordering::Acquire));
+        assert!(!request.evictable.load(Ordering::Acquire));
+    }
+
+    #[tokio::test(flavor = "current_thread")]
+    async fn sequence_exhaustion_publishes_a_control_plane_terminal_receipt() {
+        let mut machine = started_machine(2);
+        machine.last_seq = Some(MAX_SEQUENCE);
+        machine.last_acked_seq = Some(MAX_SEQUENCE);
+        let request = Arc::new(StreamRequest::new(machine));
+        let channel = Channel::new(|_| Ok(()));
+
+        assert!(matches!(
+            emit_delta(&request, &channel, "must-not-append".into()).await,
+            DeltaDelivery::Failed
+        ));
+        let snapshot = wait_for_terminal_snapshot(&request).await.unwrap();
+        assert_eq!(snapshot.status, StreamStatus::Failed);
+        assert_eq!(snapshot.last_seq, Some(MAX_SEQUENCE));
+        assert_eq!(snapshot.last_acked_seq, Some(MAX_SEQUENCE));
+        assert_snapshot_text_receipt(&snapshot, "");
+        assert_eq!(
+            snapshot.error.as_ref().map(|error| error.code.as_str()),
+            Some("SEQUENCE_EXHAUSTED")
+        );
+        assert!(request.control_plane_only_terminal.load(Ordering::Acquire));
+    }
+
+    #[tokio::test(flavor = "current_thread")]
+    async fn cancel_at_sequence_limit_becomes_releasable_control_plane_failure() {
+        let request_id = "m1-channel-0000000000000001";
+        let registry = StreamRegistry::default();
+        let mut machine = started_machine(2);
+        machine.request_id = request_id.into();
+        machine.last_seq = Some(MAX_SEQUENCE);
+        machine.last_acked_seq = Some(MAX_SEQUENCE);
+        assert!(machine.request_cancel());
+        let request = Arc::new(StreamRequest::new(machine));
+        registry
+            .insert(request_id.into(), Arc::clone(&request))
+            .unwrap();
+        let channel = Channel::new(|_| Ok(()));
+
+        assert!(matches!(
+            deliver_terminal(&request, &channel, TerminalTransition::Cancel).await,
+            TerminalDelivery::Failed
+        ));
+        let waited = wait_for_terminal_snapshot(&request).await.unwrap();
+        assert_eq!(waited.status, StreamStatus::Failed);
+        assert_eq!(waited.last_seq, Some(MAX_SEQUENCE));
+        assert_eq!(waited.last_acked_seq, Some(MAX_SEQUENCE));
+        assert_eq!(
+            waited.error.as_ref().map(|error| error.code.as_str()),
+            Some("SEQUENCE_EXHAUSTED")
+        );
+        assert!(request.control_plane_only_terminal.load(Ordering::Acquire));
+        assert_eq!(
+            request.terminal_seq.load(Ordering::Acquire),
+            NO_TERMINAL_SEQ
+        );
+
+        let final_snapshot = clone_snapshot_for_return(&request).await;
+        assert_eq!(final_snapshot, waited);
+        let released = release_request(&registry, request_id.into(), MAX_SEQUENCE)
+            .await
+            .unwrap();
+        assert!(released.released);
+        assert!(matches!(
+            registry.get(request_id),
+            Err(CommandError { ref code, .. }) if code == "STREAM_NOT_FOUND"
+        ));
+    }
+
+    #[tokio::test(flavor = "current_thread")]
+    async fn release_requires_terminal_ack_final_snapshot_and_exact_sequence() {
+        let registry = StreamRegistry::default();
+        let mut machine = started_machine(2);
+        machine.acknowledge(0).unwrap();
+        let request = Arc::new(StreamRequest::new(machine));
+        registry
+            .insert("request-release".into(), Arc::clone(&request))
+            .unwrap();
+
+        let nonterminal = release_request(&registry, "request-release".into(), 0)
+            .await
+            .unwrap_err();
+        assert_eq!(nonterminal.code, "INVALID_RELEASE");
+
+        let channel = Channel::new(|_| Ok(()));
+        assert!(matches!(
+            deliver_terminal(&request, &channel, TerminalTransition::Complete).await,
+            TerminalDelivery::Sent
+        ));
+        let waited = wait_for_terminal_snapshot(&request).await.unwrap();
+        assert_eq!(waited.last_seq, Some(1));
+
+        let before_ack = release_request(&registry, "request-release".into(), 1)
+            .await
+            .unwrap_err();
+        assert_eq!(before_ack.code, "INVALID_RELEASE");
+
+        let acknowledged_through = request.machine.lock().await.acknowledge(1).unwrap();
+        request.record_acknowledged_through(acknowledged_through);
+        let before_snapshot = release_request(&registry, "request-release".into(), 1)
+            .await
+            .unwrap_err();
+        assert_eq!(before_snapshot.code, "INVALID_RELEASE");
+
+        let final_snapshot = clone_snapshot_for_return(&request).await;
+        assert_eq!(final_snapshot.last_seq, Some(1));
+        let wrong_sequence = release_request(&registry, "request-release".into(), 0)
+            .await
+            .unwrap_err();
+        assert_eq!(wrong_sequence.code, "INVALID_RELEASE");
+        assert!(registry.get("request-release").is_ok());
+
+        let released = release_request(&registry, "request-release".into(), 1)
+            .await
+            .unwrap();
+        assert_eq!(
+            released,
+            ReleaseStreamResponse {
+                request_id: "request-release".into(),
+                released: true,
+            }
+        );
+        assert!(matches!(
+            registry.get("request-release"),
+            Err(CommandError { ref code, .. }) if code == "STREAM_NOT_FOUND"
+        ));
+    }
+
+    #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+    async fn concurrent_release_has_exactly_one_winner() {
+        let registry = Arc::new(StreamRegistry::default());
+        let mut machine = started_machine(2);
+        machine.acknowledge(0).unwrap();
+        let request = Arc::new(StreamRequest::new(machine));
+        registry
+            .insert("request-release-race".into(), Arc::clone(&request))
+            .unwrap();
+        let channel = Channel::new(|_| Ok(()));
+        assert!(matches!(
+            deliver_terminal(&request, &channel, TerminalTransition::Complete).await,
+            TerminalDelivery::Sent
+        ));
+        let acknowledged_through = request.machine.lock().await.acknowledge(1).unwrap();
+        request.record_acknowledged_through(acknowledged_through);
+        clone_snapshot_for_return(&request).await;
+
+        let first_registry = Arc::clone(&registry);
+        let first = tokio::spawn(async move {
+            release_request(&first_registry, "request-release-race".into(), 1).await
+        });
+        let second_registry = Arc::clone(&registry);
+        let second = tokio::spawn(async move {
+            release_request(&second_registry, "request-release-race".into(), 1).await
+        });
+        let results = [first.await.unwrap(), second.await.unwrap()];
+
+        assert_eq!(results.iter().filter(|result| result.is_ok()).count(), 1);
+        assert_eq!(
+            results
+                .iter()
+                .filter(|result| matches!(result, Err(error) if error.code == "STREAM_NOT_FOUND"))
+                .count(),
+            1
+        );
+    }
+
     #[derive(Clone, Copy)]
     enum DeliveryFailurePoint {
         Delta,
@@ -1463,7 +2812,7 @@ mod tests {
             )),
         }
 
-        assert!(first.channel_delivery_impossible.load(Ordering::Acquire));
+        assert!(first.control_plane_only_terminal.load(Ordering::Acquire));
         assert!(!first.evictable.load(Ordering::Acquire));
         let candidate = Arc::new(StreamRequest::new(StreamMachine::new(
             "request-new".into(),
@@ -1485,6 +2834,16 @@ mod tests {
         );
         assert!(first.evictable.load(Ordering::Acquire));
 
+        let after_snapshot = registry
+            .insert("request-new".into(), Arc::clone(&candidate))
+            .unwrap_err();
+        assert_eq!(after_snapshot.code, "REGISTRY_CAPACITY");
+        assert!(registry.get("request-000").is_ok());
+
+        let released = release_request(&registry, "request-000".into(), 0)
+            .await
+            .unwrap();
+        assert!(released.released);
         registry.insert("request-new".into(), candidate).unwrap();
         assert!(matches!(
             registry.get("request-000"),
@@ -1495,17 +2854,17 @@ mod tests {
     }
 
     #[tokio::test(flavor = "current_thread")]
-    async fn registry_recovers_at_128_after_delta_delivery_failure_snapshot() {
+    async fn registry_recovers_at_128_after_delta_delivery_failure_release() {
         assert_registry_recovers_from_delivery_failure(DeliveryFailurePoint::Delta).await;
     }
 
     #[tokio::test(flavor = "current_thread")]
-    async fn registry_recovers_at_128_after_terminal_delivery_failure_snapshot() {
+    async fn registry_recovers_at_128_after_terminal_delivery_failure_release() {
         assert_registry_recovers_from_delivery_failure(DeliveryFailurePoint::Terminal).await;
     }
 
     #[tokio::test(flavor = "current_thread")]
-    async fn registry_evicts_only_after_terminal_ack_and_snapshot_return() {
+    async fn registry_keeps_releasable_terminal_until_explicit_release() {
         let registry = StreamRegistry::default();
         let config = config(24, 2);
 
@@ -1543,8 +2902,7 @@ mod tests {
 
         let acknowledged_through = {
             let mut machine = first.machine.lock().await;
-            machine.acknowledge(1).unwrap();
-            machine.last_acked_seq
+            machine.acknowledge(1).unwrap()
         };
         first.record_acknowledged_through(acknowledged_through);
         assert!(first.terminal_acked.load(Ordering::Acquire));
@@ -1560,7 +2918,71 @@ mod tests {
         assert!(first.terminal_snapshot_returned.load(Ordering::Acquire));
         assert!(first.evictable.load(Ordering::Acquire));
 
+        let before_release = registry
+            .insert("request-new".into(), Arc::clone(&candidate))
+            .unwrap_err();
+        assert_eq!(before_release.code, "REGISTRY_CAPACITY");
+        assert!(registry.get("request-000").is_ok());
+
+        let released = release_request(&registry, "request-000".into(), 1)
+            .await
+            .unwrap();
+        assert!(released.released);
         registry.insert("request-new".into(), candidate).unwrap();
+        assert!(matches!(
+            registry.get("request-000"),
+            Err(CommandError { ref code, .. }) if code == "STREAM_NOT_FOUND"
+        ));
+        assert!(registry.get("request-new").is_ok());
+        assert_eq!(registry.inner.lock().unwrap().requests.len(), MAX_REQUESTS);
+    }
+
+    #[tokio::test(flavor = "current_thread")]
+    async fn expired_terminal_ttl_recovers_capacity_from_a_dead_webview() {
+        let registry = StreamRegistry::default();
+        let config = config(24, 2);
+        let mut first_machine = StreamMachine::new("request-000".into(), &config);
+        first_machine.start().unwrap();
+        let first = Arc::new(StreamRequest::new(first_machine));
+        registry
+            .insert("request-000".into(), Arc::clone(&first))
+            .unwrap();
+        for index in 1..MAX_REQUESTS {
+            let request_id = format!("request-{index:03}");
+            registry
+                .insert(
+                    request_id.clone(),
+                    Arc::new(StreamRequest::new(StreamMachine::new(request_id, &config))),
+                )
+                .unwrap();
+        }
+
+        let channel = Channel::new(|_| Ok(()));
+        assert!(matches!(
+            deliver_terminal(&first, &channel, TerminalTransition::Complete).await,
+            TerminalDelivery::Sent
+        ));
+        let waited = wait_for_terminal_snapshot(&first).await.unwrap();
+        assert_eq!(waited.status, StreamStatus::Completed);
+        assert!(!first.terminal_waiter_active.load(Ordering::Acquire));
+        let candidate = Arc::new(StreamRequest::new(StreamMachine::new(
+            "request-new".into(),
+            &config,
+        )));
+        assert_eq!(
+            registry
+                .insert("request-new".into(), Arc::clone(&candidate))
+                .unwrap_err()
+                .code,
+            "REGISTRY_CAPACITY"
+        );
+
+        let expired_at = Instant::now()
+            .checked_sub(TERMINAL_RETENTION_TTL + Duration::from_millis(1))
+            .unwrap();
+        *first.terminal_reached_at.lock().unwrap() = Some(expired_at);
+        registry.insert("request-new".into(), candidate).unwrap();
+
         assert!(matches!(
             registry.get("request-000"),
             Err(CommandError { ref code, .. }) if code == "STREAM_NOT_FOUND"
@@ -1611,7 +3033,7 @@ mod tests {
 
         let snapshot = clone_snapshot_for_return(&request).await;
         assert_eq!(snapshot.status, StreamStatus::Completed);
-        assert_eq!(snapshot.last_seq, 1);
+        assert_eq!(snapshot.last_seq, Some(1));
         assert_eq!(request.terminal_seq.load(Ordering::Acquire), 1);
     }
 
@@ -1663,8 +3085,7 @@ mod tests {
                     }
                     let acknowledged_through = {
                         let mut machine = ack_request.machine.lock().await;
-                        machine.acknowledge(seq).unwrap();
-                        machine.last_acked_seq
+                        machine.acknowledge(seq).unwrap()
                     };
                     ack_request.record_acknowledged_through(acknowledged_through);
                     ack_request.notify.notify_one();
@@ -1697,7 +3118,51 @@ mod tests {
 
         let snapshot = request.machine.lock().await.snapshot();
         assert_eq!(snapshot.effective_batch_window_ms, 50);
-        assert_eq!(snapshot.text.len(), chunks.len());
+        assert_snapshot_text_receipt(&snapshot, &"x".repeat(chunks.len()));
         assert!(snapshot.in_flight <= snapshot.max_in_flight);
+    }
+
+    #[tokio::test(flavor = "current_thread")]
+    async fn missing_ack_reaches_a_bounded_failed_terminal() {
+        use tauri::ipc::InvokeResponseBody;
+
+        let mut config = config(24, 2);
+        config.ack_timeout_ms = 10;
+        let mut machine = StreamMachine::new("request-ack-timeout".into(), &config);
+        let started = machine.start().unwrap();
+        let request = Arc::new(StreamRequest::new(machine));
+        let captured = Arc::new(Mutex::new(Vec::<serde_json::Value>::new()));
+        let callback_captured = Arc::clone(&captured);
+        let channel = Channel::new(move |body| {
+            let InvokeResponseBody::Json(json) = body else {
+                return Err(std::io::Error::other("unexpected raw channel body").into());
+            };
+            callback_captured
+                .lock()
+                .unwrap()
+                .push(serde_json::from_str(&json)?);
+            Ok(())
+        });
+
+        send_direct_channel_event(&channel, started).unwrap();
+        tokio::time::timeout(
+            Duration::from_secs(1),
+            run_stream(Arc::clone(&request), config, channel),
+        )
+        .await
+        .expect("a missing ACK must not leave the stream runner alive");
+
+        let events = captured.lock().unwrap().clone();
+        assert_eq!(events.len(), 2);
+        assert_eq!(events[0]["type"], "started");
+        assert_eq!(events[1]["type"], "failed");
+        assert_eq!(events[1]["error"]["code"], "ACK_TIMEOUT");
+
+        let snapshot = request.machine.lock().await.snapshot();
+        assert_eq!(snapshot.status, StreamStatus::Failed);
+        assert_eq!(snapshot.last_seq, Some(1));
+        assert_eq!(snapshot.last_acked_seq, None);
+        assert_eq!(snapshot.in_flight, 2);
+        assert_snapshot_text_receipt(&snapshot, "");
     }
 }

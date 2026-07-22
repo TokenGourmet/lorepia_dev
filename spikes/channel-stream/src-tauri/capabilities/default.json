@@ -1,9 +1,18 @@
 {
   "$schema": "../gen/schemas/desktop-schema.json",
   "identifier": "default",
-  "description": "Capability for the main window",
-  "windows": ["main"],
+  "description": "Exact app-command capability for the trusted main WebView",
+  "webviews": ["main"],
   "permissions": [
-    "core:default"
+    "allow-start-mock-stream",
+    "allow-ack-stream",
+    "allow-cancel-stream",
+    "allow-get-stream-snapshot",
+    "allow-register-host-broker-session",
+    "allow-rotate-host-broker-session",
+    "allow-host-broker-request",
+    "allow-host-broker-probe-count",
+    "allow-release-stream",
+    "allow-wait-stream-terminal"
   ]
 }

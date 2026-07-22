@@ -1,0 +1,22 @@
+App: src-tauri/gen/apple/build/arm64-sim/LorePia Keychain Spike.app
+Bundle identifier: dev.lorepia.spike.keychain
+Bundle version: 0.1.0
+Executable SHA-256: fb8309f8f1a2ec9e7c5a458c0dbc2ebd1e9abe29a22338d7a6d6a43c397232be
+
+codesign -dv --verbose=4:
+Executable=LorePia Keychain Spike.app/LorePia Keychain Spike
+Identifier=LorePia Keychain Spike
+Format=app bundle with Mach-O thin (arm64)
+CodeDirectory flags=0x20002(adhoc,linker-signed)
+CDHash=772cb5bc44bf57cdaa58797b67f99074d5587f17
+Signature=adhoc
+Info.plist=not bound
+TeamIdentifier=not set
+Sealed Resources=none
+Internal requirements=none
+
+codesign -d --entitlements :-:
+No entitlement dictionary was emitted.
+
+Generated lorepia-keychain-spike_iOS.entitlements:
+{}

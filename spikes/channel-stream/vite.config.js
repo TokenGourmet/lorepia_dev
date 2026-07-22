@@ -1,12 +1,20 @@
 import { defineConfig } from "vite";
 import { sveltekit } from "@sveltejs/kit/vite";
 
-// @ts-expect-error process is a nodejs global
+import {
+  resolveBuildProfile,
+  storeSafeAssetGate,
+} from "./scripts/build-profile.mjs";
+
 const host = process.env.TAURI_DEV_HOST;
+const buildProfile = resolveBuildProfile(process.env.TAURI_ENV_PLATFORM);
 
 // https://vite.dev/config/
 export default defineConfig(async () => ({
-  plugins: [sveltekit()],
+  plugins: [storeSafeAssetGate(buildProfile), sveltekit()],
+  define: {
+    __LOREPIA_BUILD_PROFILE__: JSON.stringify(buildProfile),
+  },
 
   // Vite options tailored for Tauri development and only applied in `tauri dev` or `tauri build`
   //

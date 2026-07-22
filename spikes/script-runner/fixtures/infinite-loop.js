@@ -1,0 +1,3 @@
+(_input) => {
+  while (true) {}
+}

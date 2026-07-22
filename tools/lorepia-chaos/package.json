@@ -1,0 +1,8 @@
+{
+  "name": "lorepia-chaos",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "test": "node --test chaos.test.mjs"
+  }
+}

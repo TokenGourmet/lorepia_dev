@@ -1,0 +1,30 @@
+Source commit: 46af7539dfc564ba2fc4c8009401878965799fc3
+Artifact executable SHA-256: 9c71fc620e001e6e1e1fee9aaba96083d35bc0c4765741e60169f6a7d38f60e7
+Host: macOS 26.5.2 build 25F84, arm64, Mac16,10
+Operator: Computer Use runtime
+Invocation count: 2
+Result: PASS twice with identical visible receipt
+Retained UTC window: 2026-07-18T22:18:12Z through 2026-07-18T22:18:41Z
+Runtime window log SHA-256: 9eb8cd6c30ba8ee7a2a9fca8b45b10337329fa65df63799fa777be383d1bc4c6
+Second-pass screenshot SHA-256: dad70c0d76c9e01b6f6fdead024668825639fb7085b6082075e4a2cdddff785b
+
+Import hardening 검증 통과
+정책: m1-import-hardening-v1
+fixture catalog SHA-256: 484a313423d4e91c792818fb64097d96f8efb7c4a31befe96a1d3f739bfe5eb2
+검증 케이스: ACCEPTED 2 / REJECTED 24
+정상 archive SHA-256: 485733d6f60763ef1e2e63b4595debc63500d2b67321ea0e4ffa3084b611dc0f
+정상 archive bytes: source 665 / uncompressed 217
+정상 archive 항목: 4개, 스크립트 2개 중 실행 0개
+정상 PNG SHA-256: ff36b8831e688e8fb5a511d916e82621821f67ce1c1c8ee204c395702c5a1a04
+정상 PNG bytes: 70, dimensions 1x1
+ZIP/PNG parser: 8.6.0 / 0.18.1
+고정 외부 sentinel: 변경 없음
+스크립트: inert quarantine
+정리 대기: 아니요
+
+Post-exit exact-path check:
+  app-local parent: empty
+  lorepia-m1-import-hardening-probe-v1: absent
+  lorepia-m1-import-hardening-outside-sentinel-v1: absent
+
+No picker, external file, URI, or product importer was exercised.

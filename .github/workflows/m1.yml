@@ -19,7 +19,7 @@ env:
 
 jobs:
   desktop:
-    name: Desktop compile/test (${{ matrix.name }})
+    name: Desktop compile/test (${{ matrix.name }} / ${{ matrix.spike }})
     runs-on: ${{ matrix.runner }}
     timeout-minutes: 45
     strategy:
@@ -28,16 +28,75 @@ jobs:
         include:
           - name: Linux
             runner: ubuntu-22.04
+            spike: channel-stream
+          - name: Linux
+            runner: ubuntu-22.04
+            spike: keychain
+          - name: Linux
+            runner: ubuntu-22.04
+            spike: sqlite-fts
+          - name: Linux
+            runner: ubuntu-22.04
+            spike: import-hardening
+          - name: Linux
+            runner: ubuntu-22.04
+            spike: lua-limits
+          - name: Linux
+            runner: ubuntu-22.04
+            spike: audio-playback
+          - name: Linux
+            runner: ubuntu-22.04
+            spike: script-runner
           - name: macOS
             runner: macos-26
+            spike: channel-stream
+          - name: macOS
+            runner: macos-26
+            spike: keychain
+          - name: macOS
+            runner: macos-26
+            spike: sqlite-fts
+          - name: macOS
+            runner: macos-26
+            spike: import-hardening
+          - name: macOS
+            runner: macos-26
+            spike: lua-limits
+          - name: macOS
+            runner: macos-26
+            spike: audio-playback
+          - name: macOS
+            runner: macos-26
+            spike: script-runner
           - name: Windows
             runner: windows-2022
+            spike: channel-stream
+          - name: Windows
+            runner: windows-2022
+            spike: keychain
+          - name: Windows
+            runner: windows-2022
+            spike: sqlite-fts
+          - name: Windows
+            runner: windows-2022
+            spike: import-hardening
+          - name: Windows
+            runner: windows-2022
+            spike: lua-limits
+          - name: Windows
+            runner: windows-2022
+            spike: audio-playback
+          - name: Windows
+            runner: windows-2022
+            spike: script-runner
     defaults:
       run:
-        working-directory: spikes/channel-stream
+        working-directory: spikes/${{ matrix.spike }}
     steps:
       - name: Check out repository
-        uses: actions/checkout@v6
+        uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6
+        with:
+          persist-credentials: false
 
       - name: Install Linux Tauri dependencies
         if: runner.os == 'Linux'
@@ -52,11 +111,11 @@ jobs:
             libxdo-dev
 
       - name: Set up Node.js
-        uses: actions/setup-node@v6
+        uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6
         with:
           node-version: 22
           cache: npm
-          cache-dependency-path: spikes/channel-stream/package-lock.json
+          cache-dependency-path: spikes/${{ matrix.spike }}/package-lock.json
 
       - name: Set up Rust
         run: |
@@ -65,6 +124,10 @@ jobs:
 
       - name: Install locked JavaScript dependencies
         run: npm ci
+
+      - name: Verify source audio fixture identity
+        if: matrix.spike == 'audio-playback'
+        run: npm run verify:fixture
 
       - name: Run frontend contract tests
         run: npm test
@@ -77,6 +140,14 @@ jobs:
 
       - name: Build frontend
         run: npm run build
+
+      - name: Verify emitted audio fixture identity
+        if: matrix.spike == 'audio-playback'
+        run: npm run verify:built-fixture
+
+      - name: Verify emitted script-runner boundary
+        if: matrix.spike == 'script-runner'
+        run: npm run verify:built
 
       - name: Check Rust formatting
         run: cargo fmt --manifest-path src-tauri/Cargo.toml --all -- --check
@@ -91,26 +162,32 @@ jobs:
         run: cargo check --locked --manifest-path src-tauri/Cargo.toml --all-targets
 
   android-compile:
-    name: Android compile (no device)
+    name: Android compile (${{ matrix.spike }}, no device)
     runs-on: ubuntu-22.04
     timeout-minutes: 60
+    strategy:
+      fail-fast: false
+      matrix:
+        spike: [channel-stream, keychain, sqlite-fts, import-hardening, lua-limits, audio-playback, script-runner]
     defaults:
       run:
         shell: bash
-        working-directory: spikes/channel-stream
+        working-directory: spikes/${{ matrix.spike }}
     steps:
       - name: Check out repository
-        uses: actions/checkout@v6
+        uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6
+        with:
+          persist-credentials: false
 
       - name: Set up Node.js
-        uses: actions/setup-node@v6
+        uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6
         with:
           node-version: 22
           cache: npm
-          cache-dependency-path: spikes/channel-stream/package-lock.json
+          cache-dependency-path: spikes/${{ matrix.spike }}/package-lock.json
 
       - name: Set up Java 21
-        uses: actions/setup-java@v5
+        uses: actions/setup-java@03ad4de0992f5dab5e18fcb136590ce7c4a0ac95 # v5
         with:
           distribution: temurin
           java-version: "21"
@@ -129,14 +206,36 @@ jobs:
       - name: Install locked JavaScript dependencies
         run: npm ci
 
+      - name: Verify source audio fixture identity
+        if: matrix.spike == 'audio-playback'
+        run: npm run verify:fixture
+
       - name: Initialize disposable Android wrapper when absent
         run: |
           if [[ ! -d src-tauri/gen/android ]]; then
             npm run tauri android init -- --ci
           fi
 
+      - name: Verify keychain Android NDK context and backup exclusions
+        if: matrix.spike == 'keychain'
+        run: npm run verify:android-wrapper
+
       - name: Compile debug ARM64 APK
         run: npm run tauri android build -- --debug --target aarch64 --apk --ci
+
+      - name: Verify APK exists
+        run: |
+          apk_path="$(find src-tauri/gen/android/app/build/outputs -type f -name '*.apk' -print -quit)"
+          test -n "$apk_path"
+          sha256sum "$apk_path"
+
+      - name: Verify emitted audio fixture identity
+        if: matrix.spike == 'audio-playback'
+        run: npm run verify:built-fixture
+
+      - name: Verify emitted script-runner boundary
+        if: matrix.spike == 'script-runner'
+        run: npm run verify:built
 
       - name: Record compile-only scope
         run: |
@@ -147,23 +246,29 @@ jobs:
           } >> "$GITHUB_STEP_SUMMARY"
 
   ios-simulator-compile:
-    name: iOS simulator compile (no device)
+    name: iOS simulator compile (${{ matrix.spike }}, no device)
     runs-on: macos-26
     timeout-minutes: 60
+    strategy:
+      fail-fast: false
+      matrix:
+        spike: [channel-stream, keychain, sqlite-fts, import-hardening, lua-limits, audio-playback, script-runner]
     defaults:
       run:
         shell: bash
-        working-directory: spikes/channel-stream
+        working-directory: spikes/${{ matrix.spike }}
     steps:
       - name: Check out repository
-        uses: actions/checkout@v6
+        uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6
+        with:
+          persist-credentials: false
 
       - name: Set up Node.js
-        uses: actions/setup-node@v6
+        uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6
         with:
           node-version: 22
           cache: npm
-          cache-dependency-path: spikes/channel-stream/package-lock.json
+          cache-dependency-path: spikes/${{ matrix.spike }}/package-lock.json
 
       - name: Set up Rust and iOS simulator target
         run: |
@@ -179,6 +284,10 @@ jobs:
       - name: Install locked JavaScript dependencies
         run: npm ci
 
+      - name: Verify source audio fixture identity
+        if: matrix.spike == 'audio-playback'
+        run: npm run verify:fixture
+
       - name: Initialize disposable iOS wrapper when absent
         run: |
           if [[ ! -d src-tauri/gen/apple ]]; then
@@ -187,6 +296,50 @@ jobs:
 
       - name: Compile debug ARM64 simulator app
         run: npm run tauri ios build -- --debug --target aarch64-sim --ci --no-sign
+
+      - name: Verify simulator app exists
+        run: |
+          app_dir="$(find src-tauri/gen/apple/build/arm64-sim -maxdepth 1 -type d -name '*.app' -print -quit)"
+          test -n "$app_dir"
+          test -f "$app_dir/Info.plist"
+
+      - name: Verify emitted audio fixture identity
+        if: matrix.spike == 'audio-playback'
+        run: npm run verify:built-fixture
+
+      - name: Verify emitted script-runner boundary
+        if: matrix.spike == 'script-runner'
+        run: npm run verify:built
+
+      - name: Verify vendored Lua is embedded in the iOS product
+        if: matrix.spike == 'lua-limits'
+        run: |
+          app_dir="$(find src-tauri/gen/apple/build/arm64-sim -maxdepth 1 -type d -name '*.app' -print -quit)"
+          test -n "$app_dir"
+          executable_name="$(/usr/libexec/PlistBuddy -c 'Print :CFBundleExecutable' "$app_dir/Info.plist")"
+          executable="$app_dir/$executable_name"
+          test -f "$executable"
+
+          libapp="$(find src-tauri/gen/apple/Externals/arm64/debug -type f -name libapp.a -print -quit)"
+          test -n "$libapp"
+          ar -t "$libapp" > "$RUNNER_TEMP/lua-libapp-members.txt"
+          grep -E '(^|-)lapi\.o$' "$RUNNER_TEMP/lua-libapp-members.txt" > /dev/null
+
+          nm -gU "$executable" > "$RUNNER_TEMP/lua-defined-symbols.txt"
+          grep -E '[[:space:]]T[[:space:]]_lua_newstate$' "$RUNNER_TEMP/lua-defined-symbols.txt" > /dev/null
+          grep -E '[[:space:]]T[[:space:]]_luaL_newstate$' "$RUNNER_TEMP/lua-defined-symbols.txt" > /dev/null
+          grep -E '[[:space:]]T[[:space:]]_lua_pcallk$' "$RUNNER_TEMP/lua-defined-symbols.txt" > /dev/null
+
+          nm -u "$executable" > "$RUNNER_TEMP/lua-undefined-symbols.txt"
+          if grep -E '[[:space:]]_lua(L)?[A-Za-z0-9_]*$' "$RUNNER_TEMP/lua-undefined-symbols.txt" > /dev/null; then
+            echo "unresolved Lua symbol remained in the final iOS executable" >&2
+            exit 1
+          fi
+          otool -L "$executable" > "$RUNNER_TEMP/lua-linked-libraries.txt"
+          if tail -n +2 "$RUNNER_TEMP/lua-linked-libraries.txt" | grep -Ei 'lua' > /dev/null; then
+            echo "final iOS executable depends on an external Lua library" >&2
+            exit 1
+          fi
 
       - name: Record compile-only scope
         run: |

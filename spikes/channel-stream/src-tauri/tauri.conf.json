@@ -18,17 +18,26 @@
       }
     ],
     "security": {
+      "capabilities": ["default"],
       "csp": {
         "default-src": "'self' customprotocol: asset:",
+        "base-uri": "'none'",
         "connect-src": "ipc: http://ipc.localhost",
+        "form-action": "'none'",
+        "frame-src": "'self'",
         "img-src": "'self' asset: http://asset.localhost data:",
+        "object-src": "'none'",
         "style-src": "'self' 'unsafe-inline'",
         "script-src": "'self'"
       },
       "devCsp": {
         "default-src": "'self' http://localhost:1420",
+        "base-uri": "'none'",
         "connect-src": "ipc: http://ipc.localhost http://localhost:1420 ws://localhost:1420 ws://*:*",
+        "form-action": "'none'",
+        "frame-src": "'self' http://localhost:1420",
         "img-src": "'self' data:",
+        "object-src": "'none'",
         "style-src": "'self' 'unsafe-inline'",
         "script-src": "'self'"
       },

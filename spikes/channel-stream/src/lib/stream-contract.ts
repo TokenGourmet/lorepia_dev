@@ -13,8 +13,13 @@ export type ExpectedTerminalSnapshot = {
   requestId: string;
   status: Extract<StreamSnapshotStatus, "completed" | "cancelled" | "failed">;
   lastSeq: number;
-  text: string;
+  acceptedText: string;
   error: { code: string; message: string } | null;
+};
+
+export type TextReceipt = {
+  textBytes: number;
+  textSha256: string;
 };
 
 export type StreamContractState = {
@@ -46,6 +51,19 @@ export type SnapshotValidation =
   | { accepted: true; snapshot: StreamSnapshot }
   | { accepted: false; error: string; mismatches: string[] };
 
+export type TerminalRecoveryValidation =
+  | {
+      accepted: true;
+      snapshot: StreamSnapshot;
+      expected: ExpectedTerminalSnapshot;
+      terminalEventDelivered: boolean;
+    }
+  | { accepted: false; error: string; mismatches: string[] };
+
+export type ReleaseValidation =
+  | { accepted: true }
+  | { accepted: false; error: string };
+
 export function createStreamContractState(): StreamContractState {
   return {
     requestId: null,
@@ -62,6 +80,32 @@ function isRecord(value: unknown): value is Record<string, unknown> {
 
 function isNonnegativeSafeInteger(value: unknown): value is number {
   return typeof value === "number" && Number.isSafeInteger(value) && value >= 0;
+}
+
+function hasOnlyKeys(value: Record<string, unknown>, allowedKeys: string[]): boolean {
+  const allowed = new Set(allowedKeys);
+  return Object.keys(value).every((key) => allowed.has(key));
+}
+
+function getWebCryptoDigest(): Pick<SubtleCrypto, "digest"> {
+  const subtle = globalThis.crypto?.subtle;
+  if (subtle === undefined) {
+    throw new Error("Web Crypto SHA-256을 사용할 수 없습니다.");
+  }
+  return subtle;
+}
+
+export async function createTextReceipt(
+  text: string,
+  digestProvider: Pick<SubtleCrypto, "digest"> = getWebCryptoDigest(),
+): Promise<TextReceipt> {
+  const encoded = new TextEncoder().encode(text);
+  const digest = await digestProvider.digest("SHA-256", encoded);
+  const textSha256 = Array.from(new Uint8Array(digest), (byte) =>
+    byte.toString(16).padStart(2, "0"),
+  ).join("");
+
+  return { textBytes: encoded.byteLength, textSha256 };
 }
 
 function describeEventType(value: unknown): string {
@@ -107,26 +151,32 @@ function parseStreamEvent(
       }
       return { accepted: true, event: value as StreamEvent };
     case "delta":
-    case "completed":
-      if (typeof value.text !== "string") {
+      if (typeof value.text !== "string" || value.text.length === 0) {
         return {
           accepted: false,
-          error: `${value.type} 이벤트의 text가 문자열이 아닙니다.`,
+          error: "delta 이벤트의 text는 비어 있지 않은 문자열이어야 합니다.",
         };
       }
       return { accepted: true, event: value as StreamEvent };
+    case "completed":
     case "cancelled":
-      if (typeof value.partialText !== "string") {
+      if (!hasOnlyKeys(value, ["type", "requestId", "seq"])) {
         return {
           accepted: false,
-          error: "cancelled 이벤트의 partialText가 문자열이 아닙니다.",
+          error: `${value.type} 종료 이벤트에 허용되지 않은 필드가 있습니다.`,
         };
       }
       return { accepted: true, event: value as StreamEvent };
     case "failed":
+      if (!hasOnlyKeys(value, ["type", "requestId", "seq", "error"])) {
+        return {
+          accepted: false,
+          error: "failed 종료 이벤트에 허용되지 않은 필드가 있습니다.",
+        };
+      }
       if (
-        typeof value.partialText !== "string" ||
         !isRecord(value.error) ||
+        !hasOnlyKeys(value.error, ["code", "message"]) ||
         typeof value.error.code !== "string" ||
         typeof value.error.message !== "string"
       ) {
@@ -145,6 +195,7 @@ function parseStreamEvent(
 }
 
 export function expectedSnapshotFrom(
+  state: StreamContractState,
   event: TerminalStreamEvent,
 ): ExpectedTerminalSnapshot {
   if (event.type === "completed") {
@@ -152,7 +203,7 @@ export function expectedSnapshotFrom(
       requestId: event.requestId,
       status: "completed",
       lastSeq: event.seq,
-      text: event.text,
+      acceptedText: state.text,
       error: null,
     };
   }
@@ -162,7 +213,7 @@ export function expectedSnapshotFrom(
       requestId: event.requestId,
       status: "cancelled",
       lastSeq: event.seq,
-      text: event.partialText,
+      acceptedText: state.text,
       error: null,
     };
   }
@@ -171,7 +222,7 @@ export function expectedSnapshotFrom(
     requestId: event.requestId,
     status: "failed",
     lastSeq: event.seq,
-    text: event.partialText,
+    acceptedText: state.text,
     error: event.error,
   };
 }
@@ -249,17 +300,8 @@ export function validateStreamEvent(
 
   const terminalExpectation =
     event.type === "completed" || event.type === "cancelled" || event.type === "failed"
-      ? expectedSnapshotFrom(event)
+      ? expectedSnapshotFrom(state, event)
       : null;
-
-  if (terminalExpectation !== null && terminalExpectation.text !== state.text) {
-    return {
-      accepted: false,
-      shouldAcknowledge: false,
-      error: `${event.type} 이벤트의 최종 텍스트가 accepted delta 누적값과 일치하지 않습니다.`,
-      nextState: state,
-    };
-  }
 
   const nextState: StreamContractState = {
     requestId: state.requestId ?? event.requestId,
@@ -278,8 +320,22 @@ export function validateStreamEvent(
   };
 }
 
-function hasValidSnapshotPayload(value: unknown): value is StreamSnapshot {
+export function isValidStreamSnapshotPayload(value: unknown): value is StreamSnapshot {
   if (!isRecord(value)) return false;
+
+  const hasValidKeys = hasOnlyKeys(value, [
+    "requestId",
+    "status",
+    "lastSeq",
+    "lastAckedSeq",
+    "inFlight",
+    "textBytes",
+    "textSha256",
+    "error",
+    "batchWindowMs",
+    "effectiveBatchWindowMs",
+    "maxInFlight",
+  ]);
 
   const statusIsValid =
     value.status === "queued" ||
@@ -290,8 +346,12 @@ function hasValidSnapshotPayload(value: unknown): value is StreamSnapshot {
   const errorIsValid =
     value.error === null ||
     (isRecord(value.error) &&
+      hasOnlyKeys(value.error, ["code", "message"]) &&
       typeof value.error.code === "string" &&
-      typeof value.error.message === "string");
+      value.error.code.length > 0 &&
+      value.error.code.length <= 64 &&
+      typeof value.error.message === "string" &&
+      value.error.message.length <= 512);
 
   const batchWindowMs = isNonnegativeSafeInteger(value.batchWindowMs)
     ? value.batchWindowMs
@@ -321,24 +381,56 @@ function hasValidSnapshotPayload(value: unknown): value is StreamSnapshot {
     maxInFlightIsValid &&
     inFlight <= maxInFlight;
 
+  const lastSeq = value.lastSeq;
+  const lastAckedSeq = value.lastAckedSeq;
+  const sequencesAreValid =
+    (lastSeq === null || isNonnegativeSafeInteger(lastSeq)) &&
+    (lastAckedSeq === null || isNonnegativeSafeInteger(lastAckedSeq));
+  const sequenceAccountingIsValid = (() => {
+    if (!sequencesAreValid || inFlight === null) return false;
+    if (lastSeq === null) {
+      return (
+        value.status === "queued" && lastAckedSeq === null && inFlight === 0
+      );
+    }
+    if (value.status === "queued") return false;
+    if (lastAckedSeq !== null && lastAckedSeq > lastSeq) return false;
+    const expectedInFlight =
+      BigInt(lastSeq) - BigInt(lastAckedSeq === null ? -1 : lastAckedSeq);
+    return expectedInFlight === BigInt(inFlight);
+  })();
+  const errorMatchesStatus =
+    value.status === "failed" ? value.error !== null : value.error === null;
+  const queuedReceiptIsValid =
+    value.status !== "queued" ||
+    (value.textBytes === 0 &&
+      value.textSha256 ===
+        "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855");
+
   return (
+    hasValidKeys &&
     typeof value.requestId === "string" &&
     value.requestId.length > 0 &&
     statusIsValid &&
-    isNonnegativeSafeInteger(value.lastSeq) &&
-    isNonnegativeSafeInteger(value.lastAckedSeq) &&
+    sequenceAccountingIsValid &&
     inFlightIsValid &&
-    typeof value.text === "string" &&
+    isNonnegativeSafeInteger(value.textBytes) &&
+    value.textBytes <= 1_048_576 &&
+    typeof value.textSha256 === "string" &&
+    /^[0-9a-f]{64}$/.test(value.textSha256) &&
     errorIsValid &&
+    errorMatchesStatus &&
+    queuedReceiptIsValid &&
     batchWindowIsValid &&
     effectiveBatchWindowIsValid &&
     maxInFlightIsValid
   );
 }
 
-export function snapshotMismatches(
+function snapshotMismatches(
   snapshot: StreamSnapshot,
   expected: ExpectedTerminalSnapshot,
+  expectedReceipt: TextReceipt,
 ): string[] {
   const mismatches: string[] = [];
 
@@ -347,7 +439,10 @@ export function snapshotMismatches(
   if (snapshot.lastSeq !== expected.lastSeq) mismatches.push("lastSeq");
   if (snapshot.lastAckedSeq !== expected.lastSeq) mismatches.push("lastAckedSeq");
   if (snapshot.inFlight !== 0) mismatches.push("inFlight");
-  if (snapshot.text !== expected.text) mismatches.push("text");
+  if (snapshot.textBytes !== expectedReceipt.textBytes) mismatches.push("textBytes");
+  if (snapshot.textSha256 !== expectedReceipt.textSha256) {
+    mismatches.push("textSha256");
+  }
 
   const errorMatches =
     (snapshot.error === null && expected.error === null) ||
@@ -360,11 +455,12 @@ export function snapshotMismatches(
   return mismatches;
 }
 
-export function validateTerminalSnapshot(
+export async function validateTerminalSnapshot(
   value: unknown,
   expected: ExpectedTerminalSnapshot,
-): SnapshotValidation {
-  if (!hasValidSnapshotPayload(value)) {
+  digestProvider?: Pick<SubtleCrypto, "digest">,
+): Promise<SnapshotValidation> {
+  if (!isValidStreamSnapshotPayload(value)) {
     return {
       accepted: false,
       error: "최종 스냅샷 데이터 형식이 유효하지 않습니다.",
@@ -372,7 +468,11 @@ export function validateTerminalSnapshot(
     };
   }
 
-  const mismatches = snapshotMismatches(value, expected);
+  const expectedReceipt = await createTextReceipt(
+    expected.acceptedText,
+    digestProvider ?? getWebCryptoDigest(),
+  );
+  const mismatches = snapshotMismatches(value, expected, expectedReceipt);
   if (mismatches.length > 0) {
     return {
       accepted: false,
@@ -382,4 +482,122 @@ export function validateTerminalSnapshot(
   }
 
   return { accepted: true, snapshot: value };
+}
+
+function terminalErrorMatches(
+  actual: StreamSnapshot["error"],
+  expected: ExpectedTerminalSnapshot["error"],
+): boolean {
+  return (
+    (actual === null && expected === null) ||
+    (actual !== null &&
+      expected !== null &&
+      actual.code === expected.code &&
+      actual.message === expected.message)
+  );
+}
+
+export async function validateTerminalRecoverySnapshot(
+  value: unknown,
+  state: StreamContractState,
+  digestProvider?: Pick<SubtleCrypto, "digest">,
+): Promise<TerminalRecoveryValidation> {
+  if (!isValidStreamSnapshotPayload(value)) {
+    return {
+      accepted: false,
+      error: "종료 복구 스냅샷 데이터 형식이 유효하지 않습니다.",
+      mismatches: ["payload"],
+    };
+  }
+  if (
+    value.status !== "completed" &&
+    value.status !== "cancelled" &&
+    value.status !== "failed"
+  ) {
+    return {
+      accepted: false,
+      error: "종료되지 않은 스냅샷을 종료 복구에 사용할 수 없습니다.",
+      mismatches: ["status"],
+    };
+  }
+  if (state.requestId === null || state.lastSeq === null || value.lastSeq === null) {
+    return {
+      accepted: false,
+      error: "started 이벤트가 확인되지 않아 종료 상태를 복구할 수 없습니다.",
+      mismatches: ["sequence"],
+    };
+  }
+
+  const expectedReceipt = await createTextReceipt(
+    state.text,
+    digestProvider ?? getWebCryptoDigest(),
+  );
+  const mismatches: string[] = [];
+  if (value.requestId !== state.requestId) mismatches.push("requestId");
+  if (value.textBytes !== expectedReceipt.textBytes) mismatches.push("textBytes");
+  if (value.textSha256 !== expectedReceipt.textSha256) mismatches.push("textSha256");
+
+  let terminalEventDelivered = false;
+  let expected: ExpectedTerminalSnapshot;
+  if (state.terminalSeen) {
+    if (state.expectedTerminal === null) {
+      mismatches.push("expectedTerminal");
+      expected = {
+        requestId: state.requestId,
+        status: value.status,
+        lastSeq: value.lastSeq,
+        acceptedText: state.text,
+        error: value.error,
+      };
+    } else {
+      expected = state.expectedTerminal;
+      terminalEventDelivered = true;
+      if (value.status !== expected.status) mismatches.push("status");
+      if (value.lastSeq !== expected.lastSeq) mismatches.push("lastSeq");
+      if (!terminalErrorMatches(value.error, expected.error)) mismatches.push("error");
+    }
+  } else {
+    const nextSeq = state.lastSeq + 1;
+    if (Number.isSafeInteger(nextSeq) && value.lastSeq === nextSeq) {
+      terminalEventDelivered = true;
+    } else if (value.status === "failed" && value.lastSeq === state.lastSeq) {
+      terminalEventDelivered = false;
+    } else {
+      mismatches.push("lastSeq");
+    }
+    expected = {
+      requestId: state.requestId,
+      status: value.status,
+      lastSeq: value.lastSeq,
+      acceptedText: state.text,
+      error: value.error,
+    };
+  }
+
+  if (mismatches.length > 0) {
+    return {
+      accepted: false,
+      error: `종료 복구 스냅샷 불일치: ${mismatches.join(", ")}`,
+      mismatches,
+    };
+  }
+  return { accepted: true, snapshot: value, expected, terminalEventDelivered };
+}
+
+export function validateReleaseStreamResponse(
+  value: unknown,
+  requestId: string,
+): ReleaseValidation {
+  if (
+    !isRecord(value) ||
+    !hasOnlyKeys(value, ["requestId", "released"]) ||
+    value.requestId !== requestId ||
+    value.released !== true
+  ) {
+    return {
+      accepted: false,
+      error: "스트림 해제 응답이 요청 ID와 정확히 일치하지 않습니다.",
+    };
+  }
+  return { accepted: true };
 }

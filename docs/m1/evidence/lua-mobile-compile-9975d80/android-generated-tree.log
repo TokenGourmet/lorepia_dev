@@ -1,0 +1,170 @@
+UTC_START=2026-07-18T23:05:16Z
+WORKTREE_ROOT=/private/tmp/lorepia-lua-fix-android.QF8rdK
+WORKDIR=/private/tmp/lorepia-lua-fix-android.QF8rdK/spikes/lua-limits
+HEAD=9975d80521c61d5c25bc9509c609439cfa371d58
+
+[GIT_STATUS] COMMAND=git status --short --branch
+## HEAD (no branch)
+?? src-tauri/gen/
+[GIT_STATUS] EXIT_CODE=0
+
+[GIT_PORCELAIN] COMMAND=git status --porcelain=v1 --untracked-files=all
+?? spikes/lua-limits/src-tauri/gen/android/.editorconfig
+?? spikes/lua-limits/src-tauri/gen/android/.gitignore
+?? spikes/lua-limits/src-tauri/gen/android/app/.gitignore
+?? spikes/lua-limits/src-tauri/gen/android/app/build.gradle.kts
+?? spikes/lua-limits/src-tauri/gen/android/app/proguard-rules.pro
+?? spikes/lua-limits/src-tauri/gen/android/app/src/main/AndroidManifest.xml
+?? spikes/lua-limits/src-tauri/gen/android/app/src/main/java/dev/lorepia/spike/lualimits/MainActivity.kt
+?? spikes/lua-limits/src-tauri/gen/android/app/src/main/res/drawable-v24/ic_launcher_foreground.xml
+?? spikes/lua-limits/src-tauri/gen/android/app/src/main/res/drawable/ic_launcher_background.xml
+?? spikes/lua-limits/src-tauri/gen/android/app/src/main/res/layout/activity_main.xml
+?? spikes/lua-limits/src-tauri/gen/android/app/src/main/res/mipmap-hdpi/ic_launcher.png
+?? spikes/lua-limits/src-tauri/gen/android/app/src/main/res/mipmap-hdpi/ic_launcher_foreground.png
+?? spikes/lua-limits/src-tauri/gen/android/app/src/main/res/mipmap-hdpi/ic_launcher_round.png
+?? spikes/lua-limits/src-tauri/gen/android/app/src/main/res/mipmap-mdpi/ic_launcher.png
+?? spikes/lua-limits/src-tauri/gen/android/app/src/main/res/mipmap-mdpi/ic_launcher_foreground.png
+?? spikes/lua-limits/src-tauri/gen/android/app/src/main/res/mipmap-mdpi/ic_launcher_round.png
+?? spikes/lua-limits/src-tauri/gen/android/app/src/main/res/mipmap-xhdpi/ic_launcher.png
+?? spikes/lua-limits/src-tauri/gen/android/app/src/main/res/mipmap-xhdpi/ic_launcher_foreground.png
+?? spikes/lua-limits/src-tauri/gen/android/app/src/main/res/mipmap-xhdpi/ic_launcher_round.png
+?? spikes/lua-limits/src-tauri/gen/android/app/src/main/res/mipmap-xxhdpi/ic_launcher.png
+?? spikes/lua-limits/src-tauri/gen/android/app/src/main/res/mipmap-xxhdpi/ic_launcher_foreground.png
+?? spikes/lua-limits/src-tauri/gen/android/app/src/main/res/mipmap-xxhdpi/ic_launcher_round.png
+?? spikes/lua-limits/src-tauri/gen/android/app/src/main/res/mipmap-xxxhdpi/ic_launcher.png
+?? spikes/lua-limits/src-tauri/gen/android/app/src/main/res/mipmap-xxxhdpi/ic_launcher_foreground.png
+?? spikes/lua-limits/src-tauri/gen/android/app/src/main/res/mipmap-xxxhdpi/ic_launcher_round.png
+?? spikes/lua-limits/src-tauri/gen/android/app/src/main/res/values-night/themes.xml
+?? spikes/lua-limits/src-tauri/gen/android/app/src/main/res/values/colors.xml
+?? spikes/lua-limits/src-tauri/gen/android/app/src/main/res/values/strings.xml
+?? spikes/lua-limits/src-tauri/gen/android/app/src/main/res/values/themes.xml
+?? spikes/lua-limits/src-tauri/gen/android/app/src/main/res/xml/file_paths.xml
+?? spikes/lua-limits/src-tauri/gen/android/build.gradle.kts
+?? spikes/lua-limits/src-tauri/gen/android/buildSrc/build.gradle.kts
+?? spikes/lua-limits/src-tauri/gen/android/buildSrc/src/main/java/dev/lorepia/spike/lualimits/kotlin/BuildTask.kt
+?? spikes/lua-limits/src-tauri/gen/android/buildSrc/src/main/java/dev/lorepia/spike/lualimits/kotlin/RustPlugin.kt
+?? spikes/lua-limits/src-tauri/gen/android/gradle.properties
+?? spikes/lua-limits/src-tauri/gen/android/gradle/wrapper/gradle-wrapper.jar
+?? spikes/lua-limits/src-tauri/gen/android/gradle/wrapper/gradle-wrapper.properties
+?? spikes/lua-limits/src-tauri/gen/android/gradlew
+?? spikes/lua-limits/src-tauri/gen/android/gradlew.bat
+?? spikes/lua-limits/src-tauri/gen/android/settings.gradle
+?? spikes/lua-limits/src-tauri/gen/schemas/acl-manifests.json
+?? spikes/lua-limits/src-tauri/gen/schemas/android-schema.json
+?? spikes/lua-limits/src-tauri/gen/schemas/capabilities.json
+?? spikes/lua-limits/src-tauri/gen/schemas/mobile-schema.json
+[GIT_PORCELAIN] EXIT_CODE=0
+
+[GIT_DIFF] COMMAND=git diff --exit-code -- .
+[GIT_DIFF] EXIT_CODE=0
+
+[GIT_DIFF_CACHED] COMMAND=git diff --cached --exit-code -- .
+[GIT_DIFF_CACHED] EXIT_CODE=0
+
+[LOCK_HASHES_AFTER]
+PACKAGE_LOCK_SHA256=049d114c3b4c672e38bb24a897bdd2702371b7ad7bebc7ae3f106465a73d93b5  package-lock.json
+CARGO_LOCK_SHA256=0f99c5dc2d5faad92b9926fe67b0c53a1d7a821059f91bac67942d2d746a3307  src-tauri/Cargo.lock
+PACKAGE_JSON_SHA256=d05c3a59117d5c993eb8f7ff3d7b6de3b42b4a29ed07e681f74636a93bc568a8  package.json
+CARGO_TOML_SHA256=a12c5b6504fbddcf675e8d57c811c9f67e997a9a6a211030deeb48e8b8770fdc  src-tauri/Cargo.toml
+
+[CHANGE_COUNTS]
+PORCELAIN_ENTRY_COUNT=44
+UNTRACKED_ANDROID_COUNT=40
+UNTRACKED_SCHEMAS_COUNT=4
+TRACKED_CHANGE_COUNT=0
+
+[IGNORED_STATUS] COMMAND=git status --ignored --short -- spikes/lua-limits
+?? spikes/lua-limits/src-tauri/gen/
+!! spikes/lua-limits/.svelte-kit/
+!! spikes/lua-limits/build/
+!! spikes/lua-limits/node_modules/
+!! spikes/lua-limits/src-tauri/gen/android/.gradle/
+!! spikes/lua-limits/src-tauri/gen/android/app/build/
+!! spikes/lua-limits/src-tauri/gen/android/app/proguard-tauri.pro
+!! spikes/lua-limits/src-tauri/gen/android/app/src/main/assets/
+!! spikes/lua-limits/src-tauri/gen/android/app/src/main/java/dev/lorepia/spike/lualimits/generated/
+!! spikes/lua-limits/src-tauri/gen/android/app/src/main/jniLibs/
+!! spikes/lua-limits/src-tauri/gen/android/app/tauri.build.gradle.kts
+!! spikes/lua-limits/src-tauri/gen/android/app/tauri.properties
+!! spikes/lua-limits/src-tauri/gen/android/build/
+!! spikes/lua-limits/src-tauri/gen/android/buildSrc/.gradle/
+!! spikes/lua-limits/src-tauri/gen/android/buildSrc/build/
+!! spikes/lua-limits/src-tauri/gen/android/tauri.settings.gradle
+!! spikes/lua-limits/src-tauri/target/
+[IGNORED_STATUS] EXIT_CODE=0
+
+[GENERATED_COUNTS]
+GEN_ANDROID_REGULAR_FILE_COUNT=874
+GEN_ANDROID_SYMLINK_COUNT=1
+GEN_ANDROID_NON_BUILD_FILE_COUNT=55
+RUST_TARGET_REGULAR_FILE_COUNT=4732
+NODE_MODULES_REGULAR_FILE_COUNT=2247
+
+[GEN_ANDROID_NON_BUILD_FILES_BEGIN]
+src-tauri/gen/android/.editorconfig
+src-tauri/gen/android/.gitignore
+src-tauri/gen/android/app/.gitignore
+src-tauri/gen/android/app/build.gradle.kts
+src-tauri/gen/android/app/proguard-rules.pro
+src-tauri/gen/android/app/proguard-tauri.pro
+src-tauri/gen/android/app/src/main/AndroidManifest.xml
+src-tauri/gen/android/app/src/main/assets/tauri.conf.json
+src-tauri/gen/android/app/src/main/java/dev/lorepia/spike/lualimits/MainActivity.kt
+src-tauri/gen/android/app/src/main/java/dev/lorepia/spike/lualimits/generated/Ipc.kt
+src-tauri/gen/android/app/src/main/java/dev/lorepia/spike/lualimits/generated/Logger.kt
+src-tauri/gen/android/app/src/main/java/dev/lorepia/spike/lualimits/generated/PermissionHelper.kt
+src-tauri/gen/android/app/src/main/java/dev/lorepia/spike/lualimits/generated/Rust.kt
+src-tauri/gen/android/app/src/main/java/dev/lorepia/spike/lualimits/generated/RustWebChromeClient.kt
+src-tauri/gen/android/app/src/main/java/dev/lorepia/spike/lualimits/generated/RustWebView.kt
+src-tauri/gen/android/app/src/main/java/dev/lorepia/spike/lualimits/generated/RustWebViewClient.kt
+src-tauri/gen/android/app/src/main/java/dev/lorepia/spike/lualimits/generated/TauriActivity.kt
+src-tauri/gen/android/app/src/main/java/dev/lorepia/spike/lualimits/generated/WryActivity.kt
+src-tauri/gen/android/app/src/main/java/dev/lorepia/spike/lualimits/generated/proguard-wry.pro
+src-tauri/gen/android/app/src/main/res/drawable-v24/ic_launcher_foreground.xml
+src-tauri/gen/android/app/src/main/res/drawable/ic_launcher_background.xml
+src-tauri/gen/android/app/src/main/res/layout/activity_main.xml
+src-tauri/gen/android/app/src/main/res/mipmap-hdpi/ic_launcher.png
+src-tauri/gen/android/app/src/main/res/mipmap-hdpi/ic_launcher_foreground.png
+src-tauri/gen/android/app/src/main/res/mipmap-hdpi/ic_launcher_round.png
+src-tauri/gen/android/app/src/main/res/mipmap-mdpi/ic_launcher.png
+src-tauri/gen/android/app/src/main/res/mipmap-mdpi/ic_launcher_foreground.png
+src-tauri/gen/android/app/src/main/res/mipmap-mdpi/ic_launcher_round.png
+src-tauri/gen/android/app/src/main/res/mipmap-xhdpi/ic_launcher.png
+src-tauri/gen/android/app/src/main/res/mipmap-xhdpi/ic_launcher_foreground.png
+src-tauri/gen/android/app/src/main/res/mipmap-xhdpi/ic_launcher_round.png
+src-tauri/gen/android/app/src/main/res/mipmap-xxhdpi/ic_launcher.png
+src-tauri/gen/android/app/src/main/res/mipmap-xxhdpi/ic_launcher_foreground.png
+src-tauri/gen/android/app/src/main/res/mipmap-xxhdpi/ic_launcher_round.png
+src-tauri/gen/android/app/src/main/res/mipmap-xxxhdpi/ic_launcher.png
+src-tauri/gen/android/app/src/main/res/mipmap-xxxhdpi/ic_launcher_foreground.png
+src-tauri/gen/android/app/src/main/res/mipmap-xxxhdpi/ic_launcher_round.png
+src-tauri/gen/android/app/src/main/res/values-night/themes.xml
+src-tauri/gen/android/app/src/main/res/values/colors.xml
+src-tauri/gen/android/app/src/main/res/values/strings.xml
+src-tauri/gen/android/app/src/main/res/values/themes.xml
+src-tauri/gen/android/app/src/main/res/xml/file_paths.xml
+src-tauri/gen/android/app/tauri.build.gradle.kts
+src-tauri/gen/android/app/tauri.properties
+src-tauri/gen/android/build.gradle.kts
+src-tauri/gen/android/buildSrc/build.gradle.kts
+src-tauri/gen/android/buildSrc/src/main/java/dev/lorepia/spike/lualimits/kotlin/BuildTask.kt
+src-tauri/gen/android/buildSrc/src/main/java/dev/lorepia/spike/lualimits/kotlin/RustPlugin.kt
+src-tauri/gen/android/gradle.properties
+src-tauri/gen/android/gradle/wrapper/gradle-wrapper.jar
+src-tauri/gen/android/gradle/wrapper/gradle-wrapper.properties
+src-tauri/gen/android/gradlew
+src-tauri/gen/android/gradlew.bat
+src-tauri/gen/android/settings.gradle
+src-tauri/gen/android/tauri.settings.gradle
+[GEN_ANDROID_NON_BUILD_FILES_END]
+
+[GEN_ANDROID_SYMLINKS_BEGIN]
+src-tauri/gen/android/app/src/main/jniLibs/arm64-v8a/libspikeslualimits_lib.so
+/private/tmp/lorepia-lua-fix-android.QF8rdK/spikes/lua-limits/src-tauri/target/aarch64-linux-android/debug/libspikeslualimits_lib.so
+[GEN_ANDROID_SYMLINKS_END]
+
+[APK_OUTPUTS_BEGIN]
+src-tauri/gen/android/app/build/outputs/apk/universal/debug/app-universal-debug.apk
+66788efe85680191b6ef43a4ca4ed96434b6316203c5c7530a4327001c5ee790  src-tauri/gen/android/app/build/outputs/apk/universal/debug/app-universal-debug.apk
+[APK_OUTPUTS_END]
+UTC_END=2026-07-18T23:05:17Z

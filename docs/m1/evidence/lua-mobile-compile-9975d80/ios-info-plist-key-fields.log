@@ -1,0 +1,8 @@
+CFBundleIdentifier=dev.lorepia.spike.lualimits
+CFBundleExecutable=LorePia Lua Limits Spike
+CFBundleShortVersionString=0.1.0
+CFBundleVersion=0.1.0
+MinimumOSVersion=14.0
+DTPlatformName=iphonesimulator
+CFBundleSupportedPlatforms=["iPhoneSimulator"]
+UIDeviceFamily=[1,2]

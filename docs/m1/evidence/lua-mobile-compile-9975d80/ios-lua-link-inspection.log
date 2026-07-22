@@ -1,0 +1,25 @@
+defined_lua_symbol_lines=342
+unresolved_lua_symbol_lines=0
+libapp_lua_c_member_lines=32
+representative_defined_symbols:
+0000000100231928 T _luaL_callmeta
+00000001002357b8 T _lua_close
+000000010023526c T _lua_newstate
+0000000100266300 T _lua_sethook
+0000000100264878 T _luaopen_base
+0000000100237474 T _luaopen_math
+unresolved_lua_symbols:
+<none>
+first_libapp_lua_c_members:
+ed4957999e0816dd-lauxlib.o
+ed4957999e0816dd-liolib.o
+ed4957999e0816dd-lopcodes.o
+ed4957999e0816dd-lstate.o
+ed4957999e0816dd-lobject.o
+ed4957999e0816dd-lmathlib.o
+ed4957999e0816dd-loadlib.o
+ed4957999e0816dd-lvm.o
+ed4957999e0816dd-lfunc.o
+ed4957999e0816dd-lstrlib.o
+ed4957999e0816dd-linit.o
+ed4957999e0816dd-lstring.o

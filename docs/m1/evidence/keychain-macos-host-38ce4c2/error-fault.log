@@ -1,0 +1,56 @@
+Timestamp                       (process)[PID]
+2026-07-19 05:16:17.773868+0900  localhost lorepia-keychain-spike[97217]: (AppIntents) [com.apple.appintents:Connection] Unable to get synchronousRemoteObjectProxy, error: Error Domain=NSCocoaErrorDomain Code=4097 "connection to service named com.apple.linkd.autoShortcut" UserInfo={NSDebugDescription=connection to service named com.apple.linkd.autoShortcut}
+2026-07-19 05:16:17.773899+0900  localhost lorepia-keychain-spike[97217]: (AppKit) [com.apple.AppKit:Application] Error registering app with intents framework: Error Domain=NSCocoaErrorDomain Code=4097 UserInfo={NSDebugDescription=<private>}
+2026-07-19 05:16:17.781594+0900  localhost lorepia-keychain-spike[97217]: (AppIntents) [com.apple.appintents:Connection] Unable to get synchronousRemoteObjectProxy, error: Error Domain=NSCocoaErrorDomain Code=4097 "connection to service named com.apple.linkd.autoShortcut" UserInfo={NSDebugDescription=connection to service named com.apple.linkd.autoShortcut}
+2026-07-19 05:16:17.781599+0900  localhost lorepia-keychain-spike[97217]: (AppIntents) [com.apple.appintents:Connection] Unable to re-register with Process Instance Registry, error: Error Domain=NSCocoaErrorDomain Code=4097 "connection to service named com.apple.linkd.autoShortcut" UserInfo={NSDebugDescription=connection to service named com.apple.linkd.autoShortcut}
+2026-07-19 05:16:17.785162+0900  localhost lorepia-keychain-spike[97217]: (AppIntents) [com.apple.appintents:Connection] Unable to get synchronousRemoteObjectProxy, error: Error Domain=NSCocoaErrorDomain Code=4097 "connection to service named com.apple.linkd.autoShortcut" UserInfo={NSDebugDescription=connection to service named com.apple.linkd.autoShortcut}
+2026-07-19 05:16:17.785166+0900  localhost lorepia-keychain-spike[97217]: (AppIntents) [com.apple.appintents:Connection] Unable to re-register with Process Instance Registry, error: Error Domain=NSCocoaErrorDomain Code=4097 "connection to service named com.apple.linkd.autoShortcut" UserInfo={NSDebugDescription=connection to service named com.apple.linkd.autoShortcut}
+2026-07-19 05:16:17.788852+0900  localhost lorepia-keychain-spike[97217]: (AppIntents) [com.apple.appintents:Connection] Will NOT re-try to establish the connection
+2026-07-19 05:16:17.788865+0900  localhost lorepia-keychain-spike[97217]: (AppIntents) [com.apple.appintents:Connection] Unable to get synchronousRemoteObjectProxy, error: Error Domain=NSCocoaErrorDomain Code=4097 "connection to service named com.apple.linkd.autoShortcut" UserInfo={NSDebugDescription=connection to service named com.apple.linkd.autoShortcut}
+2026-07-19 05:16:17.788870+0900  localhost lorepia-keychain-spike[97217]: (AppIntents) [com.apple.appintents:Connection] Unable to re-register with Process Instance Registry, error: Error Domain=NSCocoaErrorDomain Code=4097 "connection to service named com.apple.linkd.autoShortcut" UserInfo={NSDebugDescription=connection to service named com.apple.linkd.autoShortcut}
+2026-07-19 05:16:18.172663+0900  localhost lorepia-keychain-spike[97217]: (AssistantServices) [com.apple.siri:Utility] AFIsDeviceGreymatterEligible Missing entitlements for os_eligibility lookup
+2026-07-19 05:16:18.225334+0900  localhost lorepia-keychain-spike[97217]: (WebKit) [com.apple.CFPasteboard:general] WebContent[97306] Connection to 'pboard' server had an error: <dictionary: 0x1f59555f0> { count = 1, transaction: 0, voucher = 0x0, contents =
+	"XPCErrorDescription" => <string: 0x1f5955730> { string cache = 0x0, length = 18, contents = "Connection invalid" }
+}
+Invalidation reason: Connection init failed at lookup with error 159 - Sandbox restriction
+2026-07-19 05:16:18.225366+0900  localhost lorepia-keychain-spike[97217]: (WebKit) [com.apple.CFPasteboard:general] WebContent[97306] Failed to set up CFPasteboardRef 'Apple CFPasteboard general'. Error: <dictionary: 0x1f59555f0> { count = 1, transaction: 0, voucher = 0x0, contents =
+	"XPCErrorDescription" => <string: 0x1f5955730> { string cache = 0x0, length = 18, contents = "Connection invalid" }
+}
+Invalidation reason: Connection init failed at lookup with error 159 - Sandbox restriction
+2026-07-19 05:16:18.225518+0900  localhost lorepia-keychain-spike[97217]: (WebKit) [com.apple.CFPasteboard:general] WebContent[97306] Failed to set up CFPasteboardRef 'Apple CFPasteboard general'. Error: <dictionary: 0x1f59555f0> { count = 1, transaction: 0, voucher = 0x0, contents =
+	"XPCErrorDescription" => <string: 0x1f5955730> { string cache = 0x0, length = 18, contents = "Connection invalid" }
+}
+Invalidation reason: Connection init failed at lookup with error 159 - Sandbox restriction
+2026-07-19 05:16:18.233601+0900  localhost lorepia-keychain-spike[97217]: (WebKit) [com.apple.TCC:access] WebContent[97306] send_message_with_reply_sync(): XPC_ERROR_CONNECTION_INVALID for message 0xb810ac480
+2026-07-19 05:16:18.233606+0900  localhost lorepia-keychain-spike[97217]: (WebKit) [com.apple.TCC:access] WebContent[97306] TCCAccessRequest_block_invoke: Connection invalid
+2026-07-19 05:16:18.233899+0900  localhost lorepia-keychain-spike[97217]: (WebKit) [com.apple.SkyLight:default] WebContent[97306] Conn 0x0 is not a valid connection ID.
+2026-07-19 05:16:18.233946+0900  localhost lorepia-keychain-spike[97217]: (WebKit) [com.apple.SkyLight:default] WebContent[97306] Conn 0x0 is not a valid connection ID.
+2026-07-19 05:16:18.233947+0900  localhost lorepia-keychain-spike[97217]: (WebKit) [com.apple.SkyLight:default] WebContent[97306] Conn 0x0 is not a valid connection ID.
+2026-07-19 05:16:18.234305+0900  localhost lorepia-keychain-spike[97217]: (WebKit) [com.apple.launchservices:cas] WebContent[97306] CONNECT: Attempt to connect to launchservicesd prohibited because kLSServerConnectionStatusProcessIsDaemonMask is set.
+2026-07-19 05:16:18.235063+0900  localhost lorepia-keychain-spike[97217]: (WebKit) [com.apple.launchservices:cas] WebContent[97306] CRASHSTRING: rdar://problem/28724618 Couldn't connect to launchservicesd.
+2026-07-19 05:16:18.238821+0900  localhost lorepia-keychain-spike[97217]: (WebKit) WebContent[97306] invalid product id '(null)'
+2026-07-19 05:16:18.243083+0900  localhost lorepia-keychain-spike[97217]: (WebKit) [com.apple.CarbonCore:sharedcache] WebContent[97306] checkinWithServer Failed bootstrap_lookup2 for name of coreservicesd, kern_return_t=#1100/0x44c Permission denied name=com.apple.CoreServices.coreservicesd
+2026-07-19 05:16:18.245916+0900  localhost lorepia-keychain-spike[97217]: (WebKit) [com.apple.runningboard:connection] WebContent[97306] The sandbox in this process does not allow access to RunningBoard.
+2026-07-19 05:16:18.245932+0900  localhost lorepia-keychain-spike[97217]: (WebKit) [com.apple.runningboard:connection] WebContent[97306] Handshake aborted as the connection has been invalidated
+2026-07-19 05:16:18.246097+0900  localhost lorepia-keychain-spike[97217]: (WebKit) [com.apple.SkyLight:default] WebContent[97306] Conn 0x0 is not a valid connection ID.
+2026-07-19 05:16:18.246767+0900  localhost lorepia-keychain-spike[97217]: (WebKit) [com.apple.SkyLight:default] WebContent[97306] Conn 0x0 is not a valid connection ID.
+2026-07-19 05:16:18.246771+0900  localhost lorepia-keychain-spike[97217]: (WebKit) [com.apple.SkyLight:default] WebContent[97306] Conn 0x0 is not a valid connection ID.
+2026-07-19 05:16:18.246774+0900  localhost lorepia-keychain-spike[97217]: (WebKit) [com.apple.SkyLight:default] WebContent[97306] Conn 0x0 is not a valid connection ID.
+2026-07-19 05:16:18.246777+0900  localhost lorepia-keychain-spike[97217]: (WebKit) [com.apple.SkyLight:default] WebContent[97306] Conn 0x0 is not a valid connection ID.
+2026-07-19 05:16:18.246778+0900  localhost lorepia-keychain-spike[97217]: (WebKit) [com.apple.SkyLight:default] WebContent[97306] Conn 0x0 is not a valid connection ID.
+2026-07-19 05:16:18.285722+0900  localhost lorepia-keychain-spike[97217]: (WebKit) [com.apple.appintents:Connection] WebContent[97306] Missing com.apple.linkd.application-service / com.apple.linkd.autoShortcut mach-lookup entitlement, will NOT register the process
+2026-07-19 05:16:18.285832+0900  localhost lorepia-keychain-spike[97217]: (WebKit) [com.apple.AppKit:Application] WebContent[97306] Error registering app with intents framework: Error Domain=LNProcessInstanceRegistryClientErrorDomain Code=1
+2026-07-19 05:16:18.340522+0900  localhost lorepia-keychain-spike[97217]: (WebKit) WebContent[97306] networkd_settings_read_from_file_locked Sandbox is preventing this process from reading networkd settings file at "/Library/Preferences/com.apple.networkd.plist", please add an exception.
+2026-07-19 05:16:18.340548+0900  localhost lorepia-keychain-spike[97217]: (WebKit) WebContent[97306] networkd_settings_read_from_file_locked Sandbox is preventing this process from reading networkd settings file at "/Library/Preferences/com.apple.networkd.plist", please add an exception.
+2026-07-19 05:16:19.768050+0900  localhost lorepia-keychain-spike[97217]: (WebKit) [com.apple.coreaudio:audiocomp] WebContent[97306] AudioComponentPluginMgr.mm:590   reg server remote proxy error Error Domain=NSCocoaErrorDomain Code=4099 "The connection to service named com.apple.audio.AudioComponentRegistrar was invalidated: Connection init failed at lookup with error 1 - Operation no
+2026-07-19 05:16:19.777096+0900  localhost lorepia-keychain-spike[97217]: (WebKit) [com.apple.WebKit:ResourceLoadStatistics] WebContent[97306] Unable to hide query parameters from script (missing data)
+2026-07-19 05:16:31.922267+0900  localhost lorepia-keychain-spike[97217]: (BaseBoard) [com.apple.BaseBoard:Common] Unable to obtain a task name port right for pid 403: (os/kern) failure (0x5)
+2026-07-19 05:16:32.147321+0900  localhost lorepia-keychain-spike[97217]: (AppKit) [com.apple.runtime-issues:AppKit] Invalid view geometry: width is negative.
+2026-07-19 05:16:32.147652+0900  localhost lorepia-keychain-spike[97217]: (AppKit) [com.apple.runtime-issues:AppKit] Invalid view geometry: height is negative.
+2026-07-19 05:16:32.147703+0900  localhost lorepia-keychain-spike[97217]: (AppKit) [com.apple.runtime-issues:AppKit] Invalid view geometry: width is negative.
+2026-07-19 05:16:32.147706+0900  localhost lorepia-keychain-spike[97217]: (AppKit) [com.apple.runtime-issues:AppKit] Invalid view geometry: height is negative.
+2026-07-19 05:16:32.148342+0900  localhost lorepia-keychain-spike[97217]: (AppKit) [com.apple.runtime-issues:AppKit] Invalid view geometry: width is negative.
+2026-07-19 05:16:32.148354+0900  localhost lorepia-keychain-spike[97217]: (AppKit) [com.apple.runtime-issues:AppKit] Invalid view geometry: height is negative.
+2026-07-19 05:16:41.273482+0900  localhost lorepia-keychain-spike[97217]: (AssistantServices) [com.apple.siri:Utility] AFIsDeviceGreymatterEligible Missing entitlements for os_eligibility lookup
+2026-07-19 05:16:43.357740+0900  localhost lorepia-keychain-spike[97217]: (libsqlite3.dylib) [com.apple.libsqlite3:logging-persist] cannot open file at line 51044 of [f0ca7bba1c]
+2026-07-19 05:16:43.357746+0900  localhost lorepia-keychain-spike[97217]: (libsqlite3.dylib) [com.apple.libsqlite3:logging-persist] os_unix.c:51044: (2) open(/private/var/db/DetachedSignatures) - No such file or directory

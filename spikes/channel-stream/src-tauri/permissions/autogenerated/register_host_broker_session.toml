@@ -1,0 +1,11 @@
+# Automatically generated - DO NOT EDIT!
+
+[[permission]]
+identifier = "allow-register-host-broker-session"
+description = "Enables the register_host_broker_session command without any pre-configured scope."
+commands.allow = ["register_host_broker_session"]
+
+[[permission]]
+identifier = "deny-register-host-broker-session"
+description = "Denies the register_host_broker_session command without any pre-configured scope."
+commands.deny = ["register_host_broker_session"]

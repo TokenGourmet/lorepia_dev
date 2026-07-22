@@ -1,0 +1,50 @@
++zsh:2> git diff -- src-tauri/src/probe.rs
+diff --git a/spikes/lua-limits/src-tauri/src/probe.rs b/spikes/lua-limits/src-tauri/src/probe.rs
+index dfc60ad..967578e 100644
+--- a/spikes/lua-limits/src-tauri/src/probe.rs
++++ b/spikes/lua-limits/src-tauri/src/probe.rs
+@@ -780,6 +780,10 @@ mod tests {
+     #[test]
+     fn serialized_success_json_surface_is_exact() {
+         let receipt = run_probe_unlocked().expect("probe should pass");
++        println!(
++            "NATIVE_RECEIPT_JSON={}",
++            serde_json::to_string(&receipt).expect("receipt should serialize")
++        );
+         let value = serde_json::to_value(receipt).expect("receipt should serialize");
+         let object = value.as_object().expect("receipt should be an object");
+         let mut top_level_keys = object.keys().map(String::as_str).collect::<Vec<_>>();
++zsh:3> cargo test --locked --manifest-path src-tauri/Cargo.toml probe::tests::serialized_success_json_surface_is_exact -- --exact --nocapture
+   Compiling objc2-exception-helper v0.1.1
+   Compiling objc2 v0.6.4
+   Compiling block2 v0.6.2
+   Compiling objc2-core-foundation v0.3.2
+   Compiling dispatch2 v0.3.1
+   Compiling objc2-foundation v0.3.2
+   Compiling objc2-app-kit v0.3.2
+   Compiling objc2-web-kit v0.3.2
+   Compiling tao v0.35.3
+   Compiling window-vibrancy v0.6.0
+   Compiling muda v0.19.3
+   Compiling tauri-runtime v2.11.3
+   Compiling wry v0.55.1
+   Compiling tauri-runtime-wry v2.11.4
+   Compiling tauri v2.11.5
+   Compiling lorepia-lua-limits-spike v0.1.0 (/private/tmp/lorepia-lua-fix-macos.qMTSNB/spikes/lua-limits/src-tauri)
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 15.56s
+     Running unittests src/lib.rs (src-tauri/target/debug/deps/spikeslualimits_lib-6cd944d83c369fd2)
+
+running 1 test
+NATIVE_RECEIPT_JSON={"protocolVersion":1,"policyVersion":"m1-lua-limits-v1","fixtureCatalogSha256":"9ea567d6901ec39412e73f439ee9ea7d47538baea4d1a92cd409c9f3e9b97db5","mluaVersion":"0.12.0","luaVersion":"Lua 5.4","limits":{"deadlineMs":50,"instructionCap":100000,"hookCadence":1000,"memoryCeilingBytes":8388608,"maxSerializedBytes":4096},"cases":[{"caseId":"allowed-baseline","outcome":"ALLOWED","code":"ALLOWED_RESULT","result":55,"elapsedMicros":62,"hookCount":0,"instructionEstimate":0,"usedMemoryBytes":18328,"observedPeakMemoryBytes":18328,"memoryCeilingBytes":8388608},{"caseId":"infinite-loop","outcome":"INTERRUPTED","code":"INSTRUCTION_LIMIT","result":null,"elapsedMicros":496,"hookCount":100,"instructionEstimate":100000,"usedMemoryBytes":17555,"observedPeakMemoryBytes":17619,"memoryCeilingBytes":8388608},{"caseId":"recovery-after-infinite-loop","outcome":"ALLOWED","code":"ALLOWED_RESULT","result":55,"elapsedMicros":12,"hookCount":0,"instructionEstimate":0,"usedMemoryBytes":18328,"observedPeakMemoryBytes":18328,"memoryCeilingBytes":8388608},{"caseId":"recursive-pressure","outcome":"INTERRUPTED","code":"INSTRUCTION_LIMIT","result":null,"elapsedMicros":4034,"hookCount":100,"instructionEstimate":100000,"usedMemoryBytes":1616968,"observedPeakMemoryBytes":4526920,"memoryCeilingBytes":8388608},{"caseId":"recovery-after-recursive-pressure","outcome":"ALLOWED","code":"ALLOWED_RESULT","result":55,"elapsedMicros":22,"hookCount":0,"instructionEstimate":0,"usedMemoryBytes":18328,"observedPeakMemoryBytes":18328,"memoryCeilingBytes":8388608},{"caseId":"allocator-pressure","outcome":"INTERRUPTED","code":"MEMORY_LIMIT","result":null,"elapsedMicros":803,"hookCount":0,"instructionEstimate":0,"usedMemoryBytes":8345612,"observedPeakMemoryBytes":8345612,"memoryCeilingBytes":8388608},{"caseId":"recovery-after-allocator-pressure","outcome":"ALLOWED","code":"ALLOWED_RESULT","result":55,"elapsedMicros":14,"hookCount":0,"instructionEstimate":0,"usedMemoryBytes":18328,"observedPeakMemoryBytes":18328,"memoryCeilingBytes":8388608},{"caseId":"forbidden-globals-absent","outcome":"ABSENT","code":"FORBIDDEN_GLOBALS_ABSENT","result":null,"elapsedMicros":22,"hookCount":0,"instructionEstimate":0,"usedMemoryBytes":19308,"observedPeakMemoryBytes":19308,"memoryCeilingBytes":8388608},{"caseId":"recovery-after-forbidden-globals","outcome":"ALLOWED","code":"ALLOWED_RESULT","result":55,"elapsedMicros":9,"hookCount":0,"instructionEstimate":0,"usedMemoryBytes":18328,"observedPeakMemoryBytes":18328,"memoryCeilingBytes":8388608},{"caseId":"bypass-surfaces-absent","outcome":"ABSENT","code":"BYPASS_SURFACES_ABSENT","result":null,"elapsedMicros":11,"hookCount":0,"instructionEstimate":0,"usedMemoryBytes":18590,"observedPeakMemoryBytes":18590,"memoryCeilingBytes":8388608},{"caseId":"recovery-after-bypass-surfaces","outcome":"ALLOWED","code":"ALLOWED_RESULT","result":55,"elapsedMicros":8,"hookCount":0,"instructionEstimate":0,"usedMemoryBytes":18328,"observedPeakMemoryBytes":18328,"memoryCeilingBytes":8388608}],"defenses":{"freshStatePerCase":true,"textModeOnly":true,"forbiddenGlobalsAbsent":true,"bypassSurfacesAbsent":true,"processLockNonblocking":true}}
+test probe::tests::serialized_success_json_surface_is_exact ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 11 filtered out; finished in 0.01s
+
+     Running unittests src/main.rs (src-tauri/target/debug/deps/lorepia_lua_limits_spike-5d198c630119d1c2)
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
++zsh:4> date -u +%Y-%m-%dT%H:%M:%SZ
+2026-07-18T23:04:31Z

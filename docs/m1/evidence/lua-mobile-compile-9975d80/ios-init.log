@@ -1,0 +1,19 @@
+
+> @lorepia/spike-lua-limits@0.1.0 tauri
+> tauri ios init --ci
+
+        Warn No code signing certificates found. You must add one and set the certificate development team ID on the `bundle > iOS > developmentTeam` config value or the `APPLE_DEVELOPMENT_TEAM` environment variable. To list the available certificates, run `tauri info`.
+/opt/homebrew/bin/xcodegen
+/opt/homebrew/bin/idevicesyslog
+/opt/homebrew/bin/pod
+Outdated dependencies:
+  - `cocoapods` is at 1.16.2_2; latest version is 1.17.0
+  - `xcodegen` is at 2.45.4; latest version is 2.46.0
+        Info "[WORKTREE]/spikes/lua-limits/src-tauri" relative to "[WORKTREE]/spikes/lua-limits/src-tauri/gen/apple" is "../../"
+Generating Xcode project...
+⚙️  Generating plists...
+⚙️  Generating project...
+⚙️  Writing project...
+Created project at [WORKTREE]/spikes/lua-limits/src-tauri/gen/apple/lorepia-lua-limits-spike.xcodeproj
+victory: Project generated successfully!
+    Make cool apps! 🌻 🐕 🎉

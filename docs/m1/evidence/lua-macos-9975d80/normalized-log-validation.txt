@@ -1,0 +1,7 @@
+artifact-inspection.log CR=0 ESC=0 BS=0
+exact-build-session.log CR=0 ESC=0 BS=0
+native-receipt-session.log CR=0 ESC=0 BS=0
+receipt-validation.log CR=0 ESC=0 BS=0
+runtime-postcheck.log CR=0 ESC=0 BS=0
+runtime-window.log CR=0 ESC=0 BS=0
+source-restoration-check.log CR=0 ESC=0 BS=0

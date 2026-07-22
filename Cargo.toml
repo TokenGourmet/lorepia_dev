@@ -1,0 +1,42 @@
+[workspace]
+resolver = "2"
+members = [
+  "apps/desktop-mobile/src-tauri",
+  "crates/lorepia-credential-vault",
+  "crates/lorepia-core",
+  "crates/lorepia-assets",
+  "crates/lorepia-backup",
+  "crates/lorepia-import",
+  "crates/lorepia-lorebook",
+  "crates/lorepia-memory",
+  "crates/lorepia-persona",
+  "crates/lorepia-prompt",
+  "crates/lorepia-provider-runtime",
+  "crates/lorepia-providers",
+  "crates/lorepia-safety",
+  "crates/lorepia-storage",
+  "crates/lorepia-tool-runtime",
+  "tools/lorepia-loadgen",
+]
+exclude = [
+  "spikes/audio-playback/src-tauri",
+  "spikes/channel-stream/src-tauri",
+  "spikes/import-hardening/src-tauri",
+  "spikes/keychain/src-tauri",
+  "spikes/lua-limits/src-tauri",
+  "spikes/script-runner/src-tauri",
+  "spikes/sqlite-fts/src-tauri",
+]
+
+[workspace.package]
+version = "0.1.0"
+edition = "2024"
+license = "Apache-2.0"
+authors = ["LorePia contributors"]
+repository = "https://github.com/Dokpamo/lorepia_dev"
+
+[workspace.dependencies]
+serde = { version = "=1.0.229", features = ["derive"] }
+serde_json = "=1.0.150"
+tauri = { version = "=2.11.5", features = [] }
+tauri-build = { version = "=2.6.3", features = [] }

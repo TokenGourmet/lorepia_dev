@@ -1,0 +1,17 @@
+[package]
+name = "lorepia-audio-playback-spike"
+version = "0.1.0"
+description = "LorePia M-1 trusted-WebView audio playback candidate"
+authors = ["LorePia contributors"]
+edition = "2021"
+license = "Apache-2.0"
+
+[lib]
+name = "spikesaudioplayback_lib"
+crate-type = ["staticlib", "cdylib", "rlib"]
+
+[build-dependencies]
+tauri-build = { version = "=2.6.3", features = [] }
+
+[dependencies]
+tauri = { version = "=2.11.5", features = [] }

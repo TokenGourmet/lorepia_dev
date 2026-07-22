@@ -1,0 +1,24 @@
+[package]
+name = "lorepia-lua-limits-spike"
+version = "0.1.0"
+description = "LorePia M-1 bounded Lua 5.4 execution probe"
+authors = ["LorePia contributors"]
+edition = "2021"
+license = "Apache-2.0"
+
+[lib]
+name = "spikeslualimits_lib"
+crate-type = ["staticlib", "cdylib", "rlib"]
+
+[build-dependencies]
+tauri-build = { version = "=2.6.3", features = [] }
+
+[dependencies]
+mlua = { version = "=0.12.0", default-features = false, features = ["lua54", "vendored"] }
+serde = { version = "=1.0.228", features = ["derive"] }
+serde_json = "=1.0.145"
+sha2 = "=0.10.9"
+tauri = { version = "=2.11.5", features = [] }
+
+[target.'cfg(target_os = "ios")'.dependencies]
+mlua-sys = { version = "=0.11.0", default-features = false, features = ["lua54", "vendored"] }

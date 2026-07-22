@@ -1,0 +1,13 @@
+UTC_START=2026-07-18T23:02:15Z
+COMMAND=npm run tauri android init -- --ci
+
+> @lorepia/spike-lua-limits@0.1.0 tauri
+> tauri android init --ci
+
+        Info Using installed NDK: /Users/codexer/Library/Android/lorepia-sdk/ndk/28.2.13676358
+Generating Android Studio project...
+        Info "/private/tmp/lorepia-lua-fix-android.QF8rdK/spikes/lua-limits/src-tauri" relative to "/private/tmp/lorepia-lua-fix-android.QF8rdK/spikes/lua-limits/src-tauri/gen/android/lorepia_lua_limits_spike" is "../../../"
+victory: Project generated successfully!
+    Make cool apps! 🌻 🐕 🎉
+EXIT_CODE=0
+UTC_END=2026-07-18T23:02:16Z

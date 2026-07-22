@@ -1,0 +1,75 @@
+{
+  "version": 1,
+  "license": "CC0-1.0",
+  "records": [
+    {
+      "id": 1,
+      "title": "달빛 도서관",
+      "rawText": "은은한 달빛 아래 오래된 도서관 문이 조용히 열렸다."
+    },
+    {
+      "id": 2,
+      "title": "별빛 정거장",
+      "rawText": "별빛이 번지는 새벽 정거장에서 여행자는 푸른 기차를 기다렸다."
+    },
+    {
+      "id": 3,
+      "title": "바람 정원",
+      "rawText": "따뜻한 바람이 유리 정원의 작은 풍경을 흔들었다."
+    },
+    {
+      "id": 4,
+      "title": "달빛 항구",
+      "rawText": "잔잔한 항구 물결 위로 달빛이 길게 이어졌다."
+    },
+    {
+      "id": 5,
+      "title": "리터럴 표본",
+      "rawText": "검색용 문자열 100%_기록을 글자 그대로 보관했다."
+    }
+  ],
+  "queries": [
+    {
+      "queryId": "q-fts-euneunhan",
+      "mode": "fts",
+      "term": "은은한",
+      "expectedIds": [1]
+    },
+    {
+      "queryId": "q-fts-doseogwan",
+      "mode": "fts",
+      "term": "도서관",
+      "expectedIds": [1]
+    },
+    {
+      "queryId": "q-fts-jeonggeojang",
+      "mode": "fts",
+      "term": "정거장",
+      "expectedIds": [2]
+    },
+    {
+      "queryId": "q-like-byeol",
+      "mode": "like",
+      "term": "별",
+      "expectedIds": [2]
+    },
+    {
+      "queryId": "q-like-bit",
+      "mode": "like",
+      "term": "빛",
+      "expectedIds": [1, 2, 4]
+    },
+    {
+      "queryId": "q-like-escaped-wildcards",
+      "mode": "like",
+      "term": "%_",
+      "expectedIds": [5]
+    },
+    {
+      "queryId": "q-fts-injection-literal",
+      "mode": "fts",
+      "term": "%' OR 1=1 --",
+      "expectedIds": []
+    }
+  ]
+}

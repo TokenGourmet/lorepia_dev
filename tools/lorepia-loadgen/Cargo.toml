@@ -1,0 +1,24 @@
+[package]
+name = "lorepia-loadgen"
+description = "Deterministic load, verification, and benchmark evidence tooling for LorePia"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+authors.workspace = true
+repository.workspace = true
+publish = false
+
+[dependencies]
+fs2 = "=0.4.3"
+lorepia-assets = { path = "../../crates/lorepia-assets" }
+lorepia-storage = { path = "../../crates/lorepia-storage" }
+rusqlite = { version = "=0.40.1", default-features = false, features = ["bundled"] }
+serde.workspace = true
+serde_json.workspace = true
+sha2 = "=0.10.9"
+
+[dev-dependencies]
+tempfile = "=3.27.0"
+
+[lints.rust]
+unsafe_code = "forbid"

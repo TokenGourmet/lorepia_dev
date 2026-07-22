@@ -1,0 +1,11 @@
+# Automatically generated - DO NOT EDIT!
+
+[[permission]]
+identifier = "allow-host-broker-request"
+description = "Enables the host_broker_request command without any pre-configured scope."
+commands.allow = ["host_broker_request"]
+
+[[permission]]
+identifier = "deny-host-broker-request"
+description = "Denies the host_broker_request command without any pre-configured scope."
+commands.deny = ["host_broker_request"]

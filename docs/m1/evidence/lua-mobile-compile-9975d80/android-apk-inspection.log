@@ -1,0 +1,282 @@
+UTC_START=2026-07-18T23:04:42Z
+APK_SOURCE=/private/tmp/lorepia-lua-fix-android.QF8rdK/spikes/lua-limits/src-tauri/gen/android/app/build/outputs/apk/universal/debug/app-universal-debug.apk
+APK_COPY=/private/tmp/lorepia-lua-fix-android-evidence.mZRLYi/app-universal-debug.apk
+
+[COPY_APK] COMMAND=cp APK_SOURCE APK_COPY
+[COPY_APK] EXIT_CODE=0
+
+[APK_COMPARE] COMMAND=cmp -s APK_SOURCE APK_COPY
+[APK_COMPARE] EXIT_CODE=0
+
+[APK_SOURCE_SHA256] COMMAND=shasum -a 256 APK_SOURCE
+66788efe85680191b6ef43a4ca4ed96434b6316203c5c7530a4327001c5ee790  /private/tmp/lorepia-lua-fix-android.QF8rdK/spikes/lua-limits/src-tauri/gen/android/app/build/outputs/apk/universal/debug/app-universal-debug.apk
+[APK_SOURCE_SHA256] EXIT_CODE=0
+
+[APK_COPY_SHA256] COMMAND=shasum -a 256 APK_COPY
+66788efe85680191b6ef43a4ca4ed96434b6316203c5c7530a4327001c5ee790  /private/tmp/lorepia-lua-fix-android-evidence.mZRLYi/app-universal-debug.apk
+[APK_COPY_SHA256] EXIT_CODE=0
+
+[APK_STAT] COMMAND=stat -f size_bytes=%z mtime_epoch=%m APK_COPY
+size_bytes=137673749 mtime_epoch=1784415882
+[APK_STAT] EXIT_CODE=0
+
+[APK_ZIP_TEST] COMMAND=unzip -tqq APK_COPY
+[APK_ZIP_TEST] EXIT_CODE=0
+
+[APK_LIB_ENTRIES] COMMAND=unzip -Z1 APK_COPY | sed -nE native library entries
+lib/arm64-v8a/libspikeslualimits_lib.so
+[APK_LIB_ENTRIES] EXIT_CODE=0
+
+[APK_ABI_DIRS] COMMAND=unzip -Z1 APK_COPY | sed -nE ABI extraction | sort -u
+arm64-v8a
+[APK_ABI_DIRS] EXIT_CODE=0
+
+[AAPT_BADGING] COMMAND=aapt dump badging APK_COPY
+package: name='dev.lorepia.spike.lualimits' versionCode='1000' versionName='0.1.0' platformBuildVersionName='16' platformBuildVersionCode='36' compileSdkVersion='36' compileSdkVersionCodename='16'
+sdkVersion:'24'
+targetSdkVersion:'36'
+uses-permission: name='android.permission.INTERNET'
+uses-permission: name='dev.lorepia.spike.lualimits.DYNAMIC_RECEIVER_NOT_EXPORTED_PERMISSION'
+application-label:'LorePia Lua Limits Spike'
+application-label-af:'LorePia Lua Limits Spike'
+application-label-am:'LorePia Lua Limits Spike'
+application-label-ar:'LorePia Lua Limits Spike'
+application-label-as:'LorePia Lua Limits Spike'
+application-label-az:'LorePia Lua Limits Spike'
+application-label-be:'LorePia Lua Limits Spike'
+application-label-bg:'LorePia Lua Limits Spike'
+application-label-bn:'LorePia Lua Limits Spike'
+application-label-bs:'LorePia Lua Limits Spike'
+application-label-ca:'LorePia Lua Limits Spike'
+application-label-cs:'LorePia Lua Limits Spike'
+application-label-da:'LorePia Lua Limits Spike'
+application-label-de:'LorePia Lua Limits Spike'
+application-label-el:'LorePia Lua Limits Spike'
+application-label-en-AU:'LorePia Lua Limits Spike'
+application-label-en-CA:'LorePia Lua Limits Spike'
+application-label-en-GB:'LorePia Lua Limits Spike'
+application-label-en-IN:'LorePia Lua Limits Spike'
+application-label-en-XC:'LorePia Lua Limits Spike'
+application-label-es:'LorePia Lua Limits Spike'
+application-label-es-419:'LorePia Lua Limits Spike'
+application-label-es-US:'LorePia Lua Limits Spike'
+application-label-et:'LorePia Lua Limits Spike'
+application-label-eu:'LorePia Lua Limits Spike'
+application-label-fa:'LorePia Lua Limits Spike'
+application-label-fi:'LorePia Lua Limits Spike'
+application-label-fr:'LorePia Lua Limits Spike'
+application-label-fr-CA:'LorePia Lua Limits Spike'
+application-label-gl:'LorePia Lua Limits Spike'
+application-label-gu:'LorePia Lua Limits Spike'
+application-label-hi:'LorePia Lua Limits Spike'
+application-label-hr:'LorePia Lua Limits Spike'
+application-label-hu:'LorePia Lua Limits Spike'
+application-label-hy:'LorePia Lua Limits Spike'
+application-label-in:'LorePia Lua Limits Spike'
+application-label-is:'LorePia Lua Limits Spike'
+application-label-it:'LorePia Lua Limits Spike'
+application-label-iw:'LorePia Lua Limits Spike'
+application-label-ja:'LorePia Lua Limits Spike'
+application-label-ka:'LorePia Lua Limits Spike'
+application-label-kk:'LorePia Lua Limits Spike'
+application-label-km:'LorePia Lua Limits Spike'
+application-label-kn:'LorePia Lua Limits Spike'
+application-label-ko:'LorePia Lua Limits Spike'
+application-label-ky:'LorePia Lua Limits Spike'
+application-label-lo:'LorePia Lua Limits Spike'
+application-label-lt:'LorePia Lua Limits Spike'
+application-label-lv:'LorePia Lua Limits Spike'
+application-label-mk:'LorePia Lua Limits Spike'
+application-label-ml:'LorePia Lua Limits Spike'
+application-label-mn:'LorePia Lua Limits Spike'
+application-label-mr:'LorePia Lua Limits Spike'
+application-label-ms:'LorePia Lua Limits Spike'
+application-label-my:'LorePia Lua Limits Spike'
+application-label-nb:'LorePia Lua Limits Spike'
+application-label-ne:'LorePia Lua Limits Spike'
+application-label-nl:'LorePia Lua Limits Spike'
+application-label-or:'LorePia Lua Limits Spike'
+application-label-pa:'LorePia Lua Limits Spike'
+application-label-pl:'LorePia Lua Limits Spike'
+application-label-pt:'LorePia Lua Limits Spike'
+application-label-pt-BR:'LorePia Lua Limits Spike'
+application-label-pt-PT:'LorePia Lua Limits Spike'
+application-label-ro:'LorePia Lua Limits Spike'
+application-label-ru:'LorePia Lua Limits Spike'
+application-label-si:'LorePia Lua Limits Spike'
+application-label-sk:'LorePia Lua Limits Spike'
+application-label-sl:'LorePia Lua Limits Spike'
+application-label-sq:'LorePia Lua Limits Spike'
+application-label-sr:'LorePia Lua Limits Spike'
+application-label-sr-Latn:'LorePia Lua Limits Spike'
+application-label-sv:'LorePia Lua Limits Spike'
+application-label-sw:'LorePia Lua Limits Spike'
+application-label-ta:'LorePia Lua Limits Spike'
+application-label-te:'LorePia Lua Limits Spike'
+application-label-th:'LorePia Lua Limits Spike'
+application-label-tl:'LorePia Lua Limits Spike'
+application-label-tr:'LorePia Lua Limits Spike'
+application-label-uk:'LorePia Lua Limits Spike'
+application-label-ur:'LorePia Lua Limits Spike'
+application-label-uz:'LorePia Lua Limits Spike'
+application-label-vi:'LorePia Lua Limits Spike'
+application-label-zh-CN:'LorePia Lua Limits Spike'
+application-label-zh-HK:'LorePia Lua Limits Spike'
+application-label-zh-TW:'LorePia Lua Limits Spike'
+application-label-zu:'LorePia Lua Limits Spike'
+application-icon-120:'res/mipmap-mdpi-v4/ic_launcher.png'
+application-icon-160:'res/mipmap-mdpi-v4/ic_launcher.png'
+application-icon-240:'res/mipmap-hdpi-v4/ic_launcher.png'
+application-icon-320:'res/mipmap-xhdpi-v4/ic_launcher.png'
+application-icon-480:'res/mipmap-xxhdpi-v4/ic_launcher.png'
+application-icon-640:'res/mipmap-xxxhdpi-v4/ic_launcher.png'
+application-icon-65534:'res/mipmap-mdpi-v4/ic_launcher.png'
+application: label='LorePia Lua Limits Spike' icon='res/mipmap-mdpi-v4/ic_launcher.png'
+application-debuggable
+launchable-activity: name='dev.lorepia.spike.lualimits.MainActivity'  label='LorePia Lua Limits Spike' icon=''
+leanback-launchable-activity: name='dev.lorepia.spike.lualimits.MainActivity'  label='LorePia Lua Limits Spike' icon='' banner=''
+feature-group: label=''
+  uses-feature-not-required: name='android.software.leanback'
+  uses-feature: name='android.hardware.faketouch'
+  uses-implied-feature: name='android.hardware.faketouch' reason='default feature for all apps'
+main
+other-receivers
+supports-screens: 'small' 'normal' 'large' 'xlarge'
+supports-any-density: 'true'
+locales: '--_--' 'af' 'am' 'ar' 'as' 'az' 'be' 'bg' 'bn' 'bs' 'ca' 'cs' 'da' 'de' 'el' 'en-AU' 'en-CA' 'en-GB' 'en-IN' 'en-XC' 'es' 'es-419' 'es-US' 'et' 'eu' 'fa' 'fi' 'fr' 'fr-CA' 'gl' 'gu' 'hi' 'hr' 'hu' 'hy' 'in' 'is' 'it' 'iw' 'ja' 'ka' 'kk' 'km' 'kn' 'ko' 'ky' 'lo' 'lt' 'lv' 'mk' 'ml' 'mn' 'mr' 'ms' 'my' 'nb' 'ne' 'nl' 'or' 'pa' 'pl' 'pt' 'pt-BR' 'pt-PT' 'ro' 'ru' 'si' 'sk' 'sl' 'sq' 'sr' 'sr-Latn' 'sv' 'sw' 'ta' 'te' 'th' 'tl' 'tr' 'uk' 'ur' 'uz' 'vi' 'zh-CN' 'zh-HK' 'zh-TW' 'zu'
+densities: '120' '160' '240' '320' '480' '640' '65534'
+native-code: 'arm64-v8a'
+[AAPT_BADGING] EXIT_CODE=0
+
+[APKANALYZER_SUMMARY] COMMAND=apkanalyzer apk summary APK_COPY
+dev.lorepia.spike.lualimits	1000	0.1.0
+[APKANALYZER_SUMMARY] EXIT_CODE=0
+
+[APKANALYZER_APP_ID] COMMAND=apkanalyzer manifest application-id APK_COPY
+dev.lorepia.spike.lualimits
+[APKANALYZER_APP_ID] EXIT_CODE=0
+
+[APKANALYZER_VERSION_NAME] COMMAND=apkanalyzer manifest version-name APK_COPY
+0.1.0
+[APKANALYZER_VERSION_NAME] EXIT_CODE=0
+
+[APKANALYZER_VERSION_CODE] COMMAND=apkanalyzer manifest version-code APK_COPY
+1000
+[APKANALYZER_VERSION_CODE] EXIT_CODE=0
+
+[APKANALYZER_MIN_SDK] COMMAND=apkanalyzer manifest min-sdk APK_COPY
+24
+[APKANALYZER_MIN_SDK] EXIT_CODE=0
+
+[APKANALYZER_TARGET_SDK] COMMAND=apkanalyzer manifest target-sdk APK_COPY
+36
+[APKANALYZER_TARGET_SDK] EXIT_CODE=0
+
+[APKANALYZER_DEBUGGABLE] COMMAND=apkanalyzer manifest debuggable APK_COPY
+true
+[APKANALYZER_DEBUGGABLE] EXIT_CODE=0
+
+[APKANALYZER_PERMISSIONS] COMMAND=apkanalyzer manifest permissions APK_COPY
+android.permission.INTERNET
+dev.lorepia.spike.lualimits.DYNAMIC_RECEIVER_NOT_EXPORTED_PERMISSION
+[APKANALYZER_PERMISSIONS] EXIT_CODE=0
+
+[ZIPALIGN_VERIFY] COMMAND=zipalign -c 4 APK_COPY
+[ZIPALIGN_VERIFY] EXIT_CODE=0
+
+[APKSIGNER_VERIFY] COMMAND=apksigner verify --verbose --print-certs APK_COPY
+Verifies
+Verified using v1 scheme (JAR signing): false
+Verified using v2 scheme (APK Signature Scheme v2): true
+Verified using v3 scheme (APK Signature Scheme v3): false
+Verified using v3.1 scheme (APK Signature Scheme v3.1): false
+Verified using v4 scheme (APK Signature Scheme v4): false
+Verified for SourceStamp: false
+Number of signers: 1
+Signer #1 certificate DN: C=US, O=Android, CN=Android Debug
+Signer #1 certificate SHA-256 digest: 81cb32ca842b661d9010756e04ab9a3e4431f2b368bf1fd7cf6668ad8c0ff2e2
+Signer #1 certificate SHA-1 digest: 68416c4ace8cd63bd4ff190cc8bbc261de2288a1
+Signer #1 certificate MD5 digest: f3cdcd54329c458c1ef0d6e1769953b6
+Signer #1 key algorithm: RSA
+Signer #1 key size (bits): 2048
+Signer #1 public key SHA-256 digest: de9017e9599c71f36867726f687dafd41538677a1c6349e8a03410520f1b4b68
+Signer #1 public key SHA-1 digest: d085234b717b296de65522c2c2b6320d969d9c45
+Signer #1 public key MD5 digest: c5a4b833f1708edcab2cdaf92156af57
+[APKSIGNER_VERIFY] EXIT_CODE=0
+
+[MAKE_NATIVE_DIR] COMMAND=mkdir -p NATIVE_DIR
+[MAKE_NATIVE_DIR] EXIT_CODE=0
+
+[EXTRACT_NATIVE_LIBS] COMMAND=unzip -o -j APK_COPY lib/*/*.so -d NATIVE_DIR
+Archive:  /private/tmp/lorepia-lua-fix-android-evidence.mZRLYi/app-universal-debug.apk
+ extracting: /private/tmp/lorepia-lua-fix-android-evidence.mZRLYi/native-libs/libspikeslualimits_lib.so
+[EXTRACT_NATIVE_LIBS] EXIT_CODE=0
+
+[NATIVE_FILE] PATH=/private/tmp/lorepia-lua-fix-android-evidence.mZRLYi/native-libs/libspikeslualimits_lib.so
+
+[NATIVE_FILE_TYPE] COMMAND=file NATIVE_LIB
+/private/tmp/lorepia-lua-fix-android-evidence.mZRLYi/native-libs/libspikeslualimits_lib.so: ELF 64-bit LSB shared object, ARM aarch64, version 1 (SYSV), dynamically linked, with debug_info, not stripped
+[NATIVE_FILE_TYPE] EXIT_CODE=0
+
+[NATIVE_SHA256] COMMAND=shasum -a 256 NATIVE_LIB
+b5b3037b49ca6161d75615f4462d085360068d1e3de06d6ff9517a10ff8cf640  /private/tmp/lorepia-lua-fix-android-evidence.mZRLYi/native-libs/libspikeslualimits_lib.so
+[NATIVE_SHA256] EXIT_CODE=0
+
+[NATIVE_READELF_HEADER] COMMAND=llvm-readelf -h NATIVE_LIB
+ELF Header:
+  Magic:   7f 45 4c 46 02 01 01 00 00 00 00 00 00 00 00 00
+  Class:                             ELF64
+  Data:                              2's complement, little endian
+  Version:                           1 (current)
+  OS/ABI:                            UNIX - System V
+  ABI Version:                       0
+  Type:                              DYN (Shared object file)
+  Machine:                           AArch64
+  Version:                           0x1
+  Entry point address:               0x0
+  Start of program headers:          64 (bytes into file)
+  Start of section headers:          130505480 (bytes into file)
+  Flags:                             0x0
+  Size of this header:               64 (bytes)
+  Size of program headers:           56 (bytes)
+  Number of program headers:         10
+  Size of section headers:           64 (bytes)
+  Number of section headers:         35
+  Section header string table index: 33
+[NATIVE_READELF_HEADER] EXIT_CODE=0
+
+[NATIVE_READELF_DYNAMIC] COMMAND=llvm-readelf -d NATIVE_LIB
+Dynamic section at offset 0xc15928 contains 28 entries:
+  Tag                Type           Name/Value
+  0x0000000000000001 (NEEDED)       Shared library: [libandroid.so]
+  0x0000000000000001 (NEEDED)       Shared library: [libdl.so]
+  0x0000000000000001 (NEEDED)       Shared library: [liblog.so]
+  0x0000000000000001 (NEEDED)       Shared library: [libm.so]
+  0x0000000000000001 (NEEDED)       Shared library: [libc.so]
+  0x000000000000001e (FLAGS)        BIND_NOW
+  0x000000006ffffffb (FLAGS_1)      NOW
+  0x0000000000000007 (RELA)         0x2250
+  0x0000000000000008 (RELASZ)       581208 (bytes)
+  0x0000000000000009 (RELAENT)      24 (bytes)
+  0x000000006ffffff9 (RELACOUNT)    24210
+  0x0000000000000017 (JMPREL)       0x900a8
+  0x0000000000000002 (PLTRELSZ)     3792 (bytes)
+  0x0000000000000003 (PLTGOT)       0xc1e948
+  0x0000000000000014 (PLTREL)       RELA
+  0x0000000000000006 (SYMTAB)       0x308
+  0x000000000000000b (SYMENT)       24 (bytes)
+  0x0000000000000005 (STRTAB)       0x1748
+  0x000000000000000a (STRSZ)        2817 (bytes)
+  0x000000006ffffef5 (GNU_HASH)     0x1680
+  0x0000000000000019 (INIT_ARRAY)   0xc1d920
+  0x000000000000001b (INIT_ARRAYSZ) 8 (bytes)
+  0x000000000000001a (FINI_ARRAY)   0xc1d910
+  0x000000000000001c (FINI_ARRAYSZ) 16 (bytes)
+  0x000000006ffffff0 (VERSYM)       0x14a8
+  0x000000006ffffffe (VERNEED)      0x1620
+  0x000000006fffffff (VERNEEDNUM)   3
+  0x0000000000000000 (NULL)         0x0
+[NATIVE_READELF_DYNAMIC] EXIT_CODE=0
+
+OVERALL_INSPECTION_EXIT=0
+UTC_END=2026-07-18T23:04:49Z

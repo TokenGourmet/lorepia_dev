@@ -1,0 +1,168 @@
+^D
+added 87 packages, and audited 88 packages in 710ms
+
+21 packages are looking for funding
+  run `npm fund` for details
+
+3 low severity vulnerabilities
+
+To address all issues (including breaking changes), run:
+  npm audit fix --force
+
+Run `npm audit` for details.
+
+> @lorepia/spike-import-hardening@0.1.0 test
+> vitest run
+
+
+ RUN  v4.1.10 /private/tmp/lorepia-import-evidence.DTpYl8/worktree/spikes/import-hardening
+
+
+ Test Files  3 passed (3)
+      Tests  106 passed (106)
+   Start at  07:11:03
+   Duration  338ms (transform 141ms, setup 0ms, import 430ms, tests 43ms, environment 0ms)
+
+   Compiling lorepia-import-hardening-spike v0.1.0 (/private/tmp/lorepia-import-evidence.DTpYl8/worktree/spikes/import-hardening/src-tauri)
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 1.39s
+     Running unittests src/lib.rs (src-tauri/target/debug/deps/spikesimporthardening_lib-3ac6da98a0641585)
+
+running 25 tests
+test probe::tests::aggregate_compression_ratio_is_checked_with_overflow_safety ... ok
+test command_surface_tests::native_command_surface_is_exact ... ok
+test probe::tests::path_policy_rejects_cross_platform_escape_and_alias_forms ... ok
+test probe::tests::duplicate_fixture_contains_two_identical_raw_names ... ok
+test probe::tests::png_parser_rejects_all_ancillary_and_reserved_bit_chunks ... ok
+test probe::tests::png_parser_rejects_crc_truncation_trailing_and_dimensions ... ok
+test probe::tests::archives_without_required_shape_are_user_rejections_before_staging ... ok
+test probe::tests::fixture_zip_golden_and_made_by_system_are_platform_independent ... ok
+test probe::tests::process_lock_reports_bounded_busy_error ... ok
+test probe::tests::png_parser_rejects_structural_critical_chunk_regressions ... ok
+test probe::tests::portable_collision_key_rejects_unicode_caseless_aliases ... ok
+test probe::tests::fixture_catalog_is_exact_and_hash_pinned ... ok
+test probe::tests::strict_zip_parser_rejects_central_local_disagreement ... ok
+test probe::tests::strict_zip_parser_rejects_flags_disk_and_zip64_metadata ... ok
+test probe::tests::strict_zip_parser_rejects_prefix_reused_offsets_and_overlapping_ranges ... ok
+test probe::tests::strict_zip_parser_rejects_zip64_and_malformed_extra_fields ... ok
+test probe::tests::existing_publish_path_returns_bounded_conflict_code ... ok
+test probe::tests::direct_import_uses_only_generated_disk_names ... ok
+test probe::tests::source_detection_does_not_treat_a_data_descriptor_as_a_zip_start ... ok
+test probe::tests::reopened_index_is_bounded_parsed_and_exact_before_object_verification ... ok
+test probe::tests::every_catalog_case_matches_its_expected_outcome ... ok
+test probe::tests::valid_script_is_quarantined_and_never_executed ... ok
+test probe::tests::serialized_receipt_has_the_frontend_exact_key_schema ... ok
+test probe::tests::success_and_every_failure_receipt_are_bounded_and_path_free ... ok
+test probe::tests::successful_probe_cleans_owned_paths_and_preserves_no_sentinel ... ok
+
+test result: ok. 25 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.02s
+
+     Running unittests src/main.rs (src-tauri/target/debug/deps/lorepia_import_hardening_spike-a03bb35af3db1595)
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+
+> @lorepia/spike-import-hardening@0.1.0 tauri
+> tauri build --debug --bundles app --ci
+
+        Info Looking up installed tauri packages to check mismatched versions...
+     Running beforeBuildCommand `npm run build`
+
+> @lorepia/spike-import-hardening@0.1.0 build
+> vite build
+
+vite v8.1.5 building ssr environment for production...
+
+✓ 148 modules transformed.
+
+rendering chunks (1)...
+rendering chunks (2)...
+rendering chunks (3)...
+rendering chunks (4)...
+rendering chunks (5)...
+rendering chunks (6)...
+rendering chunks (7)...
+rendering chunks (8)...
+rendering chunks (9)...
+rendering chunks (10)...
+rendering chunks (11)...
+rendering chunks (12)...
+rendering chunks (13)...
+rendering chunks (14)...
+rendering chunks (15)...
+vite v8.1.5 building client environment for production...
+
+✓ 159 modules transformed.
+
+rendering chunks (1)...
+rendering chunks (2)...
+rendering chunks (3)...
+rendering chunks (4)...
+rendering chunks (5)...
+rendering chunks (6)...
+rendering chunks (7)...
+rendering chunks (8)...
+rendering chunks (9)...
+computing gzip size...
+
+.svelte-kit/output/client/_app/version.json                        0.02 kB │ gzip:  0.04 kB
+.svelte-kit/output/client/.vite/manifest.json                      2.28 kB │ gzip:  0.48 kB
+.svelte-kit/output/client/_app/immutable/chunks/xihTtKlq.js        0.06 kB │ gzip:  0.08 kB
+.svelte-kit/output/client/_app/immutable/entry/start.Bk7sDAVU.js   0.07 kB │ gzip:  0.08 kB
+.svelte-kit/output/client/_app/immutable/nodes/0.DuWwUfcX.js       0.21 kB │ gzip:  0.18 kB
+.svelte-kit/output/client/_app/immutable/nodes/1.BUk6ONv6.js       0.62 kB │ gzip:  0.35 kB
+.svelte-kit/output/client/_app/immutable/chunks/Bjy-W4x2.js        1.36 kB │ gzip:  0.65 kB
+.svelte-kit/output/client/_app/immutable/entry/app.Be9hvw0s.js     3.92 kB │ gzip:  1.82 kB
+.svelte-kit/output/client/_app/immutable/nodes/2.BNUF49-s.js      11.03 kB │ gzip:  4.23 kB
+.svelte-kit/output/client/_app/immutable/chunks/CFwNpt_k.js       26.68 kB │ gzip: 10.32 kB
+.svelte-kit/output/client/_app/immutable/chunks/C4DT2ZEi.js       36.72 kB │ gzip: 14.06 kB
+
+✓ built in 62ms
+computing gzip size...
+
+.svelte-kit/output/server/.vite/manifest.json                   2.94 kB │ gzip:  0.51 kB
+.svelte-kit/output/server/entries/pages/_layout.ts.js           0.07 kB │ gzip:  0.09 kB
+.svelte-kit/output/server/env.js                                0.22 kB │ gzip:  0.14 kB
+.svelte-kit/output/server/entries/fallbacks/layout.svelte.js    0.28 kB │ gzip:  0.21 kB
+.svelte-kit/output/server/chunks/env.js                         0.28 kB │ gzip:  0.17 kB
+.svelte-kit/output/server/internal.js                           0.40 kB │ gzip:  0.19 kB
+.svelte-kit/output/server/chunks/internal2.js                   0.87 kB │ gzip:  0.38 kB
+.svelte-kit/output/server/entries/pages/_page.svelte.js         1.17 kB │ gzip:  0.70 kB
+.svelte-kit/output/server/entries/fallbacks/error.svelte.js     5.12 kB │ gzip:  1.97 kB
+.svelte-kit/output/server/chunks/exports.js                     9.00 kB │ gzip:  2.96 kB
+.svelte-kit/output/server/chunks/shared.js                     10.57 kB │ gzip:  3.38 kB
+.svelte-kit/output/server/chunks/internal.js                   25.42 kB │ gzip:  7.86 kB
+.svelte-kit/output/server/chunks/utils.js                      31.76 kB │ gzip:  9.35 kB
+.svelte-kit/output/server/remote-entry.js                      54.47 kB │ gzip: 12.01 kB
+.svelte-kit/output/server/index.js                            125.81 kB │ gzip: 31.88 kB
+.svelte-kit/output/server/chunks/server.js                    126.32 kB │ gzip: 32.77 kB
+
+✓ built in 838ms
+
+Run npm run preview to preview your production build locally.
+
+> Using @sveltejs/adapter-static
+  Wrote site to "build"
+  ✔ done
+   Compiling objc2-exception-helper v0.1.1
+   Compiling objc2 v0.6.4
+   Compiling block2 v0.6.2
+   Compiling objc2-core-foundation v0.3.2
+   Compiling dispatch2 v0.3.1
+   Compiling objc2-foundation v0.3.2
+   Compiling objc2-app-kit v0.3.2
+   Compiling objc2-web-kit v0.3.2
+   Compiling tao v0.35.3
+   Compiling window-vibrancy v0.6.0
+   Compiling muda v0.19.3
+   Compiling tauri-runtime v2.11.3
+   Compiling wry v0.55.1
+   Compiling tauri-runtime-wry v2.11.4
+   Compiling tauri v2.11.5
+   Compiling lorepia-import-hardening-spike v0.1.0 (/private/tmp/lorepia-import-evidence.DTpYl8/worktree/spikes/import-hardening/src-tauri)
+    Finished `dev` profile [unoptimized + debuginfo] target(s) in 9.56s
+       Built application at: /private/tmp/lorepia-import-evidence.DTpYl8/worktree/spikes/import-hardening/src-tauri/target/debug/lorepia-import-hardening-spike
+    Bundling LorePia Import Hardening Spike.app (/private/tmp/lorepia-import-evidence.DTpYl8/worktree/spikes/import-hardening/src-tauri/target/debug/bundle/macos/LorePia Import Hardening Spike.app)
+    Finished 1 bundle at:
+        /private/tmp/lorepia-import-evidence.DTpYl8/worktree/spikes/import-hardening/src-tauri/target/debug/bundle/macos/LorePia Import Hardening Spike.app
