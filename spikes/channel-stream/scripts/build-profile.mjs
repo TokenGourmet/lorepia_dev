@@ -14,7 +14,14 @@ export const STORE_SAFE_PUBLIC_ASSETS = Object.freeze([
 ]);
 
 const STORE_SAFE_MOBILE_PLATFORMS = new Set(["android", "ios"]);
-const DESKTOP_RESEARCH_PLATFORMS = new Set(["macos", "windows", "linux"]);
+// Tauri reports macOS as `darwin`; keep `macos` only as an explicit manual
+// build alias used by the profile verifier and historical scripts.
+const DESKTOP_RESEARCH_PLATFORMS = new Set([
+  "darwin",
+  "macos",
+  "windows",
+  "linux",
+]);
 const ISOLATION_ROUTE_PATH = fileURLToPath(
   new URL("../src/routes/isolation/+page.svelte", import.meta.url),
 );

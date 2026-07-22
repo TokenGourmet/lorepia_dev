@@ -55,7 +55,7 @@ describe("compile-target imported-code profile", () => {
     },
   );
 
-  it.each([undefined, "macos", "windows", "linux"])(
+  it.each([undefined, "darwin", "macos", "windows", "linux"])(
     "retains the desktop research fixture for %s",
     (platform) => {
       const profile = resolveBuildProfile(platform);
@@ -83,6 +83,10 @@ describe("compile-target imported-code profile", () => {
 
     expect(profile.importedLuaFixtureAllowed).toBe(true);
     expect(profile).not.toHaveProperty("luaRuntimeImplemented");
+  });
+
+  it("recognizes the exact macOS platform value emitted by the Tauri CLI", () => {
+    expect(resolveBuildProfile("darwin").targetPlatform).toBe("darwin");
   });
 
   it("admits only non-executable allowlisted public assets to mobile output", () => {
