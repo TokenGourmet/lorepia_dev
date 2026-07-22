@@ -1,0 +1,15 @@
+--- a/app/src/main/java/com/dokpamo/dccleaner/DcHtmlParser.java
++++ b/app/src/main/java/com/dokpamo/dccleaner/DcHtmlParser.java
+@@ -47,7 +47,11 @@
+ 
+     static String parseAuthenticatedIdentificationCode(String html) {
+         if (html == null || html.isEmpty()) return null;
+-        Matcher matcher = GALLOG_ACCOUNT_URL.matcher(html.replace("\\/", "/"));
++        String normalized = html;
++        while (normalized.contains("\\/")) {
++            normalized = normalized.replace("\\/", "/");
++        }
++        Matcher matcher = GALLOG_ACCOUNT_URL.matcher(normalized);
+         while (matcher.find()) {
+             String value = decode(matcher.group(1));
+             if (SafeUrlPolicy.isValidIdentificationCode(value)
