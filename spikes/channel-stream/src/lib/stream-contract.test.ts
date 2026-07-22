@@ -3,7 +3,10 @@ import { describe, expect, it } from "vitest";
 import {
   createTextReceipt,
   createStreamContractState,
+  isValidStreamSnapshotPayload,
+  validateReleaseStreamResponse,
   validateStreamEvent,
+  validateTerminalRecoverySnapshot,
   validateTerminalSnapshot,
   type EventValidation,
   type StreamContractState,
@@ -157,6 +160,15 @@ describe("stream event contract", () => {
 
     expect(result.shouldAcknowledge).toBe(false);
     expect(result.error).toContain("배칭 설정");
+  });
+
+  it("rejects an empty delta without advancing or acknowledging it", () => {
+    const afterStart = accept(createStreamContractState(), started()).nextState;
+    const result = reject(afterStart, delta(1, requestId, ""));
+
+    expect(result.error).toContain("비어 있지 않은 문자열");
+    expect(result.nextState).toBe(afterStart);
+    expect(result.shouldAcknowledge).toBe(false);
   });
 
   it.each([
@@ -325,7 +337,7 @@ describe("terminal snapshot contract", () => {
         status: "failed",
         lastSeq: 4,
         lastAckedSeq: 2,
-        inFlight: 1,
+        inFlight: 2,
         textBytes: 3,
         textSha256: "0".repeat(64),
         error: { code: "MOCK_FAILURE", message: "failed" },
@@ -442,5 +454,220 @@ describe("terminal snapshot contract", () => {
     await expect(
       validateTerminalSnapshot(snapshot, expected, rejectingDigest),
     ).rejects.toThrow("digest unavailable");
+  });
+});
+
+describe("snapshot lifecycle and recovery contract", () => {
+  const emptySha =
+    "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855";
+  const textSha =
+    "28377ce0871248295ea61e8deb878de0cbc9b66b68d64437149928da276e8ada";
+  const base = {
+    requestId,
+    textBytes: 9,
+    textSha256: textSha,
+    batchWindowMs: 32,
+    effectiveBatchWindowMs: 32,
+    maxInFlight: 2,
+  };
+
+  function stateAfterAcceptedText(): StreamContractState {
+    const afterStart = accept(createStreamContractState(), started()).nextState;
+    return accept(afterStart, delta(1, requestId, "하나둘")).nextState;
+  }
+
+  it("accepts a queued null/null snapshot and rejects phantom sequence state", () => {
+    const queued: StreamSnapshot = {
+      requestId,
+      status: "queued",
+      lastSeq: null,
+      lastAckedSeq: null,
+      inFlight: 0,
+      textBytes: 0,
+      textSha256: emptySha,
+      error: null,
+      batchWindowMs: 32,
+      effectiveBatchWindowMs: 32,
+      maxInFlight: 2,
+    };
+
+    expect(isValidStreamSnapshotPayload(queued)).toBe(true);
+    expect(isValidStreamSnapshotPayload({ ...queued, lastSeq: 0 })).toBe(false);
+    expect(
+      isValidStreamSnapshotPayload({
+        ...queued,
+        status: "streaming",
+      }),
+    ).toBe(false);
+  });
+
+  it("enforces sequence accounting and status/error coupling", () => {
+    const completed: StreamSnapshot = {
+      ...base,
+      status: "completed",
+      lastSeq: 2,
+      lastAckedSeq: 1,
+      inFlight: 1,
+      error: null,
+    };
+
+    expect(isValidStreamSnapshotPayload(completed)).toBe(true);
+    expect(isValidStreamSnapshotPayload({ ...completed, inFlight: 0 })).toBe(false);
+    expect(
+      isValidStreamSnapshotPayload({
+        ...completed,
+        error: { code: "UNEXPECTED", message: "not allowed" },
+      }),
+    ).toBe(false);
+    expect(
+      isValidStreamSnapshotPayload({ ...completed, status: "failed" }),
+    ).toBe(false);
+    expect(
+      isValidStreamSnapshotPayload({
+        ...completed,
+        lastSeq: Number.MAX_SAFE_INTEGER + 1,
+      }),
+    ).toBe(false);
+  });
+
+  it("recovers an omitted terminal event only at the next contiguous sequence", async () => {
+    const state = stateAfterAcceptedText();
+    const snapshot: StreamSnapshot = {
+      ...base,
+      status: "completed",
+      lastSeq: 2,
+      lastAckedSeq: 1,
+      inFlight: 1,
+      error: null,
+    };
+
+    await expect(validateTerminalRecoverySnapshot(snapshot, state)).resolves.toEqual({
+      accepted: true,
+      snapshot,
+      terminalEventDelivered: true,
+      expected: {
+        requestId,
+        status: "completed",
+        lastSeq: 2,
+        acceptedText: "하나둘",
+        error: null,
+      },
+    });
+  });
+
+  it("accepts an already observed terminal without requiring its ACK first", async () => {
+    const beforeTerminal = stateAfterAcceptedText();
+    const terminalState = accept(beforeTerminal, {
+      type: "completed",
+      requestId,
+      seq: 2,
+    }).nextState;
+    const snapshot: StreamSnapshot = {
+      ...base,
+      status: "completed",
+      lastSeq: 2,
+      lastAckedSeq: 1,
+      inFlight: 1,
+      error: null,
+    };
+
+    await expect(
+      validateTerminalRecoverySnapshot(snapshot, terminalState),
+    ).resolves.toMatchObject({ accepted: true, terminalEventDelivered: true });
+  });
+
+  it("recovers a control-plane-only failure without inventing a terminal sequence", async () => {
+    const state = stateAfterAcceptedText();
+    const error = { code: "CHANNEL_DELIVERY_FAILED", message: "closed channel" };
+    const snapshot: StreamSnapshot = {
+      ...base,
+      status: "failed",
+      lastSeq: 1,
+      lastAckedSeq: 1,
+      inFlight: 0,
+      error,
+    };
+
+    await expect(validateTerminalRecoverySnapshot(snapshot, state)).resolves.toEqual({
+      accepted: true,
+      snapshot,
+      terminalEventDelivered: false,
+      expected: {
+        requestId,
+        status: "failed",
+        lastSeq: 1,
+        acceptedText: "하나둘",
+        error,
+      },
+    });
+  });
+
+  it.each([
+    {
+      name: "missed delta sequence gap",
+      change: { lastSeq: 3, lastAckedSeq: 1, inFlight: 2 },
+      mismatch: "lastSeq",
+    },
+    {
+      name: "text receipt mismatch",
+      change: { textSha256: "0".repeat(64) },
+      mismatch: "textSha256",
+    },
+    {
+      name: "wrong request",
+      change: { requestId: "request-2" },
+      mismatch: "requestId",
+    },
+  ])("fails closed for $name", async ({ change, mismatch }) => {
+    const state = stateAfterAcceptedText();
+    const snapshot = {
+      ...base,
+      status: "completed",
+      lastSeq: 2,
+      lastAckedSeq: 1,
+      inFlight: 1,
+      error: null,
+      ...change,
+    };
+
+    await expect(validateTerminalRecoverySnapshot(snapshot, state)).resolves.toMatchObject({
+      accepted: false,
+      mismatches: expect.arrayContaining([mismatch]),
+    });
+  });
+
+  it("rejects a nonterminal recovery snapshot", async () => {
+    const state = stateAfterAcceptedText();
+    await expect(
+      validateTerminalRecoverySnapshot(
+        {
+          ...base,
+          status: "streaming",
+          lastSeq: 1,
+          lastAckedSeq: 1,
+          inFlight: 0,
+          error: null,
+        },
+        state,
+      ),
+    ).resolves.toMatchObject({ accepted: false, mismatches: ["status"] });
+  });
+
+  it("validates the exact release response schema", () => {
+    expect(
+      validateReleaseStreamResponse({ requestId, released: true }, requestId),
+    ).toEqual({ accepted: true });
+    expect(
+      validateReleaseStreamResponse(
+        { requestId, released: true, ignored: true },
+        requestId,
+      ),
+    ).toMatchObject({ accepted: false });
+    expect(
+      validateReleaseStreamResponse(
+        { requestId: "request-2", released: true },
+        requestId,
+      ),
+    ).toMatchObject({ accepted: false });
   });
 });

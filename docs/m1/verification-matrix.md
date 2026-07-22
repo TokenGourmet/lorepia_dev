@@ -1,6 +1,6 @@
 # M-1 verification matrix
 
-Last updated: 2026-07-19
+Last updated: 2026-07-22
 
 This is an evidence index, not a roadmap checkbox list. Every result names the
 exact subject commit and run; a later documentation-only commit does not
@@ -160,7 +160,7 @@ These environments have been identified for upcoming runs. Inventory alone does 
 | Regex budget | NOT RUN | NOT RUN | NOT RUN | NOT RUN | NOT RUN | None |
 | Lua budget and stdlib removal | NOT RUN | PASS ([host record](evidence/lua-macos-9975d80/)) | NOT RUN | NOT RUN | NOT RUN | Fixed pure-Lua corpus proved instruction/allocator interruption, forbidden-global absence, and host recovery; this is VM non-exposure, not binary object removal, and imported Lua remains disabled |
 | JavaScript watchdog | NOT RUN | NOT RUN | NOT RUN | NOT RUN | NOT RUN | The same-event-loop iframe remains rejected. Exact candidate `58bab9d` locally passed `15/15` in the macOS Tauri WKWebView, Android emulator, and iOS simulator, including external termination and recovery; the preserved pre-warmup iOS result was `14/15`. Emulator/simulator observations do not promote these formal physical-device cells and imported JS remains disabled ([candidate](script-runner.md), [exact-commit evidence](evidence/script-runner-58bab9d/)) |
-| iframe IPC and broker denial | NOT RUN | NOT RUN | NOT RUN | NOT RUN | NOT RUN | Unsafe Android emulator baseline preserved; broker candidate retires demonstrated privileged wrappers. Same-process Tauri plugin WebView rejected after shared Channel queue audit; current eight-command spike uses a version-pinned 4096-byte transport mitigation, while imported execution stays off ([isolation](isolation.md), [Channel decision](channel-ipc-boundary.md)) |
+| iframe IPC and broker denial | NOT RUN | NOT RUN | NOT RUN | NOT RUN | NOT RUN | Unsafe Android emulator baseline preserved; broker candidate retires demonstrated privileged wrappers. Same-process Tauri plugin WebView rejected after shared Channel queue audit; current ten-command spike uses a version-pinned 4096-byte transport mitigation, while imported execution stays off ([isolation](isolation.md), [Channel decision](channel-ipc-boundary.md)) |
 | Final HTML sanitizer | NOT RUN | NOT RUN | NOT RUN | NOT RUN | NOT RUN | None |
 | Plugin network default-deny | NOT RUN | NOT RUN | NOT RUN | NOT RUN | NOT RUN | None |
 | Store-Safe imported-code lockout | NOT RUN | NOT RUN | NOT RUN | NOT RUN | NOT RUN | Android/iOS source and simulated-build checks omit executable fixture assets, replace the isolation route, scan output markers, and reject unknown targets (`07ff9c9`, `3f511f2`); packaged/physical-device evidence remains required ([decision](channel-ipc-boundary.md)) |

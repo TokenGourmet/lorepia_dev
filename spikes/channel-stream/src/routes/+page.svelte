@@ -1,7 +1,9 @@
 <script lang="ts">
   import {
     createStreamContractState,
+    validateReleaseStreamResponse,
     validateStreamEvent,
+    validateTerminalRecoverySnapshot,
     validateTerminalSnapshot,
     type ExpectedTerminalSnapshot,
     type StreamContractState,
@@ -12,7 +14,9 @@
     createStreamChannel,
     describeCommandError,
     getStreamSnapshot,
+    releaseStream,
     startMockStream,
+    waitForStreamTerminal,
     type StreamEvent,
     type StreamSnapshot,
     type StreamSnapshotStatus,
@@ -34,6 +38,10 @@
     previousDeltaArrivalMs: number | null;
     contractState: StreamContractState;
     expectedTerminal: ExpectedTerminalSnapshot | null;
+    finalizing: boolean;
+    acknowledgementFailure: string | null;
+    finalizationFailed: boolean;
+    releaseConfirmed: boolean;
   };
 
   const phaseLabel: Record<UiPhase, string> = {
@@ -74,6 +82,7 @@
   let peakPendingAckCount = $state(0);
   let peakBackendInFlight = $state(0);
   let terminalSeen = $state(false);
+  let terminalSource = $state<"channel" | "control" | null>(null);
   let effectiveBatchWindowMs = $state<number | null>(null);
   let batchWindowIncreaseMs = $state<number | null>(null);
   let backpressureObserved = $state<boolean | null>(null);
@@ -115,6 +124,7 @@
     peakPendingAckCount = 0;
     peakBackendInFlight = 0;
     terminalSeen = false;
+    terminalSource = null;
     effectiveBatchWindowMs = null;
     batchWindowIncreaseMs = null;
     backpressureObserved = null;
@@ -123,6 +133,17 @@
 
   function reportProtocolError(message: string): void {
     errorMessage = `프로토콜 오류: ${message}`;
+  }
+
+  function failFinalization(run: RunContext, message: string): void {
+    if (activeRun !== run) return;
+    run.finalizationFailed = true;
+    phase = "failed";
+    errorMessage = message;
+  }
+
+  function failFinalizationProtocol(run: RunContext, message: string): void {
+    failFinalization(run, `프로토콜 오류: ${message}`);
   }
 
   function waitForAckDelay(delayMs: number): Promise<void> {
@@ -145,9 +166,9 @@
         if (activeRun !== run) return;
 
         if (acknowledgement.requestId !== event.requestId) {
-          reportProtocolError(
-            `ACK 응답의 요청 ID가 다릅니다: ${acknowledgement.requestId}`,
-          );
+          run.acknowledgementFailure =
+            `ACK 응답의 요청 ID가 다릅니다: ${acknowledgement.requestId}`;
+          reportProtocolError(run.acknowledgementFailure);
           return;
         }
 
@@ -156,7 +177,9 @@
         peakBackendInFlight = Math.max(peakBackendInFlight, acknowledgement.inFlight);
       } catch (error) {
         if (activeRun === run) {
-          errorMessage = `ACK 실패(seq ${event.seq}): ${describeCommandError(error)}`;
+          run.acknowledgementFailure =
+            `ACK 실패(seq ${event.seq}): ${describeCommandError(error)}`;
+          errorMessage = run.acknowledgementFailure;
         }
       } finally {
         if (activeRun === run) {
@@ -166,19 +189,88 @@
     });
   }
 
-  async function queryFinalSnapshot(
-    run: RunContext,
-    expected: ExpectedTerminalSnapshot,
-  ): Promise<void> {
+  function applySnapshotToDisplay(result: StreamSnapshot): void {
+    snapshot = result;
+    backendStatus = result.status;
+    lastSeq = result.lastSeq;
+    lastAckedSeq = result.lastAckedSeq;
+    backendInFlight = result.inFlight;
+    batchWindowMs = result.batchWindowMs;
+    maxInFlight = result.maxInFlight;
+    effectiveBatchWindowMs = result.effectiveBatchWindowMs;
+    batchWindowIncreaseMs = result.effectiveBatchWindowMs - result.batchWindowMs;
+    backpressureObserved = result.effectiveBatchWindowMs > result.batchWindowMs;
+
+    if (result.status === "completed") {
+      phase = "completed";
+    } else if (result.status === "cancelled") {
+      phase = "cancelled";
+    } else if (result.status === "failed") {
+      phase = "failed";
+    }
+    if (result.error !== null) {
+      errorMessage = `${result.error.code}: ${result.error.message}`;
+    }
+  }
+
+  async function finalizeStream(run: RunContext, currentRequestId: string): Promise<void> {
     try {
+      const rawRecoverySnapshot: unknown = await waitForStreamTerminal(currentRequestId);
+      if (activeRun !== run) return;
+
+      // The backend signals only after the synchronous Channel handoff has
+      // finished. Freeze callbacks here so recovery validates one stable prefix.
+      run.finalizing = true;
+      const recovery = await validateTerminalRecoverySnapshot(
+        rawRecoverySnapshot,
+        run.contractState,
+      );
+      if (activeRun !== run) return;
+      if (!recovery.accepted) {
+        failFinalizationProtocol(run, recovery.error);
+        return;
+      }
+
+      const expected = recovery.expected;
+      run.expectedTerminal = expected;
+      if (!run.contractState.terminalSeen) {
+        terminalSource = "control";
+      }
+      applySnapshotToDisplay(recovery.snapshot);
+
       await run.ackChain;
       if (activeRun !== run) return;
+      if (run.acknowledgementFailure !== null) {
+        failFinalization(run, run.acknowledgementFailure);
+        return;
+      }
+
+      if (recovery.terminalEventDelivered) {
+        const terminalAck = await acknowledgeStream(currentRequestId, expected.lastSeq);
+        if (activeRun !== run) return;
+        if (
+          terminalAck.requestId !== currentRequestId ||
+          terminalAck.acknowledgedThrough !== expected.lastSeq ||
+          terminalAck.inFlight !== 0
+        ) {
+          failFinalizationProtocol(
+            run,
+            "종료 ACK 응답이 최종 시퀀스와 일치하지 않습니다.",
+          );
+          return;
+        }
+        lastAckedSeq = terminalAck.acknowledgedThrough;
+        backendInFlight = terminalAck.inFlight;
+      }
 
       const rawSnapshot: unknown = await getStreamSnapshot(expected.requestId);
       if (activeRun !== run) return;
 
       if (run.expectedTerminal !== expected) {
-        reportProtocolError("기대하던 종료 이벤트가 스냅샷 조회 중 변경되었습니다.");
+        failFinalizationProtocol(
+          run,
+          "기대하던 종료 이벤트가 스냅샷 조회 중 변경되었습니다.",
+        );
         return;
       }
 
@@ -186,37 +278,52 @@
       if (activeRun !== run) return;
 
       if (run.expectedTerminal !== expected) {
-        reportProtocolError("기대하던 종료 이벤트가 영수증 검증 중 변경되었습니다.");
+        failFinalizationProtocol(
+          run,
+          "기대하던 종료 이벤트가 영수증 검증 중 변경되었습니다.",
+        );
         return;
       }
 
       if (!validation.accepted) {
-        reportProtocolError(validation.error);
+        failFinalizationProtocol(run, validation.error);
         return;
       }
 
-      const result = validation.snapshot;
-      snapshot = result;
-      backendStatus = result.status;
-      lastSeq = result.lastSeq;
-      lastAckedSeq = result.lastAckedSeq;
-      backendInFlight = result.inFlight;
-      batchWindowMs = result.batchWindowMs;
-      maxInFlight = result.maxInFlight;
-      effectiveBatchWindowMs = result.effectiveBatchWindowMs;
-      batchWindowIncreaseMs = result.effectiveBatchWindowMs - result.batchWindowMs;
-      backpressureObserved = result.effectiveBatchWindowMs > result.batchWindowMs;
-
-      if (result.error !== null) {
-        errorMessage = `${result.error.code}: ${result.error.message}`;
+      applySnapshotToDisplay(validation.snapshot);
+      const rawRelease: unknown = await releaseStream(
+        currentRequestId,
+        expected.lastSeq,
+      );
+      if (activeRun !== run) return;
+      const releaseValidation = validateReleaseStreamResponse(
+        rawRelease,
+        currentRequestId,
+      );
+      if (!releaseValidation.accepted) {
+        failFinalizationProtocol(run, releaseValidation.error);
+        return;
       }
+      run.releaseConfirmed = true;
     } catch (error) {
       if (activeRun === run) {
-        errorMessage = `최종 스냅샷 조회 실패: ${describeCommandError(error)}`;
+        failFinalization(
+          run,
+          `종료 복구 또는 해제 실패: ${describeCommandError(error)}`,
+        );
       }
     } finally {
       if (activeRun === run) {
+        if (!run.releaseConfirmed && !run.finalizationFailed) {
+          failFinalization(
+            run,
+            "종료 검증이 스트림 해제 확인 없이 중단되었습니다.",
+          );
+        }
         finalSnapshotPending = false;
+        if (run.releaseConfirmed || run.finalizationFailed) {
+          activeRun = null;
+        }
       }
     }
   }
@@ -248,7 +355,7 @@
   }
 
   function handleStreamEvent(run: RunContext, event: StreamEvent): void {
-    if (activeRun !== run) return;
+    if (activeRun !== run || run.finalizing) return;
 
     const validation = validateStreamEvent(run.contractState, event);
     if (!validation.accepted) {
@@ -277,6 +384,7 @@
       phase = "streaming";
     } else {
       terminalSeen = true;
+      terminalSource = "channel";
       finalSnapshotPending = true;
       if (terminalExpectation === null) {
         reportProtocolError("종료 이벤트의 스냅샷 기대값을 만들지 못했습니다.");
@@ -288,9 +396,6 @@
 
     queueAcknowledgement(run, acceptedEvent);
 
-    if (terminalExpectation !== null) {
-      void queryFinalSnapshot(run, terminalExpectation);
-    }
   }
 
   async function startStream(): Promise<void> {
@@ -305,6 +410,10 @@
       previousDeltaArrivalMs: null,
       contractState: createStreamContractState(),
       expectedTerminal: null,
+      finalizing: false,
+      acknowledgementFailure: null,
+      finalizationFailed: false,
+      releaseConfirmed: false,
     } satisfies RunContext;
 
     run.channel = createStreamChannel((event) => handleStreamEvent(run, event));
@@ -326,6 +435,8 @@
           requestId: response.requestId,
         };
       }
+      finalSnapshotPending = true;
+      void finalizeStream(run, response.requestId);
     } catch (error) {
       if (activeRun === run) {
         phase = "failed";
@@ -451,6 +562,8 @@
       <dd>{maxInFlight ?? "—"}</dd>
       <dt>종료 이벤트</dt>
       <dd>{terminalSeen ? "수신함" : "미수신"}</dd>
+      <dt>종료 확인 경로</dt>
+      <dd>{terminalSource === null ? "—" : terminalSource === "channel" ? "Channel" : "제어 평면 복구"}</dd>
       <dt>최종 스냅샷 조회</dt>
       <dd>{finalSnapshotPending ? "ACK 완료 대기 또는 조회 중" : snapshot === null ? "미완료" : "검증 완료"}</dd>
     </dl>
@@ -475,9 +588,9 @@
         <dt>상태</dt>
         <dd>{backendStatusLabel[snapshot.status]}</dd>
         <dt>마지막 seq</dt>
-        <dd>{snapshot.lastSeq}</dd>
+        <dd>{snapshot.lastSeq ?? "—"}</dd>
         <dt>마지막 ACK seq</dt>
-        <dd>{snapshot.lastAckedSeq}</dd>
+        <dd>{snapshot.lastAckedSeq ?? "—"}</dd>
         <dt>in-flight</dt>
         <dd>{snapshot.inFlight}</dd>
         <dt>기본 배칭 윈도우</dt>

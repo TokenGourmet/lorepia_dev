@@ -128,11 +128,13 @@
     "host_broker_probe_count",
     "host_broker_request",
     "register_host_broker_session",
+    "release_stream",
     "rotate_host_broker_session",
     "start_mock_stream",
+    "wait_stream_terminal",
   ] as const;
   const EXPECTED_NATIVE_COMMAND_SHA256 =
-    "989743be825534a0355232646cb09098c6d1bbdf45047d0ee017df21606c100a";
+    "679411179e22a191fe48f8fdc503c62d6d302a888aba93fe1606c9a553bc57ce";
   const MODULE_ID = "fixture.plugin";
   const MANIFEST_PERMISSIONS = [
     "state.read",
@@ -379,7 +381,7 @@
       typeof response.sanitizeCallCount !== "number" ||
       !Number.isSafeInteger(response.sanitizeCallCount) ||
       response.sanitizeCallCount < 0 ||
-      response.commandSurfaceVersion !== 2 ||
+      response.commandSurfaceVersion !== 3 ||
       !Array.isArray(response.commandNames) ||
       response.commandNames.length !== EXPECTED_NATIVE_COMMAND_NAMES.length ||
       !EXPECTED_NATIVE_COMMAND_NAMES.every(
@@ -881,7 +883,7 @@
         [NATIVE_COMMAND_AUDIT_TEST_ID]: {
           passed: runtimeCommandAudit.passed && rawSinkUnchanged,
           detail: rawSinkUnchanged
-            ? `attested 8-command surface v2; ${runtimeCommandAudit.detail}`
+            ? `attested 10-command surface v3; ${runtimeCommandAudit.detail}`
             : `retired command audit changed a privileged sink: probe ${rawSinkBefore.probeCallCount}->${rawSinkAfter.probeCallCount}, sanitize ${rawSinkBefore.sanitizeCallCount}->${rawSinkAfter.sanitizeCallCount}`,
         },
       };

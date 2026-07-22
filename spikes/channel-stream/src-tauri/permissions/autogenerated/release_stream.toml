@@ -1,0 +1,11 @@
+# Automatically generated - DO NOT EDIT!
+
+[[permission]]
+identifier = "allow-release-stream"
+description = "Enables the release_stream command without any pre-configured scope."
+commands.allow = ["release_stream"]
+
+[[permission]]
+identifier = "deny-release-stream"
+description = "Denies the release_stream command without any pre-configured scope."
+commands.deny = ["release_stream"]

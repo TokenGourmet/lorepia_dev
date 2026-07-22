@@ -8,12 +8,24 @@ This disposable Tauri 2 + SvelteKit application validates LorePia's native-to-we
 - Every event carries a request ID and a contiguous, monotonically increasing sequence number.
 - The producer batches mock upstream chunks in a configured 16-50 ms window.
 - The frontend acknowledges consumed sequence numbers. A bounded in-flight window prevents an unbounded producer queue, and consumer delay expands the effective batching window without dropping text.
+- A full data window has one finite ACK deadline. A missing consumer ACK ends in
+  an `ACK_TIMEOUT` failure instead of leaving the producer alive indefinitely.
+- Queued snapshots use `null` sequence values. Emitted sequences are contiguous,
+  checked, and capped at JavaScript's largest safe integer.
 - Cancellation produces one `cancelled` terminal event and preserves the exact partial text in the backend state; the final snapshot proves its byte length and SHA-256 with the last sequence.
 - Deterministic failure injection produces one `failed` terminal event with the same receipt guarantees.
-- Every serialized event and JSON command response in the eight-command spike
+- Every serialized event and JSON command response in the ten-command spike
   stays within a 4096-byte application budget. Oversized deltas are split on
   UTF-8 boundaries, and terminal snapshots return byte-length/SHA-256 receipts
   instead of repeating up to 1 MiB of text.
+- A retained control-plane signal lets the trusted host recover a missed
+  terminal event without accepting a missing delta. Empty source chunks and
+  empty delta events are rejected so every omitted delta changes the receipt.
+  Lifecycle commands accept only fixed-width server-issued request IDs without
+  reflecting caller input in errors, and each request admits at most one
+  outstanding terminal waiter. Cleanup requires terminal
+  ACK, a verified final receipt, and explicit `release_stream`; a five-minute
+  terminal TTL recovers capacity if the WebView disappears.
 
 The mock proves the transport and lifecycle mechanics only. It does not claim real provider SSE, mobile physical-device behavior, persistence, or production performance.
 
@@ -31,7 +43,7 @@ imports keep JavaScript and Lua disabled. Their builds omit the plugin-frame
 assets and replace this route with a status-only page; unknown non-empty Tauri
 platform values fail the build instead of enabling the desktop research fixture.
 
-This combined disposable spike still registers the four raw Channel transport
+This combined disposable spike still registers six raw stream-lifecycle
 commands for its trusted `main` WebView. The broker is the only path to the
 fixture's sanitizer and probe sinks, not yet the only native command path. A
 same-process Tauri-managed plugin WebView is not selected as the production

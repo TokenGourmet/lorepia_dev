@@ -7,8 +7,10 @@ macro_rules! with_lorepia_app_commands {
             host_broker_probe_count,
             host_broker_request,
             register_host_broker_session,
+            release_stream,
             rotate_host_broker_session,
             start_mock_stream,
+            wait_stream_terminal,
         }
     };
 }

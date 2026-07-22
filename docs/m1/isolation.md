@@ -17,7 +17,7 @@ observations below do not change any physical-device cell in
 - The immediate fallback retires the demonstrated privileged raw wrappers and
   routes their allowed operations through a Rust broker protected by a
   host-only, cryptographically random 256-bit session token. The combined
-  disposable spike still has four raw Channel transport commands. A later
+  disposable spike still has six raw stream-lifecycle commands. A later
   Tauri 2.11.5 source audit found that a separately scoped same-process Tauri
   WebView is also insufficient because large Channel data uses an ACL-exempt,
   process-global fetch queue without WebView ownership binding. See
@@ -180,7 +180,7 @@ Commit `f7a3270` additionally keeps each current Channel event and JSON command
 response within a 4096-byte application budget, below the audited Tauri
 large-payload threshold. Terminal events no longer repeat the accumulated text;
 the final snapshot returns byte-length and SHA-256 receipts. This prevents the
-current eight-command spike from entering the shared large-response queue, but
+current ten-command spike from entering the shared large-response queue, but
 it is a version-pinned mitigation rather than a general Tauri isolation fix.
 
 ## Evidence needed to replace this baseline

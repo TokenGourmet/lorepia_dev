@@ -60,6 +60,11 @@ export type CancelStreamResponse = {
   accepted: boolean;
 };
 
+export type ReleaseStreamResponse = {
+  requestId: string;
+  released: boolean;
+};
+
 export type StreamSnapshotStatus =
   | "queued"
   | "streaming"
@@ -70,8 +75,8 @@ export type StreamSnapshotStatus =
 export type StreamSnapshot = {
   requestId: string;
   status: StreamSnapshotStatus;
-  lastSeq: number;
-  lastAckedSeq: number;
+  lastSeq: number | null;
+  lastAckedSeq: number | null;
   inFlight: number;
   textBytes: number;
   textSha256: string;
@@ -86,6 +91,8 @@ const command = {
   acknowledge: "ack_stream",
   cancel: "cancel_stream",
   snapshot: "get_stream_snapshot",
+  waitTerminal: "wait_stream_terminal",
+  release: "release_stream",
 } as const;
 
 export function createStreamChannel(
@@ -119,6 +126,17 @@ export function cancelStream(requestId: string): Promise<CancelStreamResponse> {
 
 export function getStreamSnapshot(requestId: string): Promise<StreamSnapshot> {
   return invoke<StreamSnapshot>(command.snapshot, { requestId });
+}
+
+export function waitForStreamTerminal(requestId: string): Promise<StreamSnapshot> {
+  return invoke<StreamSnapshot>(command.waitTerminal, { requestId });
+}
+
+export function releaseStream(
+  requestId: string,
+  snapshotSeq: number,
+): Promise<ReleaseStreamResponse> {
+  return invoke<ReleaseStreamResponse>(command.release, { requestId, snapshotSeq });
 }
 
 export function describeCommandError(error: unknown): string {

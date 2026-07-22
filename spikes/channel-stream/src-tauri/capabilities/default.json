@@ -11,6 +11,8 @@
     "allow-register-host-broker-session",
     "allow-rotate-host-broker-session",
     "allow-host-broker-request",
-    "allow-host-broker-probe-count"
+    "allow-host-broker-probe-count",
+    "allow-release-stream",
+    "allow-wait-stream-terminal"
   ]
 }

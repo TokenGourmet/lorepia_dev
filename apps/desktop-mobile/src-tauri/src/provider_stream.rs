@@ -50,6 +50,10 @@ const OWNER_RESET_TIMEOUT: Duration = Duration::from_secs(10);
 const TERMINAL_RETENTION: Duration = Duration::from_secs(5 * 60);
 const DIRECT_CHANNEL_BUDGET_BYTES: usize = 4_096;
 const MAX_DELTA_FRAGMENT_BYTES: usize = 512;
+/// Largest integer that JavaScript can represent exactly on the IPC wire.
+const MAX_WIRE_SEQUENCE: u64 = 9_007_199_254_740_991;
+/// Keep the final safe sequence available for exactly one terminal receipt.
+const MAX_NON_TERMINAL_SEQUENCE: u64 = MAX_WIRE_SEQUENCE - 1;
 const PER_STREAM_IN_FLIGHT_RESERVATION_BYTES: usize =
     DIRECT_CHANNEL_BUDGET_BYTES * (MAX_IN_FLIGHT as usize + 1);
 const GLOBAL_IN_FLIGHT_RESERVATION_BYTES: usize =
@@ -2172,6 +2176,18 @@ fn response_too_large() -> ProviderCommandError {
     )
 }
 
+fn next_wire_sequence(last_sent_seq: u64, maximum: u64) -> Result<u64, ProviderCommandError> {
+    last_sent_seq
+        .checked_add(1)
+        .filter(|next| *next <= maximum)
+        .ok_or_else(|| {
+            ProviderCommandError::new(
+                "STREAM_SEQUENCE_EXHAUSTED",
+                "provider stream exhausted its JavaScript-safe sequence budget",
+            )
+        })
+}
+
 async fn send_non_terminal(
     request_id: &str,
     state: &Arc<StreamRequestState>,
@@ -2203,7 +2219,7 @@ async fn send_non_terminal(
                 ));
             }
             if machine.pending_send_seq.is_none() && machine.in_flight() < MAX_IN_FLIGHT {
-                let seq = machine.last_sent_seq.saturating_add(1);
+                let seq = next_wire_sequence(machine.last_sent_seq, MAX_NON_TERMINAL_SEQUENCE)?;
                 machine.pending_send_seq = Some(seq);
                 Some(seq)
             } else {
@@ -2303,8 +2319,9 @@ async fn send_terminal(
                 "provider stream still had a pending event send",
             ));
         }
+        let seq = next_wire_sequence(machine.last_sent_seq, MAX_WIRE_SEQUENCE)?;
         machine.terminal_committing = true;
-        machine.last_sent_seq.saturating_add(1)
+        seq
     };
 
     if persistence.last_delivered_seq < seq {
@@ -2548,6 +2565,7 @@ fn storage_failure_code(error: &ProviderCommandError) -> StorageFailureCode {
         "INVALID_STREAM_EVENT"
         | "STREAM_INTERNAL_STATE"
         | "STREAM_ALREADY_TERMINAL"
+        | "STREAM_SEQUENCE_EXHAUSTED"
         | "STORAGE_SEQUENCE_INVALID" => StorageFailureCode::ProtocolViolation,
         "CREDENTIAL_NOT_CONFIGURED" | "CREDENTIAL_UNSUPPORTED" | "CREDENTIAL_INVALID_ENCODING" => {
             StorageFailureCode::AuthenticationFailed
@@ -2710,7 +2728,7 @@ mod tests {
         for fragment in split_utf8(&text, MAX_DELTA_FRAGMENT_BYTES) {
             let event = ProviderChannelEvent::TextDelta {
                 request_id: format!("provider-{}", "f".repeat(32)),
-                seq: u64::MAX,
+                seq: MAX_WIRE_SEQUENCE,
                 text: fragment.to_owned(),
             };
             assert!(serde_json::to_vec(&event).unwrap().len() <= DIRECT_CHANNEL_BUDGET_BYTES);
@@ -2969,12 +2987,12 @@ mod tests {
     fn terminal_receipts_also_fit_the_direct_budget() {
         let snapshot = ProviderStreamSnapshot {
             request_id: format!("provider-{}", "f".repeat(32)),
-            last_sent_seq: u64::MAX,
-            acknowledged_through: Some(u64::MAX),
+            last_sent_seq: MAX_WIRE_SEQUENCE,
+            acknowledged_through: Some(MAX_WIRE_SEQUENCE),
             in_flight: 0,
             cancel_requested: false,
             terminal: Some(TerminalReceipt::Failed {
-                seq: u64::MAX,
+                seq: MAX_WIRE_SEQUENCE,
                 error: ProviderCommandError::new("X".repeat(64), "Y".repeat(512)),
             }),
         };
@@ -3227,6 +3245,310 @@ mod tests {
         assert_eq!(machine.last_sent_seq, 1);
         assert_eq!(machine.pending_send_seq, None);
         assert!(machine.ack_deadline.is_some());
+    }
+
+    #[test]
+    fn wire_sequence_stops_at_javascript_safe_integer_without_wrapping() {
+        assert_eq!(
+            next_wire_sequence(MAX_WIRE_SEQUENCE - 1, MAX_WIRE_SEQUENCE).unwrap(),
+            MAX_WIRE_SEQUENCE
+        );
+        assert_eq!(
+            next_wire_sequence(MAX_NON_TERMINAL_SEQUENCE - 1, MAX_NON_TERMINAL_SEQUENCE).unwrap(),
+            MAX_NON_TERMINAL_SEQUENCE
+        );
+        assert_eq!(
+            next_wire_sequence(MAX_NON_TERMINAL_SEQUENCE, MAX_WIRE_SEQUENCE).unwrap(),
+            MAX_WIRE_SEQUENCE
+        );
+        for exhausted in [MAX_WIRE_SEQUENCE, u64::MAX] {
+            let error = next_wire_sequence(exhausted, MAX_WIRE_SEQUENCE).unwrap_err();
+            assert_eq!(error.code, "STREAM_SEQUENCE_EXHAUSTED");
+        }
+        assert_eq!(
+            next_wire_sequence(MAX_NON_TERMINAL_SEQUENCE, MAX_NON_TERMINAL_SEQUENCE)
+                .unwrap_err()
+                .code,
+            "STREAM_SEQUENCE_EXHAUSTED"
+        );
+    }
+
+    #[tokio::test]
+    async fn exhausted_non_terminal_send_does_not_call_factory_or_channel_or_mutate_state() {
+        let state = request_state("main");
+        {
+            let mut machine = state.machine.lock().await;
+            machine.last_sent_seq = MAX_NON_TERMINAL_SEQUENCE;
+            machine.acknowledged_through = Some(MAX_NON_TERMINAL_SEQUENCE);
+            machine.ack_deadline = None;
+        }
+
+        let factory_called = Arc::new(AtomicBool::new(false));
+        let channel_called = Arc::new(AtomicBool::new(false));
+        let untouched_text = Arc::new(Mutex::new("unchanged".to_owned()));
+        let channel_called_for_send = Arc::clone(&channel_called);
+        let channel = Channel::new(move |_| {
+            channel_called_for_send.store(true, Ordering::Release);
+            Ok(())
+        });
+        let factory_called_for_send = Arc::clone(&factory_called);
+        let text_for_send = Arc::clone(&untouched_text);
+
+        let error = send_non_terminal("provider-test", &state, &channel, move |request_id, seq| {
+            factory_called_for_send.store(true, Ordering::Release);
+            text_for_send.lock().unwrap().push_str("-mutated");
+            ProviderChannelEvent::TextDelta {
+                request_id,
+                seq,
+                text: "must-not-send".to_owned(),
+            }
+        })
+        .await
+        .unwrap_err();
+
+        assert_eq!(error.code, "STREAM_SEQUENCE_EXHAUSTED");
+        assert!(!factory_called.load(Ordering::Acquire));
+        assert!(!channel_called.load(Ordering::Acquire));
+        assert_eq!(untouched_text.lock().unwrap().as_str(), "unchanged");
+        let machine = state.machine.lock().await;
+        assert_eq!(machine.last_sent_seq, MAX_NON_TERMINAL_SEQUENCE);
+        assert_eq!(
+            machine.acknowledged_through,
+            Some(MAX_NON_TERMINAL_SEQUENCE)
+        );
+        assert_eq!(machine.pending_send_seq, None);
+        assert!(machine.terminal.is_none());
+        assert!(!machine.terminal_committing);
+        assert!(machine.lease_failure.is_none());
+        assert!(machine.ack_deadline.is_none());
+    }
+
+    #[tokio::test]
+    async fn last_non_terminal_sequence_is_emitted_once_and_never_duplicated() {
+        use tauri::ipc::InvokeResponseBody;
+
+        let state = request_state("main");
+        {
+            let mut machine = state.machine.lock().await;
+            machine.last_sent_seq = MAX_NON_TERMINAL_SEQUENCE - 1;
+            machine.acknowledged_through = Some(MAX_NON_TERMINAL_SEQUENCE - 1);
+            machine.ack_deadline = None;
+        }
+        let received = Arc::new(Mutex::new(Vec::<u64>::new()));
+        let received_for_send = Arc::clone(&received);
+        let channel = Channel::new(move |body| {
+            let InvokeResponseBody::Json(json) = body else {
+                return Err(std::io::Error::other("unexpected raw channel body").into());
+            };
+            let event: serde_json::Value = serde_json::from_str(&json)?;
+            received_for_send
+                .lock()
+                .unwrap()
+                .push(event["seq"].as_u64().unwrap());
+            Ok(())
+        });
+
+        let seq = send_non_terminal("provider-test", &state, &channel, |request_id, seq| {
+            ProviderChannelEvent::TextDelta {
+                request_id,
+                seq,
+                text: "last".to_owned(),
+            }
+        })
+        .await
+        .unwrap();
+        assert_eq!(seq, MAX_NON_TERMINAL_SEQUENCE);
+
+        let duplicate_factory_called = Arc::new(AtomicBool::new(false));
+        let duplicate_factory_called_for_send = Arc::clone(&duplicate_factory_called);
+        let error = send_non_terminal("provider-test", &state, &channel, move |request_id, seq| {
+            duplicate_factory_called_for_send.store(true, Ordering::Release);
+            ProviderChannelEvent::TextDelta {
+                request_id,
+                seq,
+                text: "duplicate".to_owned(),
+            }
+        })
+        .await
+        .unwrap_err();
+
+        assert_eq!(error.code, "STREAM_SEQUENCE_EXHAUSTED");
+        assert!(!duplicate_factory_called.load(Ordering::Acquire));
+        assert_eq!(*received.lock().unwrap(), vec![MAX_NON_TERMINAL_SEQUENCE]);
+        let machine = state.machine.lock().await;
+        assert_eq!(machine.last_sent_seq, MAX_NON_TERMINAL_SEQUENCE);
+        assert_eq!(machine.pending_send_seq, None);
+    }
+
+    #[tokio::test]
+    async fn terminal_uses_the_reserved_javascript_safe_sequence_after_the_last_delta() {
+        use tauri::ipc::InvokeResponseBody;
+
+        let directory = tempfile::tempdir().unwrap();
+        let storage = StorageState::open(Ok(directory.path().to_path_buf()));
+        let owner = owner_label("main");
+        let generation = StreamGeneration::new();
+        let owner_for_turn = owner.clone();
+        let generation_for_turn = generation.clone();
+        let started = storage
+            .run(move |store| {
+                let at_ms = TimestampMillis::now()?;
+                let chat = store.create_chat(CreateChat {
+                    character_id: CharacterId::parse("terminal-sequence-test")?,
+                    title: "terminal sequence boundary".to_owned(),
+                    at_ms,
+                })?;
+                store.begin_turn(BeginTurn {
+                    chat_id: chat.id,
+                    selection: StorageProviderSelection {
+                        provider_id: StorageProviderId::OpenAi,
+                        model_id: StorageModelId::parse("gpt-test")?,
+                    },
+                    owner_label: owner_for_turn,
+                    stream_generation: generation_for_turn,
+                    user_text: "hello".to_owned(),
+                    started_at_ms: at_ms,
+                })
+            })
+            .await
+            .unwrap();
+
+        // Put the durable test fixture immediately before the reserved terminal
+        // slot. The production store enforces the same JavaScript-safe upper
+        // bound, so this exercises send_terminal rather than only its helper.
+        let connection =
+            rusqlite::Connection::open(directory.path().join("lorepia.sqlite3")).unwrap();
+        assert_eq!(
+            connection
+                .execute(
+                    "UPDATE request_state
+                     SET last_delivered_seq = ?2,
+                         last_durable_seq = ?2,
+                         last_acked_seq = ?2
+                     WHERE id = ?1 AND status = 'running'",
+                    rusqlite::params![
+                        started.request_state_id.as_str(),
+                        i64::try_from(MAX_NON_TERMINAL_SEQUENCE).unwrap()
+                    ],
+                )
+                .unwrap(),
+            1
+        );
+        drop(connection);
+
+        let state = Arc::new(StreamRequestState::new(
+            owner,
+            generation,
+            "terminal-sequence-token".to_owned(),
+        ));
+        state.bind_started_turn(&started).unwrap();
+        {
+            let mut machine = state.machine.lock().await;
+            machine.last_sent_seq = MAX_NON_TERMINAL_SEQUENCE;
+            machine.acknowledged_through = Some(MAX_NON_TERMINAL_SEQUENCE);
+            machine.persisted_acked_through = Some(MAX_NON_TERMINAL_SEQUENCE);
+            machine.ack_deadline = None;
+        }
+
+        let mut persistence_started = started.clone();
+        persistence_started.last_delivered_seq = MAX_NON_TERMINAL_SEQUENCE;
+        persistence_started.last_durable_seq = MAX_NON_TERMINAL_SEQUENCE;
+        persistence_started.last_acked_seq = Some(MAX_NON_TERMINAL_SEQUENCE);
+        let mut persistence =
+            StreamPersistence::new(persistence_started, TimestampMillis::now().unwrap());
+        let received = Arc::new(Mutex::new(Vec::<u64>::new()));
+        let received_for_send = Arc::clone(&received);
+        let channel = Channel::new(move |body| {
+            let InvokeResponseBody::Json(json) = body else {
+                return Err(std::io::Error::other("unexpected raw channel body").into());
+            };
+            let event: serde_json::Value = serde_json::from_str(&json)?;
+            received_for_send
+                .lock()
+                .unwrap()
+                .push(event["seq"].as_u64().unwrap());
+            Ok(())
+        });
+
+        send_terminal(
+            "provider-test",
+            &state,
+            &channel,
+            TerminalKind::Cancelled,
+            &mut persistence,
+            &storage,
+        )
+        .await
+        .unwrap();
+
+        assert_eq!(*received.lock().unwrap(), vec![MAX_WIRE_SEQUENCE]);
+        let machine = state.machine.lock().await;
+        assert_eq!(machine.last_sent_seq, MAX_WIRE_SEQUENCE);
+        assert!(matches!(
+            machine.terminal,
+            Some(TerminalReceipt::Cancelled {
+                seq: MAX_WIRE_SEQUENCE
+            })
+        ));
+        drop(machine);
+        let request_state_id = started.request_state_id;
+        let persisted = storage
+            .run(move |store| store.get_request_state(&request_state_id))
+            .await
+            .unwrap();
+        assert_eq!(persisted.status, StorageRequestStatus::Cancelled);
+        assert_eq!(persisted.last_delivered_seq, MAX_WIRE_SEQUENCE);
+        assert_eq!(persisted.last_durable_seq, MAX_WIRE_SEQUENCE);
+    }
+
+    #[tokio::test]
+    async fn exhausted_terminal_send_does_not_call_channel_or_mutate_state_or_text() {
+        let state = request_state("main");
+        {
+            let mut machine = state.machine.lock().await;
+            machine.last_sent_seq = MAX_WIRE_SEQUENCE;
+            machine.acknowledged_through = Some(MAX_WIRE_SEQUENCE);
+            machine.ack_deadline = None;
+        }
+        let started = started_turn();
+        let started_at_ms = TimestampMillis::now().unwrap();
+        let mut persistence = StreamPersistence::new(started, started_at_ms);
+        persistence.appended_text = "unchanged".to_owned();
+        persistence.visible_text_bytes = persistence.appended_text.len();
+        let directory = tempfile::tempdir().unwrap();
+        let storage = StorageState::open(Ok(directory.path().to_path_buf()));
+        let channel_called = Arc::new(AtomicBool::new(false));
+        let channel_called_for_send = Arc::clone(&channel_called);
+        let channel = Channel::new(move |_| {
+            channel_called_for_send.store(true, Ordering::Release);
+            Ok(())
+        });
+
+        let error = send_terminal(
+            "provider-test",
+            &state,
+            &channel,
+            TerminalKind::Cancelled,
+            &mut persistence,
+            &storage,
+        )
+        .await
+        .unwrap_err();
+
+        assert_eq!(error.code, "STREAM_SEQUENCE_EXHAUSTED");
+        assert!(!channel_called.load(Ordering::Acquire));
+        assert_eq!(persistence.appended_text, "unchanged");
+        assert_eq!(persistence.visible_text_bytes, "unchanged".len());
+        assert_eq!(persistence.through_seq, 0);
+        assert_eq!(persistence.last_delivered_seq, 0);
+        assert_eq!(persistence.last_durable_seq, 0);
+        let machine = state.machine.lock().await;
+        assert_eq!(machine.last_sent_seq, MAX_WIRE_SEQUENCE);
+        assert_eq!(machine.acknowledged_through, Some(MAX_WIRE_SEQUENCE));
+        assert_eq!(machine.pending_send_seq, None);
+        assert!(machine.terminal.is_none());
+        assert!(!machine.terminal_committing);
+        assert!(machine.ack_deadline.is_none());
     }
 
     #[tokio::test]

@@ -48,15 +48,35 @@ Candidate commit `f7a3270` keeps the current spike off that queue:
    frontend hashes its accepted deltas and rejects a mismatched receipt.
 6. A broker result that would exceed the same 4096-byte response budget fails
    closed instead of entering Tauri's large command-response path.
-7. The app capability targets the exact trusted `main` WebView label, not the
+7. Lifecycle commands accept only the exact fixed-width request IDs issued by
+   the Rust registry, and error responses never echo a caller-supplied ID.
+   Each request permits only one outstanding terminal waiter, so repeated
+   direct invokes cannot accumulate unbounded watch receivers.
+8. The app capability targets the exact trusted `main` WebView label, not the
    containing window, and the config explicitly enables only that capability.
-8. Regression tests pin the audited Tauri/runtime-wry versions. A dependency
+9. Regression tests pin the audited Tauri/runtime-wry versions. A dependency
    update must re-audit these internal transport semantics before changing the
    lock.
 
-This is a mitigation for the eight commands in the disposable spike, not a
+This is a mitigation for the ten commands in the disposable spike, not a
 general patch to Tauri. Any new command response or Channel payload must receive
 an explicit bounded response-shape test.
+
+The current lifecycle contract adds `wait_stream_terminal` and
+`release_stream` without returning raw accumulated text. The waiter returns the
+same bounded byte-length/SHA-256 receipt and may recover only a missed terminal
+event at the next contiguous sequence, or a control-plane-only failure at the
+last delivered sequence. A sequence gap or receipt mismatch fails closed. The
+stream rejects empty chunks/deltas so a missing data event cannot masquerade as
+a receipt-neutral terminal event. The
+final snapshot is releasable only after the delivered terminal is cumulatively
+ACKed; explicit release removes the exact retained request, while a five-minute
+terminal TTL is the dead-WebView fallback. Immediate opportunistic eviction is
+not used because it can race final validation and release.
+
+Android URI grants in this spike are also limited to named app files, cache,
+and app-specific external export directories. No root or broad external-storage
+mapping remains.
 
 ## Product decision
 
