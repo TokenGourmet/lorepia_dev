@@ -1,7 +1,9 @@
 # Product SQLite storage
 
-This record describes the first product-owned persistence slice. It is an
+This record describes the current product-owned persistence slice. It is an
 implementation contract and local test record, not physical-device evidence.
+The complete current filesystem and cross-store ownership map is recorded in
+the [product storage layout](../architecture/product-storage-layout.md).
 
 ## Ownership and command boundary
 
@@ -12,68 +14,98 @@ SQLite runs with foreign keys, WAL mode, and a bounded busy timeout.
 
 The trusted main WebView receives only typed commands for storage status,
 creating/listing/deleting chats, loading messages, and reading/updating app
-preferences. There is no raw SQL, arbitrary path, migration, credential, or
-request-state command.
+preferences. Branch selection, request journaling, and render-cache APIs remain
+native storage capabilities; they are not direct WebView commands. There is no
+raw SQL, arbitrary path, migration, credential, asset-object, or backup command.
 
-## Schema v1
+The asset store is a separate authority. Its catalog is
+`assets/assets.sqlite3`, and its immutable content-addressed objects live below
+`assets/objects/`. The product shell currently exposes only the bounded
+asset-status command described in [Product asset-store status
+boundary](product-assets.md). API keys remain exclusively in the OS credential
+vault.
 
-Schema v1 stores:
+## Product schema v3
+
+The current product database schema is version 3. Startup has reviewed forward
+migrations from exact v1 and v2 schemas; an unknown future version, an
+unversioned non-empty database, or a modified schema fails closed.
+
+Schema v3 stores:
 
 - chats with a character ID, title, timestamps, and optimistic revision;
-- ordered user and assistant messages with complete, partial, or failed state;
-- native-owned provider request progress and cumulative usage;
+- branching user and assistant messages with parent, sibling, depth, and
+  completion state;
+- the selected active message path for each chat;
+- native-owned provider request progress, delivery/durability/ACK sequence
+  state, and cumulative usage;
 - selected provider, per-provider model IDs, theme, and default chat mode;
-- an FTS5 trigram index for later local message search.
+- an FTS5 trigram index of complete messages;
+- a bounded, renderer-versioned HTML cache.
 
-The schema has no API-key, credential-status, stream control-token, or raw
-provider-error column. API keys remain exclusively in the OS credential vault.
-Provider error details exposed by a remote body are discarded by the runtime;
-storage receives only bounded app-owned failure codes.
+The product database has no API-key, raw provider-error, asset BLOB, asset
+catalog, embedding, or separate derived-database table. Provider error bodies
+are discarded by the runtime; storage receives only bounded app-owned failure
+codes. Schema evolution requires an explicit migration and exact post-migration
+schema validation.
 
-Startup checks the exact compiled v1 tables, indexes, triggers, FTS definition,
-foreign keys, and schema version before recovery. Unknown future versions and
-modified schemas fail closed. Schema evolution requires an explicit reviewed
-migration; this slice does not claim a v2 migration yet.
+## Streaming and branching durability
 
-## Streaming durability
+Starting a turn inserts the user message, empty assistant message, selected
+branch path, and running request state transactionally. The bridge checkpoints
+visible text/refusal, provider response identity, delivery/durability/ACK
+progress, and cumulative usage at bounded intervals. Reasoning text,
+credentials, control tokens, and raw remote errors are not persisted.
 
-Starting a first-chat turn inserts the user message, empty assistant message,
-and running request state in one transaction. The bridge checkpoints visible
-text/refusal, provider response identity, and cumulative usage at a 4 KiB or
-250 ms boundary. Reasoning text, credentials, control tokens, and raw remote
-errors are not persisted.
+The final checkpoint and complete/cancelled/failed state transition are atomic
+inside `lorepia.sqlite3`. Only after that transaction succeeds may the matching
+terminal Channel event be sent. On startup, any remaining running request is
+marked interrupted with the stable `APP_RESTARTED` code while its last committed
+partial response remains available.
 
-The final checkpoint and complete/cancelled/failed state transition are atomic.
-Only after that transaction succeeds may the matching terminal Channel event be
-sent. On startup, any remaining running request is marked interrupted with the
-stable `APP_RESTARTED` code while its last committed partial response remains
-available.
+Branch mutations and active-path selection are also product-database
+transactions. This protects chat/message/request invariants inside the product
+database; it does not create atomic transactions with the separate asset
+catalog.
 
-## Current product behavior and limits
+## WAL lifecycle and bounded access
 
-The chat route finds or creates the fixed first product chat, restores stored
-messages, streams temporary deltas, then reloads canonical rows after a terminal
-result. Settings hydrate non-secret preferences and serialize optimistic writes;
-model edits are debounced. A normal Tauri close request is held until pending
-preference writes finish; browser page-hide and mobile background notifications
-remain best-effort signals because an operating-system process kill cannot be
-made durable by WebView lifecycle code. Storage unavailability disables sending
-instead of silently falling back to volatile history.
+The app serializes product storage work through a native admission gate and
+does not time out a mutation after it has begun. Reads use validated cursors and
+bounded pages. The current first-chat loader scans at most 10,000 chats and
+restores at most 10,000 messages or 16 MiB of message text before failing
+closed.
 
-Message and chat reads use validated cursors with pages of 200 and 100 rows.
-The current first-chat loader scans at most 10,000 chats before refusing to
-create a duplicate, and restores at most 10,000 messages or 16 MiB of message
-text before failing closed. This is bounded restoration, not an unbounded
-chat-history browsing claim.
+Product WAL maintenance runs every 60 seconds. It records passive-checkpoint
+telemetry, attempts `RESTART` after 64 MiB of frame payload, and permits an
+emergency `TRUNCATE` only after the restart proves there is no blocking reader
+and no remaining frame, with a 512 MiB emergency threshold. WAL and SHM files
+are runtime state, not corruption by themselves.
+
+## Backup boundary
+
+The repository contains a version-1 directory-package backup engine for the
+product database, asset catalog, and content-addressed objects. It does not
+create a monolithic ZIP and is not currently exposed as a product WebView
+command.
+
+The product database snapshot and asset-catalog snapshot are sequential cuts,
+not one cross-database atomic snapshot. Asset pins protect the exact objects in
+the catalog cut, but a product mutation that spans both authorities may race
+between the two snapshots. `BACKUP-010` therefore remains unclaimed. See the
+[storage layout](../architecture/product-storage-layout.md#backup-v1) and the
+[`lorepia-backup` contract](../../crates/lorepia-backup/README.md).
 
 ## Verification boundary
 
-Workspace tests cover schema initialization and tamper rejection, WAL reopen,
-lease/concurrency behavior, preferences conflicts, chat persistence and search,
-stream checkpoint sequencing, terminal atomicity, and restart recovery. Native
-adapter tests cover the closed command surface, non-secret preference DTO, and
-stream-to-storage mapping. Frontend tests cover strict response parsing,
-preference hydration/writes, chat restoration, and the first-chat surface.
+Workspace tests cover v1-to-v3 migration, schema initialization and tamper
+rejection, WAL reopen and maintenance behavior, lease/concurrency behavior,
+preferences conflicts, chat persistence and search, branch/active-path
+invariants, render-cache bounds, stream checkpoint sequencing, terminal
+atomicity, restart recovery, and online snapshots. Asset and backup crates have
+their own catalog, CAS, snapshot, manifest, cancellation, and restore tests.
 
-These tests and host compilation do not establish Android/iOS physical-device
-runtime behavior or packaged Windows/Linux runtime behavior.
+These source tests and host compilation do not establish Android/iOS
+physical-device runtime behavior, packaged Windows/Linux runtime behavior, the
+real 10 GiB database plus 100 GiB asset load gate, or cross-store snapshot
+atomicity.
