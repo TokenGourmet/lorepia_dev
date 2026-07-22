@@ -28,9 +28,10 @@ product UI and its owner-authored design system.
   weakening executable-content or native-command boundaries.
 - Prove the Tauri 2 + Rust + Svelte toolchain on Windows, macOS, Linux, Android, and iOS.
 - Verify Channel sequencing, batching, cancellation, backpressure, and partial-result behavior.
-- Verify that OS credential services can complete a native-only
-  absent/create/read/update/delete lifecycle without exposing secret material to
-  WebView IPC.
+- Verify that OS credential services can complete an
+  absent/create/read/update/delete lifecycle where create and update input is
+  accepted only from the trusted main WebView's narrowly scoped write command,
+  and stored secret material is never returned over WebView IPC.
 - Verify SQLite migration, reopen persistence, WAL read/write behavior, and
   deterministic Korean substring search without freezing the M1 product schema.
 - Verify bounded ZIP/PNG handling, cross-platform path rejection, inert imported
