@@ -2133,6 +2133,12 @@ async fn forward_text_fragments(
     text: String,
     kind: DeltaKind,
 ) -> Result<(), ProviderCommandError> {
+    if text.is_empty() {
+        return Err(ProviderCommandError::new(
+            "INVALID_STREAM_EVENT",
+            "provider stream text delta was empty",
+        ));
+    }
     for fragment in split_utf8(&text, MAX_DELTA_FRAGMENT_BYTES) {
         if matches!(kind, DeltaKind::Text | DeltaKind::Refusal) {
             // Reject before Channel delivery so the WebView can never observe
@@ -2722,6 +2728,217 @@ mod tests {
         }
     }
 
+    #[derive(Clone, Copy, Debug)]
+    enum ModelAction {
+        Deliver,
+        RejectDelivery,
+        AcknowledgeLatest,
+        Cancel,
+        Fail,
+    }
+
+    const MODEL_ACTIONS: [ModelAction; 5] = [
+        ModelAction::Deliver,
+        ModelAction::RejectDelivery,
+        ModelAction::AcknowledgeLatest,
+        ModelAction::Cancel,
+        ModelAction::Fail,
+    ];
+
+    #[derive(Debug)]
+    struct ReferenceStream {
+        last_sent_seq: u64,
+        acknowledged_through: Option<u64>,
+        cancel_requested: bool,
+        forced_failure: bool,
+    }
+
+    impl ReferenceStream {
+        fn after_started_and_acked() -> Self {
+            Self {
+                last_sent_seq: 0,
+                acknowledged_through: Some(0),
+                cancel_requested: false,
+                forced_failure: false,
+            }
+        }
+
+        fn in_flight(&self) -> u64 {
+            let acknowledged_count = self
+                .acknowledged_through
+                .map_or(0, |sequence| sequence.saturating_add(1));
+            self.last_sent_seq
+                .saturating_add(1)
+                .saturating_sub(acknowledged_count)
+        }
+
+        fn expected_send_error(&self) -> Option<&'static str> {
+            if self.forced_failure {
+                Some("MODEL_FORCED_FAILURE")
+            } else if self.cancel_requested {
+                Some("STREAM_CANCELLED")
+            } else {
+                None
+            }
+        }
+    }
+
+    async fn assert_reduced_model_sequence(sequence: &[ModelAction]) {
+        let state = request_state("model-owner");
+        state.machine.lock().await.record_ack_progress(0);
+        let accepted_channel = Channel::new(|_| Ok(()));
+        let rejected_channel = Channel::new(|_| Err(tauri::Error::FailedToReceiveMessage));
+        let mut reference = ReferenceStream::after_started_and_acked();
+
+        for action in sequence {
+            match action {
+                ModelAction::Deliver => {
+                    if let Some(expected_error) = reference.expected_send_error() {
+                        let error = send_non_terminal(
+                            "provider-model",
+                            &state,
+                            &accepted_channel,
+                            |request_id, seq| ProviderChannelEvent::TextDelta {
+                                request_id,
+                                seq,
+                                text: "model-delta".to_owned(),
+                            },
+                        )
+                        .await
+                        .unwrap_err();
+                        assert_eq!(error.code, expected_error, "sequence: {sequence:?}");
+                    } else {
+                        assert!(
+                            reference.in_flight() < MAX_IN_FLIGHT,
+                            "the reduced depth must not block on backpressure: {sequence:?}"
+                        );
+                        let seq = send_non_terminal(
+                            "provider-model",
+                            &state,
+                            &accepted_channel,
+                            |request_id, seq| ProviderChannelEvent::TextDelta {
+                                request_id,
+                                seq,
+                                text: "model-delta".to_owned(),
+                            },
+                        )
+                        .await
+                        .unwrap();
+                        reference.last_sent_seq += 1;
+                        assert_eq!(seq, reference.last_sent_seq, "sequence: {sequence:?}");
+                    }
+                }
+                ModelAction::RejectDelivery => {
+                    let before = reference.last_sent_seq;
+                    let error = send_non_terminal(
+                        "provider-model",
+                        &state,
+                        &rejected_channel,
+                        |request_id, seq| ProviderChannelEvent::TextDelta {
+                            request_id,
+                            seq,
+                            text: "rejected-model-delta".to_owned(),
+                        },
+                    )
+                    .await
+                    .unwrap_err();
+                    let expected = reference
+                        .expected_send_error()
+                        .unwrap_or("STREAM_CHANNEL_CLOSED");
+                    assert_eq!(error.code, expected, "sequence: {sequence:?}");
+                    assert_eq!(reference.last_sent_seq, before);
+                }
+                ModelAction::AcknowledgeLatest => {
+                    if reference.expected_send_error().is_none() {
+                        state
+                            .machine
+                            .lock()
+                            .await
+                            .record_ack_progress(reference.last_sent_seq);
+                        reference.acknowledged_through = Some(reference.last_sent_seq);
+                        state.notify.notify_waiters();
+                    }
+                }
+                ModelAction::Cancel => {
+                    let expected = !reference.cancel_requested && !reference.forced_failure;
+                    assert_eq!(state.request_cancel(), expected, "sequence: {sequence:?}");
+                    reference.cancel_requested |= expected;
+                }
+                ModelAction::Fail => {
+                    force_stream_failure(
+                        &state,
+                        ProviderCommandError::new(
+                            "MODEL_FORCED_FAILURE",
+                            "deterministic model failure",
+                        ),
+                    )
+                    .await;
+                    reference.forced_failure = true;
+                }
+            }
+
+            let machine = state.machine.lock().await;
+            assert_eq!(
+                machine.last_sent_seq, reference.last_sent_seq,
+                "sequence: {sequence:?}"
+            );
+            assert_eq!(
+                machine.acknowledged_through, reference.acknowledged_through,
+                "sequence: {sequence:?}"
+            );
+            assert_eq!(
+                machine.in_flight(),
+                reference.in_flight(),
+                "sequence: {sequence:?}"
+            );
+            assert!(
+                machine.in_flight() <= MAX_IN_FLIGHT,
+                "sequence: {sequence:?}"
+            );
+            assert_eq!(machine.pending_send_seq, None, "sequence: {sequence:?}");
+            assert!(machine.terminal.is_none(), "sequence: {sequence:?}");
+            assert!(!machine.terminal_committing, "sequence: {sequence:?}");
+            assert_eq!(
+                machine.lease_failure.is_some(),
+                reference.forced_failure,
+                "sequence: {sequence:?}"
+            );
+            drop(machine);
+            assert_eq!(
+                state.cancel_requested.load(Ordering::Acquire),
+                reference.cancel_requested,
+                "sequence: {sequence:?}"
+            );
+            assert_eq!(
+                state.forced_failure.load(Ordering::Acquire),
+                reference.forced_failure,
+                "sequence: {sequence:?}"
+            );
+            assert_eq!(
+                state.cancellation.is_cancelled(),
+                reference.cancel_requested || reference.forced_failure,
+                "sequence: {sequence:?}"
+            );
+        }
+    }
+
+    #[tokio::test]
+    async fn reduced_deterministic_action_corpus_preserves_stream_invariants() {
+        // Exhaust every action sequence through depth four (781 total cases).
+        // The larger 100k+ corpus belongs in scheduled stress runs; this
+        // reduced corpus remains deterministic and fast enough for every PR.
+        for depth in 0..=4_u32 {
+            for mut ordinal in 0..MODEL_ACTIONS.len().pow(depth) {
+                let mut sequence = Vec::with_capacity(depth as usize);
+                for _ in 0..depth {
+                    sequence.push(MODEL_ACTIONS[ordinal % MODEL_ACTIONS.len()]);
+                    ordinal /= MODEL_ACTIONS.len();
+                }
+                assert_reduced_model_sequence(&sequence).await;
+            }
+        }
+    }
+
     #[test]
     fn worst_case_delta_fragment_stays_on_direct_channel_path() {
         let text = "\u{0001}".repeat(MAX_DELTA_FRAGMENT_BYTES);
@@ -2745,6 +2962,93 @@ mod tests {
                 .iter()
                 .all(|part| part.len() <= MAX_DELTA_FRAGMENT_BYTES)
         );
+    }
+
+    #[tokio::test]
+    async fn empty_runtime_text_events_are_rejected_without_delivery_or_state_change() {
+        let directory = tempfile::tempdir().unwrap();
+        let storage = StorageState::open(Ok(directory.path().to_path_buf()));
+        let state = request_state("main");
+        let mut persistence =
+            StreamPersistence::new(started_turn(), TimestampMillis::now().unwrap());
+        let channel_called = Arc::new(AtomicBool::new(false));
+        let channel_called_for_send = Arc::clone(&channel_called);
+        let channel = Channel::new(move |_| {
+            channel_called_for_send.store(true, Ordering::Release);
+            Ok(())
+        });
+
+        for kind in [DeltaKind::Text, DeltaKind::Reasoning, DeltaKind::Refusal] {
+            let error = forward_text_fragments(
+                "provider-test",
+                &state,
+                &channel,
+                &mut persistence,
+                &storage,
+                String::new(),
+                kind,
+            )
+            .await
+            .unwrap_err();
+            assert_eq!(error.code, "INVALID_STREAM_EVENT");
+        }
+
+        assert!(!channel_called.load(Ordering::Acquire));
+        assert_eq!(persistence.through_seq, 0);
+        assert_eq!(persistence.last_delivered_seq, 0);
+        assert!(persistence.appended_text.is_empty());
+        let machine = state.machine.lock().await;
+        assert_eq!(machine.last_sent_seq, 0);
+        assert_eq!(machine.pending_send_seq, None);
+    }
+
+    #[test]
+    fn oversized_direct_event_is_rejected_before_channel_callback() {
+        let channel_called = Arc::new(AtomicBool::new(false));
+        let channel_called_for_send = Arc::clone(&channel_called);
+        let channel = Channel::new(move |_| {
+            channel_called_for_send.store(true, Ordering::Release);
+            Ok(())
+        });
+        let event = ProviderChannelEvent::TextDelta {
+            request_id: format!("provider-{}", "f".repeat(32)),
+            seq: 1,
+            text: "x".repeat(DIRECT_CHANNEL_BUDGET_BYTES),
+        };
+        assert!(serde_json::to_vec(&event).unwrap().len() > DIRECT_CHANNEL_BUDGET_BYTES);
+
+        let error = send_direct(&channel, event).unwrap_err();
+        assert_eq!(error.code, "STREAM_EVENT_TOO_LARGE");
+        assert!(!channel_called.load(Ordering::Acquire));
+    }
+
+    #[test]
+    fn snapshot_schema_exposes_control_plane_state_only() {
+        let snapshot = ProviderStreamSnapshot {
+            request_id: "provider-test".to_owned(),
+            last_sent_seq: 2,
+            acknowledged_through: Some(1),
+            in_flight: 1,
+            cancel_requested: false,
+            terminal: Some(TerminalReceipt::Cancelled { seq: 2 }),
+        };
+        let value = serde_json::to_value(snapshot).unwrap();
+        let object = value.as_object().unwrap();
+        assert_eq!(object.len(), 6);
+        for required in [
+            "requestId",
+            "lastSentSeq",
+            "acknowledgedThrough",
+            "inFlight",
+            "cancelRequested",
+            "terminal",
+        ] {
+            assert!(object.contains_key(required));
+        }
+        for forbidden in ["text", "content", "partialText", "rawText", "snapshotText"] {
+            assert!(!object.contains_key(forbidden));
+        }
+        ensure_direct_serializable(&value).unwrap();
     }
 
     #[test]
@@ -3046,6 +3350,28 @@ mod tests {
     }
 
     #[test]
+    fn repeated_registry_cleanup_has_no_count_or_byte_reservation_drift() {
+        let registry = ProviderStreamRegistry::default();
+        for iteration in 0..1_024 {
+            let (request_id, state) = registry.insert_new(owner_label("main")).unwrap();
+            if iteration % 17 == 0 {
+                let stale_state = request_state("main");
+                registry.remove_if_same(&request_id, &stale_state);
+                let inner = registry.inner.lock().unwrap();
+                assert_eq!(inner.requests.len(), 1);
+                assert_eq!(
+                    inner.reserved_in_flight_bytes,
+                    PER_STREAM_IN_FLIGHT_RESERVATION_BYTES
+                );
+            }
+            registry.remove_if_same(&request_id, &state);
+            let inner = registry.inner.lock().unwrap();
+            assert!(inner.requests.is_empty());
+            assert_eq!(inner.reserved_in_flight_bytes, 0);
+        }
+    }
+
+    #[test]
     fn owner_cleanup_cancels_only_requests_bound_to_destroyed_window() {
         let registry = ProviderStreamRegistry::default();
         let (_, main_one) = registry.insert_new(owner_label("main")).unwrap();
@@ -3245,6 +3571,91 @@ mod tests {
         assert_eq!(machine.last_sent_seq, 1);
         assert_eq!(machine.pending_send_seq, None);
         assert!(machine.ack_deadline.is_some());
+    }
+
+    #[tokio::test]
+    async fn concurrent_senders_keep_unique_sequence_and_bounded_window() {
+        use tauri::ipc::InvokeResponseBody;
+        use tokio::sync::Barrier;
+
+        let state = request_state("main");
+        state.machine.lock().await.record_ack_progress(0);
+        let (delivered_tx, mut delivered_rx) = mpsc::unbounded_channel();
+        let channel = Channel::new(move |body| {
+            let InvokeResponseBody::Json(json) = body else {
+                return Err(std::io::Error::other("unexpected raw channel body").into());
+            };
+            let event: serde_json::Value = serde_json::from_str(&json)?;
+            delivered_tx
+                .send(event["seq"].as_u64().unwrap())
+                .map_err(|_| tauri::Error::FailedToReceiveMessage)
+        });
+        let sender_count = usize::try_from(MAX_IN_FLIGHT).unwrap() + 1;
+        let start = Arc::new(Barrier::new(sender_count + 1));
+        let mut senders = Vec::with_capacity(sender_count);
+        for _ in 0..sender_count {
+            let state_for_send = Arc::clone(&state);
+            let channel_for_send = channel.clone();
+            let start_for_send = Arc::clone(&start);
+            senders.push(tokio::spawn(async move {
+                start_for_send.wait().await;
+                send_non_terminal(
+                    "provider-concurrent",
+                    &state_for_send,
+                    &channel_for_send,
+                    |request_id, seq| ProviderChannelEvent::TextDelta {
+                        request_id,
+                        seq,
+                        text: "delta".to_owned(),
+                    },
+                )
+                .await
+            }));
+        }
+        start.wait().await;
+
+        let mut delivered = Vec::with_capacity(sender_count);
+        for _ in 0..MAX_IN_FLIGHT {
+            delivered.push(
+                tokio::time::timeout(Duration::from_secs(1), delivered_rx.recv())
+                    .await
+                    .expect("the bounded window stalled")
+                    .expect("the channel callback closed"),
+            );
+        }
+        assert!(matches!(
+            delivered_rx.try_recv(),
+            Err(mpsc::error::TryRecvError::Empty)
+        ));
+        {
+            let machine = state.machine.lock().await;
+            assert_eq!(machine.in_flight(), MAX_IN_FLIGHT);
+            assert_eq!(machine.pending_send_seq, None);
+        }
+
+        state.machine.lock().await.record_ack_progress(1);
+        state.notify.notify_waiters();
+        delivered.push(
+            tokio::time::timeout(Duration::from_secs(1), delivered_rx.recv())
+                .await
+                .expect("the sender did not resume after cumulative ACK")
+                .expect("the channel callback closed"),
+        );
+
+        for sender in senders {
+            tokio::time::timeout(Duration::from_secs(1), sender)
+                .await
+                .expect("concurrent sender did not finish")
+                .unwrap()
+                .unwrap();
+        }
+        delivered.sort_unstable();
+        assert_eq!(delivered, vec![1, 2, 3, 4, 5]);
+        let machine = state.machine.lock().await;
+        assert_eq!(machine.last_sent_seq, 5);
+        assert_eq!(machine.acknowledged_through, Some(1));
+        assert_eq!(machine.in_flight(), MAX_IN_FLIGHT);
+        assert_eq!(machine.pending_send_seq, None);
     }
 
     #[test]
