@@ -16,6 +16,10 @@ import {
 
 const HERE = dirname(fileURLToPath(import.meta.url));
 const MANIFEST_PATH = resolve(HERE, "../manifest.json");
+const EXECUTION_POLICY_PATH = resolve(
+  HERE,
+  "../../../docs/m1/extreme-and-soak-execution-policy.md",
+);
 
 function manifest() {
   return JSON.parse(readFileSync(MANIFEST_PATH, "utf8"));
@@ -58,6 +62,11 @@ test("manifest expands the complete 365-ID extreme catalog", () => {
   assert.equal(checks.at(-1).id, "REL-020");
   assert.equal(new Set(checks.map(({ id }) => id)).size, 365);
   assert.ok(checks.every(({ status }) => status === "not_run"));
+});
+
+test("execution policy does not define a second extreme checklist", () => {
+  const source = readFileSync(EXECUTION_POLICY_PATH, "utf8");
+  assert.deepEqual(parseExtremeDocument(source), []);
 });
 
 test("range declarations are ignored and checklist IDs are parsed", () => {

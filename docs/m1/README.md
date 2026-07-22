@@ -8,6 +8,11 @@ recorded in [`audio-playback.md`](audio-playback.md).
 The independently terminable QuickJS-WASM Worker candidate, its empty native
 command surface, and its product non-enablement gate are recorded in
 [`script-runner.md`](script-runner.md).
+Cross-suite scheduling, seeded replay, raw telemetry, destructive-fixture
+containment, and product-versus-spike evidence rules are recorded in
+[`extreme-and-soak-execution-policy.md`](extreme-and-soak-execution-policy.md).
+That policy adds no test IDs or result status; the reviewed external plan,
+tracker manifest, and verification matrix remain authoritative for those.
 
 ## Result vocabulary
 

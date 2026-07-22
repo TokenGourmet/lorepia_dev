@@ -18,6 +18,22 @@ or third-party dependencies: Node.js 20 or newer is sufficient, and neither
 `agent/m1-product-script-contract@b8243f386a44e495229183051a0519c6843e34f8`.
 This is a conservative audit snapshot, not a claim that an item is complete.
 
+## Execution policy and authority
+
+The reviewed external extreme plan and launch audit, identified by the hashes
+in `manifest.json`, remain the canonical source for checklist IDs and launch
+conditions. `manifest.json` is the machine-readable tracking snapshot, and
+[`docs/m1/verification-matrix.md`](../../docs/m1/verification-matrix.md) remains
+the platform-evidence record.
+
+[`docs/m1/extreme-and-soak-execution-policy.md`](../../docs/m1/extreme-and-soak-execution-policy.md)
+adds scheduling, measurement, replay, and destructive-test safety rules only.
+It deliberately defines no checklist IDs and changes no status. In particular,
+the 30-minute, two-hour, eight-hour, and 72-hour tiers are different evidence
+levels; shorter runs cannot be added together to satisfy the continuous
+72-hour launch soak. A new scenario must map to one of the existing 365 IDs or
+go through a reviewed canonical-source revision before it can be tracked.
+
 ## Commands
 
 Run the self-contained checks:
@@ -107,6 +123,9 @@ and artifact that produced them.
 - `schema.json`: dependency-free JSON Schema for editors and external tooling
 - `tracker.mjs`: semantic validator, source-document parser, expander, summary
 - `test/tracker.test.mjs`: missing/duplicate/order/hash/evidence regression tests
+- `../../docs/m1/extreme-and-soak-execution-policy.md`: non-authoritative run,
+  telemetry, replay, and containment policy; defines no checklist IDs and
+  changes no result status
 
 The semantic validator intentionally enforces invariants beyond JSON Schema,
 including exact counts, generated-ID uniqueness, known override IDs, complete
