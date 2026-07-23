@@ -1,6 +1,5 @@
-/* The library's search query lives outside the page because two surfaces
-   drive it: the desktop's top search field and the mobile bottom search bar
-   that the layout swaps in for the dock, iOS 26 style. */
+/* The library query and presentation state survive the header's compact /
+   large-title transition, while the page owns the actual search surface. */
 class LibrarySearchState {
   query = $state("");
   open = $state(false);

@@ -1,0 +1,23 @@
+{
+  "$schema": "https://schema.tauri.app/config/2",
+  "build": {
+    "beforeDevCommand": "npm run dev:size:web"
+  },
+  "app": {
+    "security": {
+      "capabilities": [
+        "default",
+        {
+          "identifier": "dev-window-size-tool",
+          "description": "Development-only window resizing for responsive visual checks",
+          "webviews": ["main"],
+          "platforms": ["macOS", "windows", "linux"],
+          "permissions": [
+            "core:window:allow-set-size",
+            "core:window:allow-center"
+          ]
+        }
+      ]
+    }
+  }
+}

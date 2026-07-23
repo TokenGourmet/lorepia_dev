@@ -1,5 +1,6 @@
 <script lang="ts">
-  import { onMount } from "svelte";
+  import { goto } from "$app/navigation";
+  import { onMount, tick } from "svelte";
 
   import "$lib/design/tokens.css";
 
@@ -10,6 +11,10 @@
   import Avatar from "$lib/ui/Avatar.svelte";
   import LargeTitleHeader from "$lib/ui/LargeTitleHeader.svelte";
   import { minimizeDockOnScroll } from "$lib/ui/dock-chrome.svelte";
+  import {
+    completeNativeBack,
+    prepareNativeBack,
+  } from "$lib/ui/native-back";
   import {
     publicBootstrapError,
     requestProductBootstrap,
@@ -22,10 +27,13 @@
 
   const characters = SAMPLE_CHARACTERS;
 
-  /* The query lives in librarySearch: the mobile bottom search bar (owned by
-     the layout) and this screen's desktop field both drive the same filter. */
+  /* Search is local to the library. On phones a trailing toolbar button
+     becomes an integrated toolbar field; wide layouts keep their field
+     visible below the title. */
   let searchFocused = $state(false);
-  let searchInput = $state<HTMLInputElement | null>(null);
+  let mobileSearchInput = $state<HTMLInputElement | null>(null);
+  let desktopSearchInput = $state<HTMLInputElement | null>(null);
+  let narrowLayout = $state(true);
 
   const matches = $derived(
     characters.filter((character) =>
@@ -34,15 +42,51 @@
   );
 
   // iOS keeps Cancel up while editing or while a query is in effect.
-  const showCancel = $derived(searchFocused || librarySearch.query !== "");
+  const showCancel = $derived(
+    librarySearch.open || searchFocused || librarySearch.query !== "",
+  );
 
-  function clearQuery(): void {
+  async function openSearch(): Promise<void> {
+    librarySearch.openSearch();
+    await tick();
+    (narrowLayout ? mobileSearchInput : desktopSearchInput)?.focus();
+  }
+
+  async function openChat(event: MouseEvent): Promise<void> {
+    event.preventDefault();
+    const nativeStatus = await prepareNativeBack();
+    try {
+      await goto("/chat", {
+        state: {
+          backHref: `${window.location.pathname}${window.location.search}${window.location.hash}`,
+        },
+      });
+    } catch {
+      if (nativeStatus.active) {
+        await completeNativeBack();
+      }
+    }
+  }
+
+  async function clearQuery(): Promise<void> {
     librarySearch.query = "";
+    await tick();
+    (narrowLayout ? mobileSearchInput : desktopSearchInput)?.focus({
+      preventScroll: true,
+    });
   }
 
   function cancelSearch(): void {
-    librarySearch.query = "";
-    searchInput?.blur();
+    librarySearch.close();
+    searchFocused = false;
+    mobileSearchInput?.blur();
+    desktopSearchInput?.blur();
+  }
+
+  function closeSearchOnEscape(event: KeyboardEvent): void {
+    if (event.key === "Escape" && librarySearch.open) {
+      cancelSearch();
+    }
   }
 
   async function loadBootstrap(): Promise<void> {
@@ -60,7 +104,18 @@
   }
 
   onMount(() => {
+    const narrowQuery = window.matchMedia("(max-width: 699px)");
+    const syncLayout = (): void => {
+      narrowLayout = narrowQuery.matches;
+    };
+
+    syncLayout();
+    narrowQuery.addEventListener("change", syncLayout);
     void loadBootstrap();
+
+    return () => {
+      narrowQuery.removeEventListener("change", syncLayout);
+    };
   });
 </script>
 
@@ -68,26 +123,116 @@
   <title>LorePia — 서재</title>
 </svelte:head>
 
+<svelte:window onkeydown={closeSearchOnEscape} />
+
 <div class="screen" use:minimizeDockOnScroll>
-  <LargeTitleHeader title="서재" />
+  <LargeTitleHeader title="서재">
+    {#snippet trailing()}
+      {#if characters.length > 0}
+        {#if librarySearch.open}
+          <div
+            class="integratedsearch"
+            id="library-mobile-search"
+            role="search"
+          >
+            <div class="integratedfield">
+              <svg
+                class="searchicon"
+                viewBox="0 0 22 22"
+                width="22"
+                height="22"
+                fill="none"
+                stroke="currentColor"
+                stroke-width="2"
+                stroke-linecap="round"
+                aria-hidden="true"
+              >
+                <circle cx="8.5" cy="8.5" r="7" />
+                <path d="m13.5 13.5 7.5 7.5" />
+              </svg>
+              <input
+                type="search"
+                bind:value={librarySearch.query}
+                bind:this={mobileSearchInput}
+                onfocus={() => (searchFocused = true)}
+                onblur={() => (searchFocused = false)}
+                placeholder="캐릭터 검색"
+                aria-label="캐릭터 검색"
+                aria-controls="library-list"
+              />
+              {#if librarySearch.query !== ""}
+                <button
+                  class="clear"
+                  type="button"
+                  onpointerdown={(event) => event.preventDefault()}
+                  onclick={clearQuery}
+                  aria-label="검색어 지우기"
+                >
+                  <svg
+                    viewBox="0 0 24 24"
+                    width="10"
+                    height="10"
+                    fill="none"
+                    stroke="currentColor"
+                    stroke-width="3"
+                    stroke-linecap="round"
+                    aria-hidden="true"
+                  >
+                    <path d="M6 6l12 12M18 6 6 18" />
+                  </svg>
+                </button>
+              {/if}
+            </div>
+            <button
+              class="integratedcancel"
+              type="button"
+              aria-label="검색 닫기"
+              onclick={cancelSearch}
+            >
+              <svg
+                viewBox="0 0 22 22"
+                width="22"
+                height="22"
+                fill="none"
+                stroke="currentColor"
+                stroke-width="2"
+                stroke-linecap="round"
+                aria-hidden="true"
+              >
+                <path d="M3.5 3.5l15 15M18.5 3.5l-15 15" />
+              </svg>
+            </button>
+          </div>
+        {:else}
+          <button
+            class="searchtrigger"
+            type="button"
+            aria-label="캐릭터 검색"
+            aria-controls="library-mobile-search"
+            aria-expanded="false"
+            onclick={openSearch}
+          >
+            <svg
+              viewBox="0 0 22 22"
+              width="22"
+              height="22"
+              fill="none"
+              stroke="currentColor"
+              stroke-width="2"
+              stroke-linecap="round"
+              aria-hidden="true"
+            >
+              <circle cx="8.5" cy="8.5" r="7" />
+              <path d="m13.5 13.5 7.5 7.5" />
+            </svg>
+          </button>
+        {/if}
+      {/if}
+    {/snippet}
+  </LargeTitleHeader>
 
-  {#if loading}
-    <p class="status" role="status">제품 코어에 연결하는 중입니다.</p>
-  {:else if errorMessage}
-    <div class="status error" role="alert">
-      <span>{errorMessage}</span>
-      <button type="button" onclick={loadBootstrap}>다시 시도</button>
-    </div>
-  {/if}
-
-  {#if characters.length === 0}
-    <section class="empty">
-      <h2>첫 캐릭터를 데려오세요</h2>
-      <p>카드 파일을 가져오면 이곳에 이야기가 쌓입니다.</p>
-      <a class="cta" href="/import">캐릭터 가져오기</a>
-    </section>
-  {:else}
-    <div class="searchrow">
+  {#if characters.length > 0}
+    <div class="desktopsearchrow" id="library-desktop-search" role="search">
       <div class="search">
         <svg
           viewBox="0 0 24 24"
@@ -105,10 +250,13 @@
         <input
           type="search"
           bind:value={librarySearch.query}
-          bind:this={searchInput}
-          onfocus={() => (searchFocused = true)}
+          bind:this={desktopSearchInput}
+          onfocus={() => {
+            searchFocused = true;
+            librarySearch.openSearch();
+          }}
           onblur={() => (searchFocused = false)}
-          placeholder="검색"
+          placeholder="캐릭터 검색"
           aria-label="캐릭터 검색"
           aria-controls="library-list"
         />
@@ -116,6 +264,7 @@
           <button
             class="clear"
             type="button"
+            onpointerdown={(event) => event.preventDefault()}
             onclick={clearQuery}
             aria-label="검색어 지우기"
           >
@@ -151,13 +300,30 @@
     </div>
   {/if}
 
+  {#if loading}
+    <p class="status" role="status">제품 코어에 연결하는 중입니다.</p>
+  {:else if errorMessage}
+    <div class="status error" role="alert">
+      <span>{errorMessage}</span>
+      <button type="button" onclick={loadBootstrap}>다시 시도</button>
+    </div>
+  {/if}
+
+  {#if characters.length === 0}
+    <section class="empty">
+      <h2>첫 캐릭터를 데려오세요</h2>
+      <p>카드 파일을 가져오면 이곳에 이야기가 쌓입니다.</p>
+      <a class="cta" href="/import">캐릭터 가져오기</a>
+    </section>
+  {/if}
+
   {#if characters.length > 0 && matches.length === 0}
     <p class="noresult" role="status">일치하는 캐릭터가 없습니다.</p>
   {:else if characters.length > 0}
     <ol class="list" id="library-list">
       {#each matches as character (character.id)}
         <li>
-          <a class="row" href="/chat">
+          <a class="row" href="/chat" onclick={openChat}>
             <Avatar initial={character.initial} size={48} />
             <span class="body">
               <span class="line">
@@ -239,9 +405,116 @@
     cursor: pointer;
   }
 
-  /* On phones search lives at the bottom next to the dock (iOS 26), so the
-     top field only exists on the wide layout. */
-  .searchrow {
+  /* iOS 26 integratedButton: a 44pt circular toolbar item, 16pt from the
+     trailing edge. The material remains adaptive; its geometry is fixed. */
+  .searchtrigger {
+    position: relative;
+    width: var(--size-touch);
+    height: var(--size-touch);
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    padding: 0;
+    border: 0;
+    background: transparent;
+    color: var(--text-mid);
+    cursor: pointer;
+  }
+
+  .searchtrigger::before {
+    content: "";
+    position: absolute;
+    inset: 0;
+    border: 0.5px solid var(--hairline);
+    border-radius: var(--r-pill);
+    background: var(--bar-bg);
+    -webkit-backdrop-filter: blur(20px) saturate(1.6);
+    backdrop-filter: blur(20px) saturate(1.6);
+    box-shadow: var(--shadow-float);
+  }
+
+  .searchtrigger svg {
+    position: relative;
+  }
+
+  /* UIKit 26 measured at runtime: the active platter is 16pt from both
+     screen edges and 44pt high. Its search-bar item sits 4pt inside; the
+     44pt close control follows the field with an 11pt gap. */
+  .integratedsearch {
+    width: calc(100vw - var(--sp-4) * 2);
+    height: var(--size-touch);
+    box-sizing: border-box;
+    padding: 0 var(--sp-1);
+    border: 0.5px solid var(--hairline);
+    border-radius: 22px;
+    display: flex;
+    align-items: center;
+    background: var(--bar-bg);
+    -webkit-backdrop-filter: blur(20px) saturate(1.6);
+    backdrop-filter: blur(20px) saturate(1.6);
+    box-shadow: var(--shadow-float);
+    color: var(--text-mid);
+  }
+
+  .integratedfield {
+    flex: 1;
+    min-width: 0;
+    height: var(--size-touch);
+    box-sizing: border-box;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    padding-left: var(--sp-3);
+  }
+
+  .integratedfield .searchicon {
+    flex-shrink: 0;
+  }
+
+  .integratedfield input {
+    flex: 1;
+    min-width: 0;
+    height: 40px;
+    border: 0;
+    padding: 0;
+    background: transparent;
+    color: var(--text-strong);
+    font-family: var(--font-ui);
+    font-size: var(--fs-bartitle);
+    line-height: 22px;
+    caret-color: var(--cursor-color);
+  }
+
+  .integratedfield input:focus {
+    outline: none;
+  }
+
+  .integratedfield input::placeholder {
+    color: var(--text-faint);
+  }
+
+  .integratedfield input::-webkit-search-cancel-button {
+    -webkit-appearance: none;
+    appearance: none;
+  }
+
+  .integratedcancel {
+    flex: 0 0 var(--size-touch);
+    width: var(--size-touch);
+    height: var(--size-touch);
+    margin-left: 11px;
+    padding: 0;
+    border: 0;
+    border-radius: 22px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    background: transparent;
+    color: var(--text-strong);
+    cursor: pointer;
+  }
+
+  .desktopsearchrow {
     flex-shrink: 0;
     display: none;
     align-items: center;
@@ -261,10 +534,6 @@
     border-radius: var(--r-block);
     background: var(--surface-bubble);
     color: var(--text-faint);
-  }
-
-  .search:focus-within {
-    box-shadow: inset 0 0 0 1.5px var(--tint);
   }
 
   .search input {
@@ -308,9 +577,29 @@
     cursor: pointer;
   }
 
+  .integratedfield .clear {
+    position: relative;
+    width: 36px;
+    height: 36px;
+    background: transparent;
+  }
+
+  .integratedfield .clear::before {
+    content: "";
+    position: absolute;
+    width: 18px;
+    height: 18px;
+    border-radius: var(--r-pill);
+    background: var(--text-faint);
+  }
+
+  .integratedfield .clear svg {
+    position: relative;
+  }
+
   .cancel {
     flex-shrink: 0;
-    min-height: 36px;
+    min-height: var(--size-touch);
     padding: 0;
     border: 0;
     background: transparent;
@@ -525,6 +814,11 @@
   }
 
   @media (min-width: 700px) {
+    .searchtrigger,
+    .integratedsearch {
+      display: none;
+    }
+
     /* Rows carry the page gutter in their own padding, so this column is
        wider by exactly that much and avatars stay flush with the title. */
     .status,
@@ -535,12 +829,12 @@
 
     /* Card-shaped, so their edges land on the gutter like the title. */
     .status.error,
-    .searchrow {
+    .desktopsearchrow {
       width: min(100% - var(--sp-4) * 2, 680px);
       margin-inline: auto;
     }
 
-    .searchrow {
+    .desktopsearchrow {
       display: flex;
     }
   }

@@ -65,6 +65,8 @@
 
   --size-avatar: 36px;
   --size-touch: 44px;
+  /* iOS 26 top toolbar row: a 44pt control centred in a 54pt row. */
+  --size-navbar: 54px;
   --bubble-max: 76%;
   --measure-story: 62ch;
 

@@ -1,0 +1,9 @@
+[default]
+description = "Allows the trusted LorePia WebView to coordinate iOS native back navigation."
+permissions = [
+    "allow-complete",
+    "allow-pop",
+    "allow-prepare",
+    "allow-set-enabled",
+    "allow-status",
+]

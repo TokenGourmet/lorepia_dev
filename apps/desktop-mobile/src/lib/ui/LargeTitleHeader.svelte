@@ -6,7 +6,11 @@
     title,
     leading,
     trailing,
-  }: { title: string; leading?: Snippet; trailing?: Snippet } = $props();
+  }: {
+    title: string;
+    leading?: Snippet;
+    trailing?: Snippet;
+  } = $props();
 
   let barElement = $state<HTMLElement | null>(null);
   let largeTitleElement = $state<HTMLElement | null>(null);
@@ -63,6 +67,12 @@
     backdrop-filter: blur(20px) saturate(1.6);
   }
 
+  @media (max-width: 699px) {
+    .bar {
+      height: var(--size-navbar);
+    }
+  }
+
   /* Separator only once content sits under the bar, as on iOS. */
   .bar::after {
     content: "";
@@ -103,8 +113,8 @@
   .leading,
   .trailing {
     position: absolute;
+    top: var(--safe-top);
     bottom: 0;
-    height: var(--size-touch);
     display: inline-flex;
     align-items: center;
   }

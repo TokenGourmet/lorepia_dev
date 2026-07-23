@@ -26,6 +26,7 @@ export const PRODUCT_COMMANDS = Object.freeze([
 ]);
 
 const CORE_WINDOW_PERMISSIONS = new Set(["core:window:allow-destroy"]);
+const EXACT_PLUGIN_PERMISSIONS = new Set(["native-back:default"]);
 const EXACT_CSP = Object.freeze({
   "default-src": "'self' customprotocol: asset:",
   "base-uri": "'none'",
@@ -76,6 +77,7 @@ export function verifySecurityContracts({ commandSource, capability, tauriConfig
 
   const expectedPermissions = new Set([
     ...CORE_WINDOW_PERMISSIONS,
+    ...EXACT_PLUGIN_PERMISSIONS,
     ...commands.map((command) => `allow-${command.replaceAll("_", "-")}`),
   ]);
   if (!Array.isArray(capability.permissions)) throw new Error("CAPABILITY_PERMISSIONS_MISSING");

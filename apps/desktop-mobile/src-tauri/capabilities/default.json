@@ -5,6 +5,7 @@
   "webviews": ["main"],
   "permissions": [
     "core:window:allow-destroy",
+    "native-back:default",
     "allow-get-product-bootstrap",
     "allow-get-provider-credential-status",
     "allow-save-provider-api-key",

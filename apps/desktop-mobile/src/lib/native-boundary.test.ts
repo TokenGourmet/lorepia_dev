@@ -31,6 +31,13 @@ const appleProject = readFileSync(
   new URL("../../src-tauri/gen/apple/project.yml", import.meta.url),
   "utf8",
 );
+const nativeBackSwift = readFileSync(
+  new URL(
+    "../../../../crates/tauri-plugin-native-back/ios/Sources/NativeBackPlugin.swift",
+    import.meta.url,
+  ),
+  "utf8",
+);
 const capabilityFiles = readdirSync(
   new URL("../../src-tauri/capabilities", import.meta.url),
 ).sort();
@@ -42,6 +49,7 @@ describe("native product boundary", () => {
     expect(capability.webviews).toEqual(["main"]);
     expect(capability.permissions).toEqual([
       "core:window:allow-destroy",
+      "native-back:default",
       "allow-get-product-bootstrap",
       "allow-get-provider-credential-status",
       "allow-save-provider-api-key",
@@ -92,6 +100,64 @@ describe("native product boundary", () => {
     expect(androidActivity).toContain("package dev.lorepia.client");
     expect(appleProject).toContain(
       "PRODUCT_BUNDLE_IDENTIFIER: dev.lorepia.client",
+    );
+  });
+
+  it("uses UIKit's iOS 26 navigation stack without taking over its recognizer", () => {
+    expect(nativeBackSwift).toContain(
+      "Plugin, UINavigationControllerDelegate",
+    );
+    expect(nativeBackSwift).toContain(
+      "if #available(iOS 26.0, *)",
+    );
+    expect(nativeBackSwift).toContain(
+      "interactiveContentPopGestureRecognizer",
+    );
+    expect(nativeBackSwift).toContain(
+      "navigationController.setViewControllers",
+    );
+    expect(nativeBackSwift).toContain(
+      "appearance.configureWithTransparentBackground()",
+    );
+    expect(nativeBackSwift).toContain(
+      "navigationBar.tintColor = .clear",
+    );
+    expect(nativeBackSwift).toContain(
+      "navigationBar.isUserInteractionEnabled = true",
+    );
+    expect(nativeBackSwift).toContain(
+      "navigationBar.layer.mask = emptyChromeMask",
+    );
+    expect(nativeBackSwift).toContain(
+      "UIBezierPath(rect: .zero).cgPath",
+    );
+    expect(nativeBackSwift).toContain(
+      "sourceController.navigationItem.backBarButtonItem = backItem",
+    );
+    expect(nativeBackSwift).toContain(
+      "backItem.hidesSharedBackground = true",
+    );
+    expect(nativeBackSwift).toContain(
+      "insets.top = -navigationBarHeight",
+    );
+    expect(nativeBackSwift).toContain("makeRoomTitleHitTarget");
+    expect(nativeBackSwift).toContain(
+      '"window.dispatchEvent(new Event(\'lorepia:native-room-info\'))"',
+    );
+    expect(nativeBackSwift).not.toMatch(
+      /interactiveContentPopGestureRecognizer\??\.(?:delegate|addTarget)/u,
+    );
+    expect(nativeBackSwift).toContain(
+      "webview.scrollView.panGestureRecognizer.require(",
+    );
+    expect(nativeBackSwift).toContain(
+      "toFail: contentPopGestureRecognizer",
+    );
+    expect(nativeBackSwift).toContain(
+      "webview.allowsBackForwardNavigationGestures = false",
+    );
+    expect(nativeBackSwift).toContain(
+      '"window.dispatchEvent(new Event(\'lorepia:native-back\'))"',
     );
   });
 

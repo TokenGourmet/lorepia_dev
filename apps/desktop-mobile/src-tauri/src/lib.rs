@@ -39,6 +39,7 @@ fn get_product_bootstrap(core: State<'_, LorePiaCore>) -> ProductBootstrap {
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     let app = tauri::Builder::default()
+        .plugin(tauri_plugin_native_back::init())
         .manage(LorePiaCore::new())
         .manage(CredentialVaultState::default())
         .manage(ProviderStreamRegistry::default())

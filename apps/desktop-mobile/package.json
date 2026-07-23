@@ -11,6 +11,8 @@
   "packageManager": "npm@10.9.8",
   "scripts": {
     "dev": "vite dev",
+    "dev:size:web": "vite dev --mode size-tool",
+    "dev:size-tool": "tauri dev --config src-tauri/tauri.dev-size.conf.json",
     "build": "npm run build:web && npm run verify:built-boundary",
     "build:web": "vite build",
     "verify:built-boundary": "node scripts/verify-built-executable-boundary.mjs",

@@ -108,9 +108,13 @@
     display: flex;
     align-items: flex-end;
     gap: var(--sp-2);
-    margin: var(--sp-2) var(--sp-3)
-      calc(var(--sp-3) + var(--safe-bottom));
-    padding: 5px;
+    width: var(--dock-width);
+    min-height: var(--size-tabbar);
+    box-sizing: border-box;
+    margin: var(--sp-2) auto 0;
+    /* A 44px field plus this padding and the hairline resolves to the dock's
+       52px resting height without shrinking the touch-sized input area. */
+    padding: 3px;
     background: var(--surface-card);
     border: 0.5px solid var(--hairline);
     border-radius: 27px;
@@ -165,7 +169,9 @@
     padding: 11px 46px 11px var(--sp-2);
     font-family: var(--font-ui);
     font-size: 16px;
-    line-height: var(--lh-chat);
+    /* 22px type plus 11px vertical insets resolves to the shared 44px
+       control height instead of making the 52px outer capsule grow. */
+    line-height: 22px;
     color: var(--text-strong);
     outline: none;
   }

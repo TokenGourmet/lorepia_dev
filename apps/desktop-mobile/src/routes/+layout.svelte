@@ -1,5 +1,6 @@
 <script lang="ts">
-  import { onMount, tick } from "svelte";
+  import { afterNavigate, beforeNavigate } from "$app/navigation";
+  import { onMount, type Component } from "svelte";
   import { getCurrentWindow } from "@tauri-apps/api/window";
   import { page } from "$app/state";
 
@@ -12,9 +13,20 @@
   import { createPreferenceCloseHandler } from "$lib/storage/preference-close-guard";
   import { librarySearch } from "$lib/characters/library-search.svelte";
   import { dockChrome } from "$lib/ui/dock-chrome.svelte";
-  import { PERSON_ICON_PATHS, SEARCH_ICON_PATHS } from "$lib/ui/icons";
+  import { PERSON_ICON_PATHS } from "$lib/ui/icons";
+  import {
+    backSwipeSurfaceHost,
+    captureBackSwipeSurface,
+    clearBackSwipeSurface,
+  } from "$lib/ui/back-swipe-surface";
+  import {
+    completeNativeBack,
+    setNativeBackEnabled,
+  } from "$lib/ui/native-back";
 
   let { children } = $props();
+  let DevSizeTool = $state<Component | null>(null);
+  let shellElement = $state<HTMLElement | null>(null);
 
   // Tabs are for everyday destinations, the iOS way: import and the site
   // preview are reached from Home, and 계정 carries the account card plus
@@ -51,8 +63,6 @@
       pathname.startsWith("/import") ||
       pathname.startsWith("/community"),
   );
-  const isLibraryScreen = $derived(pathname === "/");
-
   function isActive(href: string): boolean {
     return href === "/" ? pathname === "/" : pathname.startsWith(href);
   }
@@ -61,27 +71,41 @@
     NAV_ITEMS.findIndex((item) => isActive(item.href)),
   );
 
-  let bottomSearchField = $state<HTMLInputElement | null>(null);
-
-  async function openBottomSearch(): Promise<void> {
-    librarySearch.openSearch();
-    await tick();
-    bottomSearchField?.focus();
+  function localHref(url: URL): string {
+    return `${url.pathname}${url.search}${url.hash}`;
   }
 
+  /* Preserve the exact rendered source surface just before SvelteKit
+     unmounts it. The clone is visual-only and inert; browser history remains
+     the authority for where the interactive pop actually navigates. */
+  beforeNavigate(({ from, to }) => {
+    if (
+      shellElement !== null &&
+      from !== null &&
+      to !== null &&
+      to.url.pathname === "/chat" &&
+      !from.url.pathname.startsWith("/chat")
+    ) {
+      captureBackSwipeSurface(shellElement, localHref(from.url));
+    }
+  });
+
+  afterNavigate(({ to }) => {
+    if (to !== null && !to.url.pathname.startsWith("/chat")) {
+      clearBackSwipeSurface();
+      void completeNativeBack();
+    } else if (to !== null && to.url.pathname !== "/chat") {
+      void setNativeBackEnabled(false);
+    }
+  });
+
   // Leaving a screen dismisses its transient chrome, as navigation does on
-  // iOS: the bottom search collapses and the dock restores.
+  // iOS: the library search closes and the dock restores.
   $effect(() => {
     void pathname;
     librarySearch.close();
     dockChrome.restore();
   });
-
-  function onWindowKeydown(event: KeyboardEvent): void {
-    if (event.key === "Escape" && librarySearch.open) {
-      librarySearch.close();
-    }
-  }
 
   async function hydrateProductSession(): Promise<void> {
     await appPreferences.hydrate();
@@ -110,6 +134,17 @@
     void hydrateProductSession();
     let mounted = true;
     let removeCloseGuard: (() => void) | null = null;
+
+    if (
+      import.meta.env.DEV &&
+      import.meta.env.MODE === "size-tool"
+    ) {
+      void import("$lib/dev-size-tool/DevSizeTool.svelte").then(
+        ({ default: component }) => {
+          if (mounted) DevSizeTool = component;
+        },
+      );
+    }
 
     /* Outside Tauri (browser dev preview) the window bridge is absent and
        getCurrentWindow throws; a crash here poisons the layout's effect
@@ -149,6 +184,7 @@
 
     return () => {
       mounted = false;
+      DevSizeTool = null;
       removeCloseGuard?.();
       window.removeEventListener("pagehide", flushPreferences);
       document.removeEventListener(
@@ -160,122 +196,108 @@
   });
 </script>
 
-<svelte:window onkeydown={onWindowKeydown} />
-
-<div class="shell" class:detail={isDetailScreen}>
+<div class="stage">
   <div
-    class="dockrow"
-    class:searching={librarySearch.open}
-    class:minimized={dockChrome.minimized}
-    class:hasball={isLibraryScreen}
+    class="back-swipe-underlay"
+    use:backSwipeSurfaceHost
+    inert
+    aria-hidden="true"
+  ></div>
+  <div
+    class="shell"
+    class:detail={isDetailScreen}
+    bind:this={shellElement}
+    data-back-swipe-foreground
   >
-    <nav class="appnav" data-active={activeIndex} aria-label="주요 메뉴">
-      {#if activeIndex >= 0}
-        <span class="indicator" aria-hidden="true"></span>
-      {/if}
-      {#each NAV_ITEMS as item (item.href)}
-        <a
-          href={item.href}
-          class="navitem"
-          aria-current={isActive(item.href) ? "page" : undefined}
-        >
-          <svg
-            viewBox="0 0 24 24"
-            width="22"
-            height="22"
-            fill="none"
-            stroke="currentColor"
-            stroke-width="1.8"
-            stroke-linecap="round"
-            stroke-linejoin="round"
-            aria-hidden="true"
+    <div class="dockrow" class:minimized={dockChrome.minimized}>
+      <nav class="appnav" data-active={activeIndex} aria-label="주요 메뉴">
+        {#if activeIndex >= 0}
+          <span class="indicator" aria-hidden="true"></span>
+        {/if}
+        {#each NAV_ITEMS as item (item.href)}
+          <a
+            href={item.href}
+            class="navitem"
+            aria-current={isActive(item.href) ? "page" : undefined}
           >
-            {#each TAB_ICONS[item.href] as d (d)}
-              <path {d} />
-            {/each}
-          </svg>
-          <span>{item.label}</span>
-        </a>
-      {/each}
-    </nav>
-    {#if isLibraryScreen && !librarySearch.open}
-      <button
-        class="searchball"
-        type="button"
-        aria-label="캐릭터 검색"
-        onclick={openBottomSearch}
-      >
-        <svg
-          viewBox="0 0 24 24"
-          width="20"
-          height="20"
-          fill="none"
-          stroke="currentColor"
-          stroke-width="2"
-          stroke-linecap="round"
-          aria-hidden="true"
-        >
-          {#each SEARCH_ICON_PATHS as d (d)}
-            <path {d} />
-          {/each}
-        </svg>
-      </button>
-    {/if}
-    {#if librarySearch.open}
-      <div class="bottomsearch">
-        <svg
-          viewBox="0 0 24 24"
-          width="16"
-          height="16"
-          fill="none"
-          stroke="currentColor"
-          stroke-width="2"
-          stroke-linecap="round"
-          aria-hidden="true"
-        >
-          {#each SEARCH_ICON_PATHS as d (d)}
-            <path {d} />
-          {/each}
-        </svg>
-        <input
-          type="search"
-          bind:value={librarySearch.query}
-          bind:this={bottomSearchField}
-          placeholder="검색"
-          aria-label="캐릭터 검색"
-        />
-      </div>
-      <!-- The circle keeps the search button's exact seat, now wearing X:
-           the dock morphs into the field in place, iOS 26 style. -->
-      <button
-        class="searchcancel"
-        type="button"
-        aria-label="검색 닫기"
-        onclick={() => librarySearch.close()}
-      >
-        <svg
-          viewBox="0 0 24 24"
-          width="18"
-          height="18"
-          fill="none"
-          stroke="currentColor"
-          stroke-width="2"
-          stroke-linecap="round"
-          aria-hidden="true"
-        >
-          <path d="M6 6l12 12M18 6 6 18" />
-        </svg>
-      </button>
-    {/if}
+            <svg
+              viewBox="0 0 24 24"
+              width="22"
+              height="22"
+              fill="none"
+              stroke="currentColor"
+              stroke-width="1.8"
+              stroke-linecap="round"
+              stroke-linejoin="round"
+              aria-hidden="true"
+            >
+              {#each TAB_ICONS[item.href] as d (d)}
+                <path {d} />
+              {/each}
+            </svg>
+            <span>{item.label}</span>
+          </a>
+        {/each}
+      </nav>
+    </div>
+    <main class="content">
+      {@render children()}
+    </main>
   </div>
-  <main class="content">
-    {@render children()}
-  </main>
 </div>
 
+{#if DevSizeTool}
+  <DevSizeTool />
+{/if}
+
 <style>
+  @property --back-swipe-shade {
+    syntax: "<number>";
+    inherits: true;
+    initial-value: 0.12;
+  }
+
+  .stage {
+    position: relative;
+    height: 100%;
+    overflow: hidden;
+    background: var(--surface-page);
+  }
+
+  .back-swipe-underlay {
+    --back-swipe-shade: 0.12;
+    position: absolute;
+    z-index: 0;
+    inset: 0;
+    overflow: hidden;
+    visibility: hidden;
+    pointer-events: none;
+    background: var(--surface-page);
+  }
+
+  :global(.back-swipe-underlay[data-ready="true"]) {
+    visibility: visible;
+  }
+
+  .back-swipe-underlay::after {
+    content: "";
+    position: absolute;
+    inset: 0;
+    background: #000;
+    opacity: var(--back-swipe-shade);
+    pointer-events: none;
+  }
+
+  .back-swipe-underlay :global([data-back-swipe-snapshot]),
+  .back-swipe-underlay :global([data-back-swipe-snapshot] *) {
+    animation: none !important;
+    transition: none !important;
+    caret-color: transparent !important;
+  }
+
   .shell {
     position: relative;
+    z-index: 1;
     height: 100%;
     background: var(--surface-page);
   }
@@ -285,12 +307,10 @@
     min-width: 0;
   }
 
-  /* The bottom row holds the dock plus, on the library, the round search
-     button beside it — the iOS 26 grouping. It spans the screen so the group
-     centers as one unit; pointer events re-enable per child so the empty
-     flanks don't swallow content taps. Above a home indicator it rides the
-     safe inset plus sp-3; with no inset it floors at sp-4 to match the side
-     margins. */
+  /* The bottom row holds only top-level navigation. It spans the screen so
+     the dock stays centered; pointer events re-enable on the dock so the
+     empty flanks don't swallow content taps. Above a home indicator it rides
+     the safe inset plus sp-3, with a sp-4 floor when no inset is present. */
   .dockrow {
     position: absolute;
     z-index: 10;
@@ -310,22 +330,6 @@
 
   .dockrow > :global(*) {
     pointer-events: auto;
-  }
-
-  /* With the search circle sharing the row, the swept span no longer fits
-     narrow screens whole, so the dock's width budget gives up the circle
-     and its gap; the slot geometry re-derives from the shrunken width. */
-  .dockrow.hasball {
-    --dock-width: min(
-      calc(100vw - var(--sp-4) * 2 - var(--size-tabbar) - var(--sp-2)),
-      calc(var(--dock-span) * 1px)
-    );
-  }
-
-  /* While the bottom search is up it replaces the dock, as the iOS 26 tab
-     bar morphs into a search field. */
-  .dockrow.searching .appnav {
-    display: none;
   }
 
   .appnav {
@@ -364,25 +368,11 @@
   /* iOS 26 minimize: while content scrolls down the dock compacts to an
      icon-only bar — the labels collapse and the bar's own height drops to
      fit just the glyphs (44 bar / 36 slot keeps the 4px inset, so the
-     indicator stays concentric). Scrolling up restores it. The search
-     pieces inherit the same compact size, so a search opened from the
-     minimized dock keeps its footprint. */
+     indicator stays concentric). Scrolling up restores it. */
   .dockrow.minimized .appnav {
     --slot-h: 36px;
     height: 44px;
     transform: translateY(4px);
-  }
-
-  .dockrow.minimized .searchball,
-  .dockrow.minimized .searchcancel {
-    width: 44px;
-    height: 44px;
-    translate: 0 4px;
-  }
-
-  .dockrow.minimized .bottomsearch {
-    height: 44px;
-    translate: 0 4px;
   }
 
   .dockrow.minimized .navitem {
@@ -392,110 +382,6 @@
   .dockrow.minimized .navitem span {
     height: 0;
     opacity: 0;
-  }
-
-  /* The search circle and its X-wearing counterpart share one seat beside
-     the dock, so open/close reads as the same control changing face. */
-  .searchball,
-  .searchcancel {
-    flex: none;
-    width: var(--size-tabbar);
-    height: var(--size-tabbar);
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
-    padding: 0;
-    border: 0.5px solid var(--hairline);
-    border-radius: var(--r-pill);
-    background: var(--bar-bg);
-    -webkit-backdrop-filter: blur(24px) saturate(1.6);
-    backdrop-filter: blur(24px) saturate(1.6);
-    box-shadow: var(--shadow-float);
-    color: var(--text-mid);
-    cursor: pointer;
-    /* Offsets and presses live on the individual translate/scale properties,
-       never the transform shorthand: entry keyframes animate `scale` while
-       the minimized `translate` holds, so the swap cannot jump. */
-    transition:
-      translate var(--dur-base) var(--ease-out),
-      scale var(--dur-base) var(--ease-spring),
-      width var(--dur-base) var(--ease-out),
-      height var(--dur-base) var(--ease-out);
-    animation: lp-swap-in var(--dur-base) var(--ease-spring) backwards;
-  }
-
-  .searchball:active,
-  .searchcancel:active {
-    scale: 0.9;
-  }
-
-  /* The circle re-popping into its seat with a new face. */
-  @keyframes lp-swap-in {
-    from {
-      opacity: 0;
-      scale: 0.8;
-    }
-  }
-
-  /* The field unfolds leftward out of the circle's side, the iOS 26
-     circle-to-field morph. */
-  @keyframes lp-field-in {
-    from {
-      opacity: 0;
-      scale: 0.75 1;
-    }
-  }
-
-  .bottomsearch {
-    /* The dock's exact footprint, so the morph reads as the capsule
-       changing role rather than a new bar appearing. */
-    flex: none;
-    width: var(--dock-width);
-    box-sizing: border-box;
-    display: flex;
-    align-items: center;
-    gap: var(--sp-2);
-    height: var(--size-tabbar);
-    padding: 0 var(--sp-4);
-    border: 0.5px solid var(--hairline);
-    border-radius: var(--r-pill);
-    background: var(--bar-bg);
-    -webkit-backdrop-filter: blur(24px) saturate(1.6);
-    backdrop-filter: blur(24px) saturate(1.6);
-    box-shadow: var(--shadow-float);
-    color: var(--text-faint);
-    font-family: var(--font-ui);
-    transform-origin: right center;
-    transition:
-      translate var(--dur-base) var(--ease-out),
-      height var(--dur-base) var(--ease-out);
-    animation: lp-field-in var(--dur-base) var(--ease-out) backwards;
-  }
-
-  .bottomsearch input {
-    flex: 1;
-    min-width: 0;
-    border: 0;
-    padding: 0;
-    background: transparent;
-    color: var(--text-strong);
-    font-family: var(--font-ui);
-    /* 16px keeps mobile WebViews from auto-zooming the focused field. */
-    font-size: 16px;
-    caret-color: var(--cursor-color);
-  }
-
-  .bottomsearch input:focus {
-    outline: none;
-  }
-
-  .bottomsearch input::placeholder {
-    color: var(--text-faint);
-  }
-
-  .bottomsearch input::-webkit-search-cancel-button {
-    -webkit-appearance: none;
-    appearance: none;
   }
 
   /* The floating dock overlays each screen's own scroll area, so widen the
@@ -619,21 +505,13 @@
       --safe-bottom: env(safe-area-inset-bottom, 0px);
     }
 
-    /* The rail takes the dock's place in the grid; the bottom-search pieces
-       are phone chrome and stay off. */
+    /* The rail takes the dock's place in the grid. */
     .dockrow,
     .shell.detail .dockrow {
       display: contents;
     }
 
-    .searchball,
-    .bottomsearch,
-    .searchcancel {
-      display: none;
-    }
-
-    .appnav,
-    .dockrow.searching .appnav {
+    .appnav {
       position: static;
       display: flex;
       transform: none;

@@ -65,7 +65,8 @@ describe("first chat surface", () => {
     expect(source).not.toMatch(/\sstyle=/);
     expect(source).toContain("height={keyboardInset.value}");
     // The interactive back drag is the one runtime-styled surface; its CSSOM
-    // writes live behind the edge-back action, never in this markup.
-    expect(source).toContain("use:edgeSwipeBack");
+    // writes live behind the content-back action, never in this markup.
+    expect(source).toContain("use:contentSwipeBack");
+    expect(source).toContain("enabled: !nativeBackActive");
   });
 });

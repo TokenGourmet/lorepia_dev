@@ -1,6 +1,7 @@
 <script lang="ts">
   import { onDestroy, onMount } from "svelte";
   import { goto } from "$app/navigation";
+  import { page } from "$app/state";
 
   import "$lib/design/tokens.css";
 
@@ -27,12 +28,18 @@
   import { appPreferences } from "$lib/storage/app-preferences.svelte";
   import { storageClient } from "$lib/storage/client";
   import Avatar from "$lib/ui/Avatar.svelte";
+  import { activateBackSwipeSurface } from "$lib/ui/back-swipe-surface";
   import { chatRoomPrefs } from "$lib/chat/room-prefs.svelte";
-  import { edgeSwipeBack } from "$lib/ui/edge-back";
+  import { contentSwipeBack } from "$lib/ui/content-back";
+  import {
+    connectNativeBack,
+    requestNativeBackPop,
+  } from "$lib/ui/native-back";
 
   const characterName = "세라핀";
   const characterInitial = "세";
   const STREAM_TEXT_BLOCK_CHARACTERS = 8_192;
+  const NATIVE_ROOM_INFO_EVENT = "lorepia:native-room-info";
 
   let scrollRegion = $state<HTMLDivElement | null>(null);
   let activeStream = $state<FirstChatStreamHandle | null>(null);
@@ -41,8 +48,36 @@
   let storageUnavailable = $state(false);
   let historyEpoch = 0;
   let disposed = false;
+  let nativeBackActive = $state(false);
 
   let messages = $state<ChatMessage[]>([]);
+
+  function backHref(): string | null {
+    const candidate = (page.state as { backHref?: unknown }).backHref;
+    return typeof candidate === "string" &&
+      candidate.startsWith("/") &&
+      !candidate.startsWith("//")
+      ? candidate
+      : null;
+  }
+
+  function navigateBack(): void {
+    const fallback = backHref();
+    if (fallback !== null && window.history.length > 1) {
+      window.history.back();
+      return;
+    }
+    void goto(fallback ?? "/");
+  }
+
+  async function handleBackClick(event: MouseEvent): Promise<void> {
+    event.preventDefault();
+    if (nativeBackActive) {
+      const status = await requestNativeBackPop();
+      if (status.active) return;
+    }
+    navigateBack();
+  }
 
   async function initializeHistory(): Promise<void> {
     const epoch = ++historyEpoch;
@@ -260,8 +295,37 @@
 
   onMount(() => {
     const stopKeyboardInset = keyboardInset.start();
+    let disconnectNativeBack = (): void => undefined;
+    let nativeBackDisposed = false;
+    const openNativeRoomInfo = (): void => {
+      if (!nativeBackDisposed) void goto("/chat/info");
+    };
+    window.addEventListener(NATIVE_ROOM_INFO_EVENT, openNativeRoomInfo);
+
+    void connectNativeBack(() => {
+      if (nativeBackDisposed) return;
+      nativeBackActive = false;
+      navigateBack();
+    }).then((connection) => {
+      if (nativeBackDisposed) {
+        connection.disconnect();
+        return;
+      }
+      disconnectNativeBack = connection.disconnect;
+      nativeBackActive =
+        connection.status.active && connection.status.gestureEnabled;
+    });
+
     void initializeHistory();
-    return stopKeyboardInset;
+    return () => {
+      nativeBackDisposed = true;
+      window.removeEventListener(
+        NATIVE_ROOM_INFO_EVENT,
+        openNativeRoomInfo,
+      );
+      disconnectNativeBack();
+      stopKeyboardInset?.();
+    };
   });
   onDestroy(() => {
     disposed = true;
@@ -288,9 +352,14 @@
   <title>LorePia — 대화</title>
 </svelte:head>
 
-<div class="screen" use:edgeSwipeBack={{ onBack: () => goto("/") }}>
+<div class="screen">
   <header class="top">
-    <a class="back" href="/" aria-label="서재로 돌아가기">
+    <a
+      class="back"
+      href="/"
+      aria-label="이전 화면으로 돌아가기"
+      onclick={handleBackClick}
+    >
       <svg
         viewBox="0 0 24 24"
         width="20"
@@ -308,7 +377,12 @@
     <!-- iOS Messages identity: avatar stacked over the name, centered; the
          chevron marks it as the door to the room detail. It is the single
          entry — Messages has no ⋯ in the chat bar. -->
-    <a class="identity" href="/chat/info">
+    <a
+      class="identity"
+      href="/chat/info"
+      aria-hidden={nativeBackActive}
+      tabindex={nativeBackActive ? -1 : undefined}
+    >
       <Avatar initial={characterInitial} size={36} />
       <span class="name">
         {characterName}
@@ -332,7 +406,15 @@
     <span class="lead-balance" aria-hidden="true"></span>
   </header>
 
-  <div class="scroll" bind:this={scrollRegion}>
+  <div
+    class="scroll"
+    bind:this={scrollRegion}
+    use:contentSwipeBack={{
+      onBack: navigateBack,
+      getUnderlay: () => activateBackSwipeSurface(backHref()),
+      enabled: !nativeBackActive,
+    }}
+  >
     {#if messages.length === 0}
       <div class="empty-thread">
         <Avatar initial={characterInitial} size={72} />
@@ -407,6 +489,7 @@
   .back {
     width: var(--size-touch);
     height: var(--size-touch);
+    box-sizing: border-box;
     flex-shrink: 0;
     display: inline-flex;
     align-items: center;
@@ -418,13 +501,11 @@
     color: var(--text-mid);
     cursor: pointer;
     transition:
-      background var(--dur-fast) var(--ease-out),
-      transform var(--dur-base) var(--ease-spring);
+      background var(--dur-fast) var(--ease-out);
   }
 
   .back:active {
     background: var(--surface-bubble);
-    transform: scale(0.9);
   }
 
   .lead-balance {
@@ -466,6 +547,34 @@
   .chev {
     flex-shrink: 0;
     color: var(--text-faint);
+  }
+
+  @media (max-width: 699px) {
+    /* Apple iOS 26 top toolbar: a 44pt control centred in a 54pt row.
+       Every top-level mobile header uses the same --size-navbar zone. */
+    .top {
+      box-sizing: content-box;
+      height: var(--size-navbar);
+      min-height: 0;
+      padding: var(--safe-top) var(--sp-4) 0;
+      background: transparent;
+      -webkit-backdrop-filter: none;
+      backdrop-filter: none;
+    }
+
+    .back {
+      border: 0.5px solid var(--hairline);
+      background: var(--bar-bg);
+      -webkit-backdrop-filter: blur(20px) saturate(1.6);
+      backdrop-filter: blur(20px) saturate(1.6);
+      box-shadow: var(--shadow-float);
+    }
+
+    .identity {
+      height: var(--size-navbar);
+      min-height: 0;
+      padding: 0;
+    }
   }
 
   .scroll {
@@ -529,6 +638,12 @@
   }
 
   .composer-slot {
+    flex-shrink: 0;
+    box-sizing: border-box;
+    padding-bottom: max(
+      calc(env(safe-area-inset-bottom, 0px) + var(--sp-3)),
+      var(--sp-4)
+    );
     background: var(--surface-page);
   }
 

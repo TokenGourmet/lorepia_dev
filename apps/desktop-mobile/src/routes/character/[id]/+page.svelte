@@ -7,8 +7,28 @@
   import { findSampleCharacter } from "$lib/characters/sample";
   import Avatar from "$lib/ui/Avatar.svelte";
   import { edgeSwipeBack } from "$lib/ui/edge-back";
+  import {
+    completeNativeBack,
+    prepareNativeBack,
+  } from "$lib/ui/native-back";
 
   const character = $derived(findSampleCharacter(page.params.id ?? ""));
+
+  async function openChat(event: MouseEvent): Promise<void> {
+    event.preventDefault();
+    const nativeStatus = await prepareNativeBack();
+    try {
+      await goto("/chat", {
+        state: {
+          backHref: `${window.location.pathname}${window.location.search}${window.location.hash}`,
+        },
+      });
+    } catch {
+      if (nativeStatus.active) {
+        await completeNativeBack();
+      }
+    }
+  }
 </script>
 
 <svelte:head>
@@ -63,7 +83,7 @@
     </dl>
 
     <div class="actions">
-      <a class="start" href="/chat">대화 시작</a>
+      <a class="start" href="/chat" onclick={openChat}>대화 시작</a>
     </div>
   {:else}
     <section class="missing">
