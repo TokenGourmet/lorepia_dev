@@ -96,6 +96,61 @@
   --safe-bottom: 0px;
 }
 
+/* Safari/WKWebView otherwise adds a delayed gray flash over links and
+   controls. iOS components own their pressed feedback; keyboard focus remains
+   independent of this touch-only highlight. */
+:root[data-native-platform="ios"] {
+  -webkit-tap-highlight-color: rgba(0, 0, 0, 0);
+}
+
+/* Android keeps immediate Material-style press confirmation. Once that
+   replacement exists, suppress Chromium's second WebView highlight on the
+   same semantic controls so the two states never stack. */
+:root[data-native-platform="android"]
+  :where(
+    a[href]:not([aria-disabled="true"]),
+    button:not(:disabled),
+    [role="button"].lp-state-layer:not([aria-disabled="true"])
+  ) {
+  -webkit-tap-highlight-color: rgba(0, 0, 0, 0);
+}
+
+.lp-state-layer {
+  position: relative;
+}
+
+.lp-state-layer::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  background: var(--text-strong);
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity var(--dur-fast) var(--ease-out);
+}
+
+:root[data-native-platform="ios"] .lp-state-layer:active::after {
+  opacity: 0.06;
+  transition-duration: 0ms;
+}
+
+:root[data-native-platform="android"] .lp-state-layer:active::after {
+  opacity: 0.1;
+  transition-duration: 0ms;
+}
+
+@media (hover: hover) and (pointer: fine) {
+  :root:not([data-native-platform]) .lp-state-layer:hover::after {
+    opacity: 0.05;
+  }
+
+  :root:not([data-native-platform]) .lp-state-layer:active::after {
+    opacity: 0.1;
+    transition-duration: 0ms;
+  }
+}
+
 html,
 body {
   margin: 0;

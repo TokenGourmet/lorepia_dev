@@ -388,7 +388,7 @@
           {#if credentialConfigured === true}
             <span class="chip ok">저장됨 · 값은 다시 표시되지 않음</span>
             <button
-              class="remove"
+              class="remove lp-state-layer"
               type="button"
               onclick={removeKey}
               disabled={credentialBusy}>키 삭제</button

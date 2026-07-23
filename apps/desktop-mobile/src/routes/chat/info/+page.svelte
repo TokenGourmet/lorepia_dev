@@ -71,7 +71,7 @@
 
   <section class="group" aria-label="바로가기">
     <div class="card">
-      <a class="row link" href="/character/seraphine">
+      <a class="row link lp-state-layer" href="/character/seraphine">
         <span class="label">캐릭터 정보 보기</span>
         <svg
           class="chev"
@@ -88,7 +88,7 @@
           <path d="m9 18 6-6-6-6" />
         </svg>
       </a>
-      <a class="row link" href="/account">
+      <a class="row link lp-state-layer" href="/account">
         <span class="label">계정 및 설정</span>
         <svg
           class="chev"

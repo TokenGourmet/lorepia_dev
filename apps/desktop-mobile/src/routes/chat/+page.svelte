@@ -378,7 +378,7 @@
          chevron marks it as the door to the room detail. It is the single
          entry — Messages has no ⋯ in the chat bar. -->
     <a
-      class="identity"
+      class="identity lp-state-layer"
       href="/chat/info"
       aria-hidden={nativeBackActive}
       tabindex={nativeBackActive ? -1 : undefined}

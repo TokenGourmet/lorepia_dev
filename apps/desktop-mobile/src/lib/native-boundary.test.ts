@@ -1,4 +1,5 @@
 import { readFileSync, readdirSync } from "node:fs";
+import { runInNewContext } from "node:vm";
 import { describe, expect, it } from "vitest";
 
 import capability from "../../src-tauri/capabilities/default.json";
@@ -41,6 +42,23 @@ const nativeBackSwift = readFileSync(
 const capabilityFiles = readdirSync(
   new URL("../../src-tauri/capabilities", import.meta.url),
 ).sort();
+
+function runPlatformInit({
+  userAgent,
+  platform,
+  maxTouchPoints,
+}: {
+  userAgent: string;
+  platform: string;
+  maxTouchPoints: number;
+}) {
+  const dataset: Record<string, string> = {};
+  runInNewContext(platformInit, {
+    navigator: { userAgent, platform, maxTouchPoints },
+    document: { documentElement: { dataset } },
+  });
+  return dataset;
+}
 
 describe("native product boundary", () => {
   it("grants only the product commands to the trusted main WebView", () => {
@@ -172,7 +190,7 @@ describe("native product boundary", () => {
       '<script src="%sveltekit.assets%/platform-init.js"></script>',
     );
     expect(appTemplate).not.toMatch(/<script(?![^>]+src=)[^>]*>/u);
-    expect(platformInit).toContain('navigator.userAgent.includes("Android")');
+    expect(platformInit).toContain('userAgent.includes("Android")');
     expect(platformInit).toContain(
       'document.documentElement.dataset.nativeInsetOwner = "android-view-padding"',
     );
@@ -181,6 +199,66 @@ describe("native product boundary", () => {
     );
     expect(designTokens).toMatch(
       /data-native-inset-owner="android-view-padding"[^}]+--safe-top:\s*0px;[^}]+--safe-bottom:\s*0px;/su,
+    );
+  });
+
+  it("removes Safari's gray tap flash only inside the iOS app surface", () => {
+    expect(
+      runPlatformInit({
+        userAgent:
+          "Mozilla/5.0 (iPhone; CPU iPhone OS 26_0 like Mac OS X) AppleWebKit/605.1.15",
+        platform: "iPhone",
+        maxTouchPoints: 5,
+      }),
+    ).toEqual({ nativePlatform: "ios" });
+    expect(
+      runPlatformInit({
+        userAgent:
+          "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15) AppleWebKit/605.1.15",
+        platform: "MacIntel",
+        maxTouchPoints: 5,
+      }),
+    ).toEqual({ nativePlatform: "ios" });
+    expect(
+      runPlatformInit({
+        userAgent:
+          "Mozilla/5.0 (Linux; Android 16) AppleWebKit/537.36 Chrome/140.0 Mobile",
+        platform: "Linux armv8l",
+        maxTouchPoints: 5,
+      }),
+    ).toEqual({
+      nativePlatform: "android",
+      nativeInsetOwner: "android-view-padding",
+    });
+    expect(
+      runPlatformInit({
+        userAgent:
+          "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 Chrome/140.0",
+        platform: "MacIntel",
+        maxTouchPoints: 0,
+      }),
+    ).toEqual({});
+
+    expect(designTokens).toMatch(
+      /:root\[data-native-platform="ios"\]\s*\{[^}]+-webkit-tap-highlight-color:\s*rgba\(0,\s*0,\s*0,\s*0\);/su,
+    );
+    expect(designTokens).toMatch(
+      /:root\[data-native-platform="android"\][^{]+\{[^}]+-webkit-tap-highlight-color:\s*rgba\(0,\s*0,\s*0,\s*0\);/su,
+    );
+    expect(designTokens).toMatch(
+      /\.lp-state-layer::after\s*\{[^}]+background:\s*var\(--text-strong\);[^}]+opacity:\s*0;/su,
+    );
+    expect(designTokens).toMatch(
+      /:root\[data-native-platform="ios"\]\s+\.lp-state-layer:active::after\s*\{[^}]+opacity:\s*0\.06;/su,
+    );
+    expect(designTokens).toMatch(
+      /:root\[data-native-platform="android"\]\s+\.lp-state-layer:active::after\s*\{[^}]+opacity:\s*0\.1;/su,
+    );
+    expect(designTokens).toMatch(
+      /:root:not\(\[data-native-platform\]\)\s+\.lp-state-layer:hover::after\s*\{[^}]+opacity:\s*0\.05;/su,
+    );
+    expect(designTokens).not.toMatch(
+      /html,\s*body\s*\{[^}]+-webkit-tap-highlight-color:/su,
     );
   });
 });

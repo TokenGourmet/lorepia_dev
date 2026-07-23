@@ -162,7 +162,7 @@
               />
               {#if librarySearch.query !== ""}
                 <button
-                  class="clear"
+                  class="clear lp-state-layer"
                   type="button"
                   onpointerdown={(event) => event.preventDefault()}
                   onclick={clearQuery}
@@ -184,7 +184,7 @@
               {/if}
             </div>
             <button
-              class="integratedcancel"
+              class="integratedcancel lp-state-layer"
               type="button"
               aria-label="검색 닫기"
               onclick={cancelSearch}
@@ -205,7 +205,7 @@
           </div>
         {:else}
           <button
-            class="searchtrigger"
+            class="searchtrigger lp-state-layer"
             type="button"
             aria-label="캐릭터 검색"
             aria-controls="library-mobile-search"
@@ -262,7 +262,7 @@
         />
         {#if librarySearch.query !== ""}
           <button
-            class="clear"
+            class="clear lp-state-layer"
             type="button"
             onpointerdown={(event) => event.preventDefault()}
             onclick={clearQuery}
@@ -287,7 +287,7 @@
         <!-- pointerdown runs before the input's blur, so the tap still lands
              when losing focus is what hides this button. -->
         <button
-          class="cancel"
+          class="cancel lp-state-layer"
           type="button"
           onpointerdown={(event) => {
             event.preventDefault();
@@ -305,7 +305,9 @@
   {:else if errorMessage}
     <div class="status error" role="alert">
       <span>{errorMessage}</span>
-      <button type="button" onclick={loadBootstrap}>다시 시도</button>
+      <button class="lp-state-layer" type="button" onclick={loadBootstrap}
+        >다시 시도</button
+      >
     </div>
   {/if}
 
@@ -416,6 +418,7 @@
     justify-content: center;
     padding: 0;
     border: 0;
+    border-radius: var(--r-pill);
     background: transparent;
     color: var(--text-mid);
     cursor: pointer;
