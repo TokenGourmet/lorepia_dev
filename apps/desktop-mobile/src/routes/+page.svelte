@@ -4,10 +4,12 @@
   import "$lib/design/tokens.css";
 
   import { SAMPLE_CHARACTERS } from "$lib/characters/sample";
+  import { librarySearch } from "$lib/characters/library-search.svelte";
   import { matchesQuery } from "$lib/characters/search";
   import { formatMessageTime } from "$lib/design/time-of-day";
   import Avatar from "$lib/ui/Avatar.svelte";
   import LargeTitleHeader from "$lib/ui/LargeTitleHeader.svelte";
+  import { minimizeDockOnScroll } from "$lib/ui/dock-chrome.svelte";
   import {
     publicBootstrapError,
     requestProductBootstrap,
@@ -20,14 +22,27 @@
 
   const characters = SAMPLE_CHARACTERS;
 
-  let query = $state("");
+  /* The query lives in librarySearch: the mobile bottom search bar (owned by
+     the layout) and this screen's desktop field both drive the same filter. */
+  let searchFocused = $state(false);
+  let searchInput = $state<HTMLInputElement | null>(null);
 
   const matches = $derived(
-    characters.filter((character) => matchesQuery(character, query)),
+    characters.filter((character) =>
+      matchesQuery(character, librarySearch.query),
+    ),
   );
 
+  // iOS keeps Cancel up while editing or while a query is in effect.
+  const showCancel = $derived(searchFocused || librarySearch.query !== "");
+
   function clearQuery(): void {
-    query = "";
+    librarySearch.query = "";
+  }
+
+  function cancelSearch(): void {
+    librarySearch.query = "";
+    searchInput?.blur();
   }
 
   async function loadBootstrap(): Promise<void> {
@@ -53,7 +68,7 @@
   <title>LorePia — 서재</title>
 </svelte:head>
 
-<div class="screen">
+<div class="screen" use:minimizeDockOnScroll>
   <LargeTitleHeader title="서재" />
 
   {#if loading}
@@ -72,46 +87,65 @@
       <a class="cta" href="/import">캐릭터 가져오기</a>
     </section>
   {:else}
-    <div class="search">
-      <svg
-        viewBox="0 0 24 24"
-        width="16"
-        height="16"
-        fill="none"
-        stroke="currentColor"
-        stroke-width="2"
-        stroke-linecap="round"
-        aria-hidden="true"
-      >
-        <circle cx="11" cy="11" r="7" />
-        <path d="m20 20-3.5-3.5" />
-      </svg>
-      <input
-        type="search"
-        bind:value={query}
-        placeholder="이름, 초성, 대화 내용"
-        aria-label="캐릭터 검색"
-        aria-controls="library-list"
-      />
-      {#if query !== ""}
-        <button
-          class="clear"
-          type="button"
-          onclick={clearQuery}
-          aria-label="검색어 지우기"
+    <div class="searchrow">
+      <div class="search">
+        <svg
+          viewBox="0 0 24 24"
+          width="16"
+          height="16"
+          fill="none"
+          stroke="currentColor"
+          stroke-width="2"
+          stroke-linecap="round"
+          aria-hidden="true"
         >
-          <svg
-            viewBox="0 0 24 24"
-            width="12"
-            height="12"
-            fill="none"
-            stroke="currentColor"
-            stroke-width="3"
-            stroke-linecap="round"
-            aria-hidden="true"
+          <circle cx="11" cy="11" r="7" />
+          <path d="m20 20-3.5-3.5" />
+        </svg>
+        <input
+          type="search"
+          bind:value={librarySearch.query}
+          bind:this={searchInput}
+          onfocus={() => (searchFocused = true)}
+          onblur={() => (searchFocused = false)}
+          placeholder="검색"
+          aria-label="캐릭터 검색"
+          aria-controls="library-list"
+        />
+        {#if librarySearch.query !== ""}
+          <button
+            class="clear"
+            type="button"
+            onclick={clearQuery}
+            aria-label="검색어 지우기"
           >
-            <path d="M6 6l12 12M18 6 6 18" />
-          </svg>
+            <svg
+              viewBox="0 0 24 24"
+              width="12"
+              height="12"
+              fill="none"
+              stroke="currentColor"
+              stroke-width="3"
+              stroke-linecap="round"
+              aria-hidden="true"
+            >
+              <path d="M6 6l12 12M18 6 6 18" />
+            </svg>
+          </button>
+        {/if}
+      </div>
+      {#if showCancel}
+        <!-- pointerdown runs before the input's blur, so the tap still lands
+             when losing focus is what hides this button. -->
+        <button
+          class="cancel"
+          type="button"
+          onpointerdown={(event) => {
+            event.preventDefault();
+            cancelSearch();
+          }}
+        >
+          취소
         </button>
       {/if}
     </div>
@@ -128,9 +162,25 @@
             <span class="body">
               <span class="line">
                 <span class="name">{character.name}</span>
-                <time class="when" datetime={character.lastAt.toISOString()}
-                  >{formatMessageTime(character.lastAt)}</time
-                >
+                <span class="meta">
+                  <time class="when" datetime={character.lastAt.toISOString()}
+                    >{formatMessageTime(character.lastAt)}</time
+                  >
+                  <svg
+                    class="chev"
+                    viewBox="0 0 24 24"
+                    width="14"
+                    height="14"
+                    fill="none"
+                    stroke="currentColor"
+                    stroke-width="2.2"
+                    stroke-linecap="round"
+                    stroke-linejoin="round"
+                    aria-hidden="true"
+                  >
+                    <path d="m9 18 6-6-6-6" />
+                  </svg>
+                </span>
               </span>
               <span class="preview">{character.lastMessage}</span>
             </span>
@@ -189,14 +239,24 @@
     cursor: pointer;
   }
 
-  .search {
+  /* On phones search lives at the bottom next to the dock (iOS 26), so the
+     top field only exists on the wide layout. */
+  .searchrow {
     flex-shrink: 0;
+    display: none;
+    align-items: center;
+    gap: var(--sp-2);
+    margin: 0 var(--sp-4);
+  }
+
+  .search {
+    flex: 1;
+    min-width: 0;
     display: flex;
     align-items: center;
     gap: var(--sp-2);
     box-sizing: border-box;
     height: 36px;
-    margin: 0 var(--sp-4);
     padding: 0 var(--sp-3);
     border-radius: var(--r-block);
     background: var(--surface-bubble);
@@ -246,6 +306,26 @@
     background: var(--text-faint);
     color: var(--surface-page);
     cursor: pointer;
+  }
+
+  .cancel {
+    flex-shrink: 0;
+    min-height: 36px;
+    padding: 0;
+    border: 0;
+    background: transparent;
+    color: var(--tint);
+    font-family: var(--font-ui);
+    font-size: var(--fs-chat);
+    cursor: pointer;
+    animation: lp-cancel-in var(--dur-base) var(--ease-out);
+  }
+
+  @keyframes lp-cancel-in {
+    from {
+      opacity: 0;
+      transform: translateX(8px);
+    }
   }
 
   .noresult {
@@ -349,19 +429,29 @@
     text-overflow: ellipsis;
   }
 
-  .when {
-    font-size: var(--fs-caption);
-    color: var(--text-faint);
+  .meta {
+    display: inline-flex;
+    align-items: center;
+    gap: 1px;
     flex-shrink: 0;
+    color: var(--text-faint);
   }
 
+  .when {
+    font-size: var(--fs-caption);
+  }
+
+  /* Two-line preview with a trailing chevron on the timestamp: the Messages
+     row anatomy. */
   .preview {
     font-size: 13px;
     line-height: 1.45;
     color: var(--text-mid);
-    white-space: nowrap;
+    display: -webkit-box;
+    -webkit-box-orient: vertical;
+    -webkit-line-clamp: 2;
+    line-clamp: 2;
     overflow: hidden;
-    text-overflow: ellipsis;
   }
 
   .empty {
@@ -445,9 +535,13 @@
 
     /* Card-shaped, so their edges land on the gutter like the title. */
     .status.error,
-    .search {
+    .searchrow {
       width: min(100% - var(--sp-4) * 2, 680px);
       margin-inline: auto;
+    }
+
+    .searchrow {
+      display: flex;
     }
   }
 </style>

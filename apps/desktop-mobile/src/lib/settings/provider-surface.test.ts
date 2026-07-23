@@ -1,8 +1,10 @@
 import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
 
+// The settings surface lives in SettingsPane so every presentation — today
+// the 계정 tab route — renders the same contract-bearing markup.
 const source = readFileSync(
-  new URL("./+page.svelte", import.meta.url),
+  new URL("./SettingsPane.svelte", import.meta.url),
   "utf8",
 );
 

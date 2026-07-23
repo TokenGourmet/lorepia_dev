@@ -1,6 +1,8 @@
 <script lang="ts">
   import "$lib/design/tokens.css";
 
+  import LargeTitleHeader from "$lib/ui/LargeTitleHeader.svelte";
+
   interface PreviewResult {
     id: string;
     file: string;
@@ -41,9 +43,25 @@
 </svelte:head>
 
 <div class="screen">
-  <header class="top">
-    <h1>가져오기</h1>
-  </header>
+  <LargeTitleHeader title="가져오기">
+    {#snippet leading()}
+      <a class="back" href="/home" aria-label="홈으로 돌아가기">
+        <svg
+          viewBox="0 0 24 24"
+          width="20"
+          height="20"
+          fill="none"
+          stroke="currentColor"
+          stroke-width="2"
+          stroke-linecap="round"
+          stroke-linejoin="round"
+          aria-hidden="true"
+        >
+          <path d="m15 18-6-6 6-6" />
+        </svg>
+      </a>
+    {/snippet}
+  </LargeTitleHeader>
 
   <section class="drop">
     <span class="drop-ic" aria-hidden="true">
@@ -102,25 +120,23 @@
     font-family: var(--font-ui);
   }
 
-  .top {
-    position: sticky;
-    top: 0;
-    z-index: 5;
-    display: flex;
+  .back {
+    width: var(--size-touch);
+    height: var(--size-touch);
+    flex-shrink: 0;
+    display: inline-flex;
     align-items: center;
-    padding: var(--sp-3) var(--sp-4);
-    padding-top: calc(var(--sp-3) + var(--safe-top));
-    background: var(--bar-bg);
-    -webkit-backdrop-filter: blur(20px) saturate(1.6);
-    backdrop-filter: blur(20px) saturate(1.6);
+    justify-content: center;
+    border-radius: var(--r-pill);
+    color: var(--text-mid);
+    transition:
+      background var(--dur-fast) var(--ease-out),
+      transform var(--dur-base) var(--ease-spring);
   }
 
-  .top h1 {
-    margin: 0;
-    font-size: var(--fs-title);
-    font-weight: 700;
-    letter-spacing: -0.03em;
-    color: var(--text-strong);
+  .back:active {
+    background: var(--surface-bubble);
+    transform: scale(0.9);
   }
 
   .drop {
@@ -286,10 +302,6 @@
   }
 
   @media (min-width: 700px) {
-    .top {
-      padding-left: max(var(--sp-4), calc((100% - 680px) / 2));
-    }
-
     .drop {
       width: min(100% - var(--sp-4) * 2, 680px);
       margin-left: auto;

@@ -46,22 +46,22 @@
   --r-card: 24px;
   --r-pill: 999px;
 
-  /* Floating dock. One tab is the unit -- a 64x48 slot inside a 60px bar --
-     and the dock is that unit swept across however many tabs there are: 68px
-     per tab (64 wide + 4 gap), less the trailing gap, plus 8px padding a
-     side. When the screen cannot fit that, the whole geometry scales
-     uniformly, so the capsule keeps its shape rather than flattening. The
-     dock's own width:height is a result of the tab count, not a constant.
-     The vertical axis stops scaling once the 48-unit slot would drop under
-     --size-touch (44px), so the bar floors at 44 * 60/48 = 55px while the
-     width keeps shrinking. */
-  --dock-tabs: 5;
+  /* Floating dock. One tab is the unit -- a 64x44 slot inside a 52px bar,
+     iOS tab-bar height -- and the dock is that unit swept across however
+     many tabs there are: 68px per tab (64 wide + 4 gap), less the trailing
+     gap, plus 8px padding a side. When the screen cannot fit that, the whole
+     geometry scales uniformly, so the capsule keeps its shape rather than
+     flattening. The dock's own width:height is a result of the tab count,
+     not a constant. The vertical axis stops scaling once the 44-unit slot
+     would drop under --size-touch (44px), so the bar floors at 52px while
+     the width keeps shrinking. */
+  --dock-tabs: 4;
   --dock-span: calc(68 * var(--dock-tabs) + 12);
   --dock-width: min(
     calc(100vw - var(--sp-4) * 2),
     calc(var(--dock-span) * 1px)
   );
-  --size-tabbar: max(55px, calc(var(--dock-width) * 60 / var(--dock-span)));
+  --size-tabbar: max(52px, calc(var(--dock-width) * 52 / var(--dock-span)));
 
   --size-avatar: 36px;
   --size-touch: 44px;

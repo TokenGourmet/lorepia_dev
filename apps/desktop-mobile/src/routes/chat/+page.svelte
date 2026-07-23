@@ -476,7 +476,7 @@
     </div>
 
     <a class="panel-link" href="/character/seraphine">캐릭터 정보 보기</a>
-    <a class="panel-link" href="/settings">앱 설정</a>
+    <a class="panel-link" href="/account">계정 및 설정</a>
   </aside>
 </div>
 

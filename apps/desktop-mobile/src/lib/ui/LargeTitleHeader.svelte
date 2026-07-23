@@ -1,7 +1,12 @@
 <script lang="ts">
   import { onMount } from "svelte";
+  import type { Snippet } from "svelte";
 
-  let { title }: { title: string } = $props();
+  let {
+    title,
+    leading,
+    trailing,
+  }: { title: string; leading?: Snippet; trailing?: Snippet } = $props();
 
   let barElement = $state<HTMLElement | null>(null);
   let largeTitleElement = $state<HTMLElement | null>(null);
@@ -30,6 +35,12 @@
 
 <header class="bar" class:collapsed bind:this={barElement}>
   <span class="bartitle" aria-hidden="true">{title}</span>
+  {#if leading}
+    <span class="leading">{@render leading()}</span>
+  {/if}
+  {#if trailing}
+    <span class="trailing">{@render trailing()}</span>
+  {/if}
 </header>
 
 <h1 class="title" bind:this={largeTitleElement}>{title}</h1>
@@ -85,6 +96,26 @@
   .bar.collapsed .bartitle {
     opacity: 1;
     transform: none;
+  }
+
+  /* Leading/trailing actions stay pinned in the bar the iOS way, unmoved by
+     the large title scrolling underneath. */
+  .leading,
+  .trailing {
+    position: absolute;
+    bottom: 0;
+    height: var(--size-touch);
+    display: inline-flex;
+    align-items: center;
+  }
+
+  .leading {
+    left: var(--sp-1);
+  }
+
+  /* On the content gutter, like the large title below it. */
+  .trailing {
+    right: var(--sp-4);
   }
 
   .title {
