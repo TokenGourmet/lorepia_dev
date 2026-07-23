@@ -10,7 +10,7 @@
     type FrameChunkBuffer,
   } from "$lib/chat/frame-chunk-buffer";
   import MessageThread from "$lib/chat/MessageThread.svelte";
-  import type { ChatMessage, ThreadMode } from "$lib/chat/types";
+  import type { ChatMessage } from "$lib/chat/types";
   import { keyboardInset } from "$lib/design/keyboard-inset.svelte";
   import { activeProviderProfile } from "$lib/providers/active-profile.svelte";
   import {
@@ -27,19 +27,14 @@
   import { appPreferences } from "$lib/storage/app-preferences.svelte";
   import { storageClient } from "$lib/storage/client";
   import Avatar from "$lib/ui/Avatar.svelte";
-  import { horizontalSwipe, type SwipeCommit } from "$lib/ui/horizontal-swipe";
+  import { chatRoomPrefs } from "$lib/chat/room-prefs.svelte";
+  import { edgeSwipeBack } from "$lib/ui/edge-back";
 
   const characterName = "세라핀";
   const characterInitial = "세";
   const STREAM_TEXT_BLOCK_CHARACTERS = 8_192;
 
-  let mode = $state<ThreadMode>("chat");
   let scrollRegion = $state<HTMLDivElement | null>(null);
-  let panelElement = $state<HTMLElement | null>(null);
-
-  let panelOpen = $state(false);
-  let panelShift = $state(0);
-  let backDrag = $state(0);
   let activeStream = $state<FirstChatStreamHandle | null>(null);
   let activeDeltaBuffer: FrameChunkBuffer | null = null;
   let chatId = $state<string | null>(null);
@@ -59,7 +54,7 @@
       await appPreferences.hydrate();
       const loaded = await loadOrCreateFirstChat();
       if (disposed || epoch !== historyEpoch) return;
-      mode = appPreferences.current.defaultMode;
+      chatRoomPrefs.seedDefault(appPreferences.current.defaultMode);
       chatId = loaded.chat.id;
       messages = [...boundedTailById(loaded.messages)];
       storageUnavailable = false;
@@ -85,61 +80,6 @@
         storageUnavailable = true;
       }
     }
-  }
-
-  function panelWidth(): number {
-    return panelElement?.offsetWidth ?? 320;
-  }
-
-  function openPanel(): void {
-    panelOpen = true;
-    panelShift = panelWidth();
-  }
-
-  function closePanel(): void {
-    panelOpen = false;
-    panelShift = 0;
-  }
-
-  function clamp(value: number, min: number, max: number): number {
-    return Math.min(Math.max(value, min), max);
-  }
-
-  function handleSwipeMove(dx: number): void {
-    if (panelOpen) {
-      panelShift = clamp(panelWidth() - dx, 0, panelWidth());
-      return;
-    }
-    if (dx < 0) {
-      backDrag = 0;
-      panelShift = clamp(-dx, 0, panelWidth());
-    } else {
-      panelShift = 0;
-      backDrag = dx;
-    }
-  }
-
-  function handleSwipeEnd(commit: SwipeCommit): void {
-    if (panelOpen) {
-      if (commit === "right") {
-        closePanel();
-      } else {
-        panelShift = panelWidth();
-      }
-      return;
-    }
-    if (panelShift > 0) {
-      if (commit === "left") {
-        openPanel();
-      } else {
-        panelShift = 0;
-      }
-      return;
-    }
-    if (backDrag > 0 && commit === "right") {
-      void goto("/");
-    }
-    backDrag = 0;
   }
 
   function replaceMessage(
@@ -348,10 +288,7 @@
   <title>LorePia — 대화</title>
 </svelte:head>
 
-<div
-  class="screen"
-  use:horizontalSwipe={{ onMove: handleSwipeMove, onEnd: handleSwipeEnd }}
->
+<div class="screen" use:edgeSwipeBack={{ onBack: () => goto("/") }}>
   <header class="top">
     <a class="back" href="/" aria-label="서재로 돌아가기">
       <svg
@@ -368,31 +305,31 @@
         <path d="m15 18-6-6 6-6" />
       </svg>
     </a>
-    <button class="identity" type="button" onclick={openPanel}>
-      <Avatar initial={characterInitial} size={32} />
-      <span class="titles">
-        <span class="name">{characterName}</span>
-        <span class="tagline">달빛 서고의 사서</span>
+    <!-- iOS Messages identity: avatar stacked over the name, centered; the
+         chevron marks it as the door to the room detail. It is the single
+         entry — Messages has no ⋯ in the chat bar. -->
+    <a class="identity" href="/chat/info">
+      <Avatar initial={characterInitial} size={36} />
+      <span class="name">
+        {characterName}
+        <svg
+          class="chev"
+          viewBox="0 0 24 24"
+          width="10"
+          height="10"
+          fill="none"
+          stroke="currentColor"
+          stroke-width="2.6"
+          stroke-linecap="round"
+          stroke-linejoin="round"
+          aria-hidden="true"
+        >
+          <path d="m9 18 6-6-6-6" />
+        </svg>
       </span>
-    </button>
-    <button
-      class="more"
-      type="button"
-      onclick={openPanel}
-      aria-label="대화 설정 열기"
-    >
-      <svg
-        viewBox="0 0 24 24"
-        width="20"
-        height="20"
-        fill="currentColor"
-        aria-hidden="true"
-      >
-        <circle cx="5" cy="12" r="1.8" />
-        <circle cx="12" cy="12" r="1.8" />
-        <circle cx="19" cy="12" r="1.8" />
-      </svg>
-    </button>
+    </a>
+    <!-- Balances the back button so the identity stack stays centered. -->
+    <span class="lead-balance" aria-hidden="true"></span>
   </header>
 
   <div class="scroll" bind:this={scrollRegion}>
@@ -408,7 +345,12 @@
         </p>
       </div>
     {:else}
-      <MessageThread {messages} {mode} {characterName} {characterInitial} />
+      <MessageThread
+        {messages}
+        mode={chatRoomPrefs.mode}
+        {characterName}
+        {characterInitial}
+      />
     {/if}
   </div>
 
@@ -435,49 +377,6 @@
     ></svg>
   </div>
 
-  <button
-    class="scrim"
-    class:open={panelOpen}
-    type="button"
-    aria-label="방 설정 닫기"
-    aria-hidden={!panelOpen}
-    tabindex={panelOpen ? 0 : -1}
-    onclick={closePanel}
-  ></button>
-
-  <aside
-    class="panel"
-    class:open={panelOpen}
-    bind:this={panelElement}
-    aria-label="방 설정"
-  >
-    <div class="panel-hero">
-      <Avatar initial={characterInitial} size={48} />
-      <div>
-        <p class="panel-name">{characterName}</p>
-        <p class="panel-tagline">달빛 서고의 사서</p>
-      </div>
-    </div>
-
-    <div class="panel-row">
-      <span class="panel-label">표시 모드</span>
-      <div class="segment" role="group" aria-label="표시 모드 선택">
-        <button
-          type="button"
-          class:active={mode === "chat"}
-          onclick={() => (mode = "chat")}>채팅</button
-        >
-        <button
-          type="button"
-          class:active={mode === "story"}
-          onclick={() => (mode = "story")}>스토리</button
-        >
-      </div>
-    </div>
-
-    <a class="panel-link" href="/character/seraphine">캐릭터 정보 보기</a>
-    <a class="panel-link" href="/account">계정 및 설정</a>
-  </aside>
 </div>
 
 <style>
@@ -489,7 +388,6 @@
     font-family: var(--font-ui);
     position: relative;
     overflow: hidden;
-    touch-action: pan-y;
   }
 
   .top {
@@ -506,8 +404,7 @@
     backdrop-filter: blur(20px) saturate(1.6);
   }
 
-  .back,
-  .more {
+  .back {
     width: var(--size-touch);
     height: var(--size-touch);
     flex-shrink: 0;
@@ -525,50 +422,50 @@
       transform var(--dur-base) var(--ease-spring);
   }
 
-  .back:active,
-  .more:active {
+  .back:active {
     background: var(--surface-bubble);
     transform: scale(0.9);
+  }
+
+  .lead-balance {
+    width: var(--size-touch);
+    flex-shrink: 0;
   }
 
   .identity {
     flex: 1;
     display: flex;
+    flex-direction: column;
     align-items: center;
     justify-content: center;
-    gap: var(--sp-3);
+    gap: 3px;
     min-width: 0;
     min-height: var(--size-touch);
     border: none;
     background: transparent;
     cursor: pointer;
     font-family: var(--font-ui);
-    padding: 0;
-  }
-
-  .titles {
-    display: flex;
-    flex-direction: column;
-    align-items: flex-start;
-    min-width: 0;
+    padding: var(--sp-1) 0;
+    text-decoration: none;
   }
 
   .name {
-    font-size: var(--fs-bartitle-sub);
+    display: inline-flex;
+    align-items: center;
+    gap: 2px;
+    max-width: 100%;
+    font-size: var(--fs-caption);
     font-weight: 600;
-    letter-spacing: -0.02em;
+    letter-spacing: -0.01em;
     color: var(--text-strong);
     white-space: nowrap;
     overflow: hidden;
     text-overflow: ellipsis;
   }
 
-  .tagline {
-    font-size: var(--fs-caption);
-    color: var(--text-mid);
-    white-space: nowrap;
-    overflow: hidden;
-    text-overflow: ellipsis;
+  .chev {
+    flex-shrink: 0;
+    color: var(--text-faint);
   }
 
   .scroll {
@@ -642,137 +539,7 @@
     flex: none;
   }
 
-  .scrim {
-    position: absolute;
-    inset: 0;
-    border: none;
-    padding: 0;
-    background: rgba(0, 0, 0, 0.35);
-    -webkit-backdrop-filter: blur(6px);
-    backdrop-filter: blur(6px);
-    cursor: pointer;
-    opacity: 0;
-    visibility: hidden;
-    transition:
-      opacity var(--dur-base) var(--ease-out),
-      visibility var(--dur-base) var(--ease-out);
-  }
-
-  .scrim.open {
-    opacity: 1;
-    visibility: visible;
-  }
-
-  .panel {
-    position: absolute;
-    top: 0;
-    right: 0;
-    bottom: 0;
-    width: min(320px, 84vw);
-    background: var(--surface-card);
-    border-radius: var(--r-card) 0 0 var(--r-card);
-    box-shadow: var(--shadow-float);
-    padding: calc(var(--sp-4) + var(--safe-top)) var(--sp-4)
-      calc(var(--sp-4) + var(--safe-bottom));
-    display: flex;
-    flex-direction: column;
-    gap: var(--sp-3);
-    box-sizing: border-box;
-    transform: translateX(105%);
-    transition: transform var(--dur-slow) var(--ease-out);
-  }
-
-  .panel.open {
-    transform: translateX(0);
-  }
-
-  .panel-hero {
-    display: flex;
-    align-items: center;
-    gap: var(--sp-3);
-    padding-bottom: var(--sp-3);
-    border-bottom: 0.5px solid var(--hairline);
-  }
-
-  .panel-name {
-    margin: 0;
-    font-size: var(--fs-chat);
-    font-weight: 500;
-    color: var(--text-strong);
-  }
-
-  .panel-tagline {
-    margin: 0;
-    font-size: var(--fs-label);
-    color: var(--text-mid);
-  }
-
-  .panel-row {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    gap: var(--sp-3);
-    min-height: var(--size-touch);
-  }
-
-  .panel-label {
-    font-size: var(--fs-ui);
-    color: var(--text-strong);
-  }
-
-  .segment {
-    display: flex;
-    background: var(--surface-bubble);
-    border-radius: 10px;
-    padding: 2px;
-    gap: 2px;
-  }
-
-  .segment button {
-    min-height: 30px;
-    padding: 0 var(--sp-3);
-    border: none;
-    border-radius: 8px;
-    background: transparent;
-    color: var(--text-mid);
-    font-family: var(--font-ui);
-    font-size: var(--fs-label);
-    font-weight: 500;
-    cursor: pointer;
-    transition:
-      background var(--dur-base) var(--ease-out),
-      color var(--dur-base) var(--ease-out),
-      box-shadow var(--dur-base) var(--ease-out),
-      transform var(--dur-fast) var(--ease-spring);
-  }
-
-  .segment button:active {
-    transform: scale(0.95);
-  }
-
-  .segment button.active {
-    background: var(--segment-thumb);
-    color: var(--text-strong);
-    font-weight: 600;
-    box-shadow: 0 1px 4px rgba(0, 0, 0, 0.12);
-  }
-
-  .panel-link {
-    display: flex;
-    align-items: center;
-    min-height: var(--size-touch);
-    font-size: var(--fs-ui);
-    color: var(--text-strong);
-    text-decoration: none;
-    border-bottom: 0.5px solid var(--hairline);
-  }
-
   @media (prefers-reduced-motion: reduce) {
-    .scrim,
-    .panel {
-      transition: none;
-    }
-
     .scroll {
       scroll-behavior: auto;
     }

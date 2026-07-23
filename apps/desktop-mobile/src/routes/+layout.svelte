@@ -111,21 +111,29 @@
     let mounted = true;
     let removeCloseGuard: (() => void) | null = null;
 
-    const appWindow = getCurrentWindow();
-    const closeWithFlushedPreferences = createPreferenceCloseHandler(
-      () => appPreferences.flush(),
-      () => appWindow.destroy(),
-    );
-    void appWindow
-      .onCloseRequested(closeWithFlushedPreferences)
-      .then((unlisten) => {
-        if (mounted) {
-          removeCloseGuard = unlisten;
-        } else {
-          unlisten();
-        }
-      })
-      .catch(() => undefined);
+    /* Outside Tauri (browser dev preview) the window bridge is absent and
+       getCurrentWindow throws; a crash here poisons the layout's effect
+       tree and breaks every later page unmount, so the guard is set up
+       only when the bridge exists. */
+    try {
+      const appWindow = getCurrentWindow();
+      const closeWithFlushedPreferences = createPreferenceCloseHandler(
+        () => appPreferences.flush(),
+        () => appWindow.destroy(),
+      );
+      void appWindow
+        .onCloseRequested(closeWithFlushedPreferences)
+        .then((unlisten) => {
+          if (mounted) {
+            removeCloseGuard = unlisten;
+          } else {
+            unlisten();
+          }
+        })
+        .catch(() => undefined);
+    } catch {
+      // No native window to guard; preference flushing below still runs.
+    }
 
     const flushPreferences = (): void => {
       void appPreferences.flush();

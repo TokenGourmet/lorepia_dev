@@ -1,9 +1,12 @@
 <script lang="ts">
+  import { goto } from "$app/navigation";
+
   import "$lib/design/tokens.css";
 
   import { SAMPLE_CHARACTERS } from "$lib/characters/sample";
   import Avatar from "$lib/ui/Avatar.svelte";
   import LargeTitleHeader from "$lib/ui/LargeTitleHeader.svelte";
+  import { edgeSwipeBack } from "$lib/ui/edge-back";
 
   // Placeholder for the site-backed storefront; swaps to live community
   // cards once the sharing service is wired.
@@ -14,7 +17,7 @@
   <title>LorePia — 커뮤니티</title>
 </svelte:head>
 
-<div class="screen">
+<div class="screen" use:edgeSwipeBack={{ onBack: () => goto("/home") }}>
   <LargeTitleHeader title="커뮤니티">
     {#snippet leading()}
       <a class="back" href="/home" aria-label="홈으로 돌아가기">

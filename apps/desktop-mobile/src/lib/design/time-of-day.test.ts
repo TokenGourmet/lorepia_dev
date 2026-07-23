@@ -1,6 +1,10 @@
 import { describe, expect, it } from "vitest";
 
-import { dayPeriod, formatMessageTime } from "./time-of-day";
+import {
+  dayPeriod,
+  formatMessageTime,
+  formatThreadStamp,
+} from "./time-of-day";
 
 describe("dayPeriod", () => {
   it("maps every hour to a period boundary contract", () => {
@@ -31,5 +35,27 @@ describe("formatMessageTime", () => {
     expect(formatMessageTime(new Date(2026, 6, 19, 12, 5))).toBe("낮 12:05");
     expect(formatMessageTime(new Date(2026, 6, 19, 9, 30))).toBe("아침 9:30");
     expect(formatMessageTime(new Date(2026, 6, 19, 18, 59))).toBe("저녁 6:59");
+  });
+});
+
+describe("formatThreadStamp", () => {
+  const now = new Date(2026, 6, 23, 10, 0);
+
+  it("uses relative day words for today and yesterday", () => {
+    expect(formatThreadStamp(new Date(2026, 6, 23, 0, 12), now)).toBe(
+      "오늘 새벽 12:12",
+    );
+    expect(formatThreadStamp(new Date(2026, 6, 22, 23, 42), now)).toBe(
+      "어제 밤 11:42",
+    );
+  });
+
+  it("switches to calendar dates two days back, adding the year only when it differs", () => {
+    expect(formatThreadStamp(new Date(2026, 6, 21, 9, 5), now)).toBe(
+      "7월 21일 아침 9:05",
+    );
+    expect(formatThreadStamp(new Date(2025, 11, 31, 18, 30), now)).toBe(
+      "2025년 12월 31일 저녁 6:30",
+    );
   });
 });

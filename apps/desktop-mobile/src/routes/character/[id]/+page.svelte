@@ -1,10 +1,12 @@
 <script lang="ts">
+  import { goto } from "$app/navigation";
   import { page } from "$app/state";
 
   import "$lib/design/tokens.css";
 
   import { findSampleCharacter } from "$lib/characters/sample";
   import Avatar from "$lib/ui/Avatar.svelte";
+  import { edgeSwipeBack } from "$lib/ui/edge-back";
 
   const character = $derived(findSampleCharacter(page.params.id ?? ""));
 </script>
@@ -13,7 +15,7 @@
   <title>LorePia — {character ? character.name : "캐릭터"}</title>
 </svelte:head>
 
-<div class="screen">
+<div class="screen" use:edgeSwipeBack={{ onBack: () => goto("/") }}>
   <header class="top">
     <a class="back" href="/" aria-label="서재로 돌아가기">
       <svg

@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { formatMessageTime } from "$lib/design/time-of-day";
+  import { formatThreadStamp } from "$lib/design/time-of-day";
   import type { ChatMessage, ThreadMode } from "./types";
 
   let {
@@ -14,28 +14,39 @@
     characterInitial: string;
   } = $props();
 
+  /* Time reads the iMessage way: no per-bubble stamps — a centered separator
+     marks the thread start and any lull longer than this. */
+  const SEPARATOR_GAP_MS = 60 * 60 * 1000;
+
   interface ThreadEntry {
     message: ChatMessage;
-    time: string;
+    separator: string | null;
     showHeader: boolean;
-    showTime: boolean;
     isTail: boolean;
     isTyping: boolean;
+  }
+
+  function gapBefore(index: number): boolean {
+    if (index === 0) return true;
+    return (
+      messages[index].sentAt.getTime() - messages[index - 1].sentAt.getTime() >
+      SEPARATOR_GAP_MS
+    );
   }
 
   const entries: ThreadEntry[] = $derived(
     messages.map((message, index) => {
       const prev = messages[index - 1];
       const next = messages[index + 1];
-      const time = formatMessageTime(message.sentAt);
-      const sameRunNext = next !== undefined && next.role === message.role;
+      const separated = gapBefore(index);
+      // A separator breaks the run: the next message regroups under a fresh
+      // header, and the previous one keeps its tail.
+      const sameRunNext =
+        next !== undefined && next.role === message.role && !gapBefore(index + 1);
       return {
         message,
-        time,
-        showHeader: prev === undefined || prev.role !== message.role,
-        showTime:
-          message.streaming !== true &&
-          !(sameRunNext && formatMessageTime(next.sentAt) === time),
+        separator: separated ? formatThreadStamp(message.sentAt) : null,
+        showHeader: separated || prev === undefined || prev.role !== message.role,
         isTail: !sameRunNext,
         isTyping:
           message.streaming === true &&
@@ -49,6 +60,13 @@
 {#if mode === "chat"}
   <ol class="thread chat">
     {#each entries as entry (entry.message.id)}
+      {#if entry.separator}
+        <li class="sep">
+          <time datetime={entry.message.sentAt.toISOString()}
+            >{entry.separator}</time
+          >
+        </li>
+      {/if}
       {#if entry.message.role === "character"}
         <li
           class="row character"
@@ -88,11 +106,6 @@
                 </p>
                 {/if}
               </div>
-              {#if entry.showTime}
-                <time class="stamp" datetime={entry.message.sentAt.toISOString()}
-                  >{entry.time}</time
-                >
-              {/if}
             </div>
           </div>
         </li>
@@ -103,11 +116,6 @@
           class:grouped={!entry.showHeader}
         >
           <div class="bubble-line mine">
-            {#if entry.showTime}
-              <time class="stamp" datetime={entry.message.sentAt.toISOString()}
-                >{entry.time}</time
-              >
-            {/if}
             <div class="bubble inverted">
               <p>{entry.message.text}</p>
             </div>
@@ -119,6 +127,13 @@
 {:else}
   <ol class="thread story">
     {#each entries as entry (entry.message.id)}
+      {#if entry.separator}
+        <li class="sep">
+          <time datetime={entry.message.sentAt.toISOString()}
+            >{entry.separator}</time
+          >
+        </li>
+      {/if}
       <li class="passage" class:mine={entry.message.role === "user"}>
         {#if entry.showHeader}
           <span class="speaker"
@@ -152,11 +167,6 @@
             <p>{entry.message.text}</p>
           </div>
         {/if}
-        {#if entry.showTime}
-          <time class="stamp" datetime={entry.message.sentAt.toISOString()}
-            >{entry.time}</time
-          >
-        {/if}
       </li>
     {/each}
   </ol>
@@ -184,6 +194,21 @@
 
   .chat .row.grouped {
     margin-top: calc(var(--sp-1) - var(--sp-4));
+  }
+
+  /* Centered thread separator, the iMessage idiom: the only place time
+     appears in the transcript. */
+  .sep {
+    align-self: center;
+    padding-top: var(--sp-2);
+    font-family: var(--font-ui);
+    font-size: var(--fs-caption);
+    font-weight: 500;
+    color: var(--text-faint);
+  }
+
+  .sep:first-child {
+    padding-top: 0;
   }
 
   .row {
@@ -246,12 +271,13 @@
     justify-content: flex-end;
   }
 
+  /* Received bubbles sit flat in tonal gray, the iMessage way — only the
+     user's tinted bubble carries depth. */
   .bubble {
-    background: var(--surface-card);
+    background: var(--surface-bubble);
     border-radius: var(--r-bubble);
     padding: 10px 14px;
     min-width: 0;
-    box-shadow: 0 1px 2px rgba(0, 0, 0, 0.05);
   }
 
   .chat .row:last-child {
@@ -316,14 +342,6 @@
     color: var(--text-mid);
   }
 
-  .stamp {
-    font-family: var(--font-ui);
-    font-size: var(--fs-caption);
-    color: var(--text-faint);
-    flex-shrink: 0;
-    white-space: nowrap;
-  }
-
   .story {
     gap: var(--sp-5);
     max-width: var(--measure-story);
@@ -372,14 +390,6 @@
     line-height: var(--lh-chat);
     color: #fff;
     overflow-wrap: anywhere;
-  }
-
-  .story .stamp {
-    align-self: flex-start;
-  }
-
-  .passage.mine .stamp {
-    align-self: flex-end;
   }
 
   .typing {

@@ -1,7 +1,10 @@
 <script lang="ts">
+  import { goto } from "$app/navigation";
+
   import "$lib/design/tokens.css";
 
   import LargeTitleHeader from "$lib/ui/LargeTitleHeader.svelte";
+  import { edgeSwipeBack } from "$lib/ui/edge-back";
 
   interface PreviewResult {
     id: string;
@@ -42,7 +45,7 @@
   <title>LorePia — 가져오기</title>
 </svelte:head>
 
-<div class="screen">
+<div class="screen" use:edgeSwipeBack={{ onBack: () => goto("/home") }}>
   <LargeTitleHeader title="가져오기">
     {#snippet leading()}
       <a class="back" href="/home" aria-label="홈으로 돌아가기">
