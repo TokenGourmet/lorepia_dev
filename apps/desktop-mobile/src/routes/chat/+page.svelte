@@ -554,8 +554,9 @@
   }
 
   .name {
-    font-size: var(--fs-ui);
-    font-weight: 500;
+    font-size: var(--fs-bartitle-sub);
+    font-weight: 600;
+    letter-spacing: -0.02em;
     color: var(--text-strong);
     white-space: nowrap;
     overflow: hidden;

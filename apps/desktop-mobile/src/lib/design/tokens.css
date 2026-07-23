@@ -30,6 +30,13 @@
   --fs-ui: 14px;
   --fs-chat: 15px;
   --fs-story: 16px;
+  /* Navigation bar sizes, mirroring iOS large title (34pt) and the inline
+     title (17pt) that takes over once the large title scrolls away. The -sub
+     step is for a bar title that carries a subtitle under it, where the full
+     17px would crowd the two-line stack. */
+  --fs-bartitle-sub: 15px;
+  --fs-bartitle: 17px;
+  --fs-title: 33px;
   --lh-chat: 1.6;
   --lh-story: 1.8;
 
@@ -39,7 +46,22 @@
   --r-card: 24px;
   --r-pill: 999px;
 
-  --size-tabbar: 60px;
+  /* Floating dock. One tab is the unit -- a 64x48 slot inside a 60px bar --
+     and the dock is that unit swept across however many tabs there are: 68px
+     per tab (64 wide + 4 gap), less the trailing gap, plus 8px padding a
+     side. When the screen cannot fit that, the whole geometry scales
+     uniformly, so the capsule keeps its shape rather than flattening. The
+     dock's own width:height is a result of the tab count, not a constant.
+     The vertical axis stops scaling once the 48-unit slot would drop under
+     --size-touch (44px), so the bar floors at 44 * 60/48 = 55px while the
+     width keeps shrinking. */
+  --dock-tabs: 5;
+  --dock-span: calc(68 * var(--dock-tabs) + 12);
+  --dock-width: min(
+    calc(100vw - var(--sp-4) * 2),
+    calc(var(--dock-span) * 1px)
+  );
+  --size-tabbar: max(55px, calc(var(--dock-width) * 60 / var(--dock-span)));
 
   --size-avatar: 36px;
   --size-touch: 44px;

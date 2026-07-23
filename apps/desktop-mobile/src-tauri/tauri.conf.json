@@ -13,7 +13,9 @@
     "windows": [
       {
         "label": "main",
-        "title": "LorePia"
+        "title": "LorePia",
+        "width": 360,
+        "height": 780
       }
     ],
     "security": {

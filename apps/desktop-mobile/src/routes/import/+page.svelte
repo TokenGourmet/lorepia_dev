@@ -117,8 +117,8 @@
 
   .top h1 {
     margin: 0;
-    font-size: 33px;
-    font-weight: 800;
+    font-size: var(--fs-title);
+    font-weight: 700;
     letter-spacing: -0.03em;
     color: var(--text-strong);
   }

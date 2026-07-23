@@ -4,8 +4,10 @@
   import "$lib/design/tokens.css";
 
   import { SAMPLE_CHARACTERS } from "$lib/characters/sample";
+  import { matchesQuery } from "$lib/characters/search";
   import { formatMessageTime } from "$lib/design/time-of-day";
   import Avatar from "$lib/ui/Avatar.svelte";
+  import LargeTitleHeader from "$lib/ui/LargeTitleHeader.svelte";
   import {
     publicBootstrapError,
     requestProductBootstrap,
@@ -17,6 +19,16 @@
   let loading = $state(true);
 
   const characters = SAMPLE_CHARACTERS;
+
+  let query = $state("");
+
+  const matches = $derived(
+    characters.filter((character) => matchesQuery(character, query)),
+  );
+
+  function clearQuery(): void {
+    query = "";
+  }
 
   async function loadBootstrap(): Promise<void> {
     loading = true;
@@ -42,9 +54,7 @@
 </svelte:head>
 
 <div class="screen">
-  <header class="top">
-    <h1>서재</h1>
-  </header>
+  <LargeTitleHeader title="서재" />
 
   {#if loading}
     <p class="status" role="status">제품 코어에 연결하는 중입니다.</p>
@@ -62,8 +72,56 @@
       <a class="cta" href="/import">캐릭터 가져오기</a>
     </section>
   {:else}
-    <ol class="list">
-      {#each characters as character (character.id)}
+    <div class="search">
+      <svg
+        viewBox="0 0 24 24"
+        width="16"
+        height="16"
+        fill="none"
+        stroke="currentColor"
+        stroke-width="2"
+        stroke-linecap="round"
+        aria-hidden="true"
+      >
+        <circle cx="11" cy="11" r="7" />
+        <path d="m20 20-3.5-3.5" />
+      </svg>
+      <input
+        type="search"
+        bind:value={query}
+        placeholder="이름, 초성, 대화 내용"
+        aria-label="캐릭터 검색"
+        aria-controls="library-list"
+      />
+      {#if query !== ""}
+        <button
+          class="clear"
+          type="button"
+          onclick={clearQuery}
+          aria-label="검색어 지우기"
+        >
+          <svg
+            viewBox="0 0 24 24"
+            width="12"
+            height="12"
+            fill="none"
+            stroke="currentColor"
+            stroke-width="3"
+            stroke-linecap="round"
+            aria-hidden="true"
+          >
+            <path d="M6 6l12 12M18 6 6 18" />
+          </svg>
+        </button>
+      {/if}
+    </div>
+  {/if}
+
+  {#if characters.length > 0 && matches.length === 0}
+    <p class="noresult" role="status">일치하는 캐릭터가 없습니다.</p>
+  {:else if characters.length > 0}
+    <ol class="list" id="library-list">
+      {#each matches as character (character.id)}
         <li>
           <a class="row" href="/chat">
             <Avatar initial={character.initial} size={48} />
@@ -80,9 +138,10 @@
         </li>
       {/each}
     </ol>
-    {#if bootstrap}
-      <p class="core">코어 v{bootstrap.coreVersion} · 기기 로컬 저장</p>
-    {/if}
+  {/if}
+
+  {#if bootstrap && characters.length > 0}
+    <p class="core">코어 v{bootstrap.coreVersion} · 기기 로컬 저장</p>
   {/if}
 </div>
 
@@ -95,28 +154,6 @@
     flex-direction: column;
     background: var(--surface-page);
     font-family: var(--font-ui);
-  }
-
-  .top {
-    position: sticky;
-    top: 0;
-    z-index: 5;
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    padding: var(--sp-3) var(--sp-4);
-    padding-top: calc(var(--sp-3) + var(--safe-top));
-    background: var(--bar-bg);
-    -webkit-backdrop-filter: blur(20px) saturate(1.6);
-    backdrop-filter: blur(20px) saturate(1.6);
-  }
-
-  .top h1 {
-    margin: 0;
-    font-size: 33px;
-    font-weight: 800;
-    letter-spacing: -0.03em;
-    color: var(--text-strong);
   }
 
   .status {
@@ -150,6 +187,73 @@
     font-family: var(--font-ui);
     font-size: var(--fs-label);
     cursor: pointer;
+  }
+
+  .search {
+    flex-shrink: 0;
+    display: flex;
+    align-items: center;
+    gap: var(--sp-2);
+    box-sizing: border-box;
+    height: 36px;
+    margin: 0 var(--sp-4);
+    padding: 0 var(--sp-3);
+    border-radius: var(--r-block);
+    background: var(--surface-bubble);
+    color: var(--text-faint);
+  }
+
+  .search:focus-within {
+    box-shadow: inset 0 0 0 1.5px var(--tint);
+  }
+
+  .search input {
+    flex: 1;
+    min-width: 0;
+    border: 0;
+    padding: 0;
+    background: transparent;
+    color: var(--text-strong);
+    font-family: var(--font-ui);
+    font-size: var(--fs-chat);
+    caret-color: var(--cursor-color);
+  }
+
+  .search input:focus {
+    outline: none;
+  }
+
+  .search input::placeholder {
+    color: var(--text-faint);
+  }
+
+  /* The custom clear button below replaces the platform decoration. */
+  .search input::-webkit-search-cancel-button {
+    -webkit-appearance: none;
+    appearance: none;
+  }
+
+  .clear {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+    width: 18px;
+    height: 18px;
+    padding: 0;
+    border: 0;
+    border-radius: var(--r-pill);
+    background: var(--text-faint);
+    color: var(--surface-page);
+    cursor: pointer;
+  }
+
+  .noresult {
+    margin: var(--sp-6) 0 0;
+    padding: 0 var(--sp-4);
+    font-size: var(--fs-ui);
+    color: var(--text-mid);
+    text-align: center;
   }
 
   .list {
@@ -331,10 +435,6 @@
   }
 
   @media (min-width: 700px) {
-    .top {
-      padding-left: max(var(--sp-4), calc((100% - 680px) / 2));
-    }
-
     /* Rows carry the page gutter in their own padding, so this column is
        wider by exactly that much and avatars stay flush with the title. */
     .status,
@@ -343,8 +443,9 @@
       margin-inline: auto;
     }
 
-    /* Card-shaped, so its border lands on the gutter like the title. */
-    .status.error {
+    /* Card-shaped, so their edges land on the gutter like the title. */
+    .status.error,
+    .search {
       width: min(100% - var(--sp-4) * 2, 680px);
       margin-inline: auto;
     }
