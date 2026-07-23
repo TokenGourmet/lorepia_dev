@@ -47,6 +47,32 @@ describe("first chat surface", () => {
     expect(source).toContain("streaming: false");
   });
 
+  it("keeps drafting available and reports exact readiness failures on send", () => {
+    expect(source).toContain(
+      "activeProviderProfile.sendBlockReason",
+    );
+    expect(source).toContain("blockedReason={sendBlockReason}");
+    expect(source).toContain("validate={firstChatInputBlockReason}");
+    expect(source).toContain(
+      "로컬 저장소를 사용할 수 없어 메시지를 보낼 수 없습니다.",
+    );
+    expect(source).toContain(
+      "대화를 준비하는 중이라 아직 메시지를 보낼 수 없습니다.",
+    );
+    expect(source).not.toContain(
+      "disabled={activeProviderProfile.current === null || chatId === null}",
+    );
+  });
+
+  it("starts the interactive fallback across the complete chat surface", () => {
+    expect(source).toMatch(
+      /<div\s+class="screen"\s+use:contentSwipeBack=/,
+    );
+    expect(source).toMatch(
+      /<div\s+class="scroll"\s+bind:this=\{scrollRegion\}\s*>/,
+    );
+  });
+
   it("batches streaming deltas per frame and drains them before terminal", () => {
     expect(source).toContain('from "$lib/chat/frame-chunk-buffer"');
     expect(source).toContain("deltaBuffer.append(delta)");

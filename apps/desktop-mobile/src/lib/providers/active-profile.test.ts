@@ -36,6 +36,43 @@ describe("active provider profile", () => {
     expect(activeProviderProfile.current).toBeNull();
   });
 
+  it("explains every provider state that blocks a chat submission", () => {
+    activeProviderProfile.select("anthropic");
+    activeProviderProfile.setModelId("claude-example");
+    expect(activeProviderProfile.sendBlockReason).toBe(
+      "Anthropic API 키 상태를 확인하는 중이라 아직 메시지를 보낼 수 없습니다.",
+    );
+
+    activeProviderProfile.setCredentialConfigured("anthropic", "error");
+    expect(activeProviderProfile.sendBlockReason).toBe(
+      "Anthropic API 키 상태를 확인하지 못해 메시지를 보낼 수 없습니다. 설정에서 다시 확인해 주세요.",
+    );
+
+    activeProviderProfile.setCredentialConfigured("anthropic", false);
+    expect(activeProviderProfile.sendBlockReason).toBe(
+      "Anthropic API 키가 설정되지 않아 메시지를 보낼 수 없습니다.",
+    );
+
+    activeProviderProfile.setCredentialConfigured("anthropic", true);
+    activeProviderProfile.setModelId("");
+    expect(activeProviderProfile.sendBlockReason).toBe(
+      "모델 ID가 설정되지 않아 메시지를 보낼 수 없습니다.",
+    );
+
+    activeProviderProfile.setModelId("bad\nmodel");
+    expect(activeProviderProfile.sendBlockReason).toBe(
+      "모델 설정이 올바르지 않아 메시지를 보낼 수 없습니다. 모델 ID에는 제어 문자를 넣을 수 없습니다.",
+    );
+
+    activeProviderProfile.setModelId("claude-example");
+    expect(activeProviderProfile.sendBlockReason).toBeNull();
+
+    activeProviderProfile.select("google-vertex-ai");
+    expect(activeProviderProfile.sendBlockReason).toBe(
+      "Vertex AI Gemini는 OAuth 연결이 아직 지원되지 않아 메시지를 보낼 수 없습니다.",
+    );
+  });
+
   it("validates the native model-id byte contract", () => {
     expect(modelIdValidationMessage("openai", "  ")).not.toBeNull();
     expect(modelIdValidationMessage("openai", "bad\nmodel")).not.toBeNull();

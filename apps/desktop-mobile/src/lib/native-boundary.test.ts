@@ -261,4 +261,31 @@ describe("native product boundary", () => {
       /html,\s*body\s*\{[^}]+-webkit-tap-highlight-color:/su,
     );
   });
+
+  it("keeps iOS app chrome out of text selection without disabling editable text", () => {
+    const controlRule = designTokens.match(
+      /:root\[data-native-platform="ios"\]\s+:where\(([^}]+)\)\s*\{([^}]+-webkit-touch-callout:\s*none;[^}]*)\}/su,
+    );
+    expect(controlRule).not.toBeNull();
+
+    const selectors = controlRule?.[1] ?? "";
+    const declarations = controlRule?.[2] ?? "";
+    expect(selectors).toContain("a[href]");
+    expect(selectors).toContain("button");
+    expect(selectors).toContain('[role="button"]');
+    expect(selectors).toContain('[role="tab"]');
+    expect(selectors).toContain('[role="menuitem"]');
+    expect(selectors).toContain(
+      'label:has(> input:is([type="checkbox"], [type="radio"]))',
+    );
+    expect(selectors).not.toMatch(
+      /(?:^|[\s,>+~])(?:textarea|\[contenteditable)/u,
+    );
+    expect(declarations).toMatch(/-webkit-user-select:\s*none;/u);
+    expect(declarations).toMatch(/(?:^|\s)user-select:\s*none;/u);
+    expect(declarations).toMatch(/-webkit-touch-callout:\s*none;/u);
+    expect(designTokens).not.toMatch(
+      /:root\[data-native-platform="ios"\][^{]*\b(?:input|textarea)\s*(?:,|\{)[^}]+user-select:\s*none;/su,
+    );
+  });
 });

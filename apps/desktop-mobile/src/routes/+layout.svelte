@@ -125,7 +125,7 @@
       }
     } catch {
       if (activeProviderProfile.isCredentialOperationCurrent(providerId, epoch)) {
-        activeProviderProfile.setCredentialConfigured(providerId, null);
+        activeProviderProfile.setCredentialConfigured(providerId, "error");
       }
     }
   }

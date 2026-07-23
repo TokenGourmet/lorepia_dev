@@ -88,7 +88,7 @@
         activeProviderProfile.isCredentialOperationCurrent(providerId, epoch) &&
         providerId === selectedProviderId
       ) {
-        activeProviderProfile.setCredentialConfigured(providerId, null);
+        activeProviderProfile.setCredentialConfigured(providerId, "error");
         credentialError = publicCredentialErrorMessage(error);
       }
     }
@@ -395,6 +395,8 @@
             >
           {:else if credentialConfigured === false}
             <span class="chip">저장된 키 없음</span>
+          {:else if credentialConfigured === "error"}
+            <span class="chip">상태 확인 실패</span>
           {:else}
             <span class="chip">상태 확인 중</span>
           {/if}

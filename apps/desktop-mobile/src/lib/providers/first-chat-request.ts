@@ -15,6 +15,19 @@ function utf8Length(value: string): number {
   return new TextEncoder().encode(value).byteLength;
 }
 
+export function firstChatInputBlockReason(
+  value: string,
+): string | null {
+  const normalized = value.trim();
+  if (normalized.includes("\0")) {
+    return "메시지에 사용할 수 없는 문자가 포함되어 있어 보낼 수 없습니다.";
+  }
+  if (utf8Length(normalized) > FIRST_CHAT_MAX_INPUT_BYTES) {
+    return `메시지는 UTF-8 ${FIRST_CHAT_MAX_INPUT_BYTES.toLocaleString("en-US")}바이트 이하여야 합니다.`;
+  }
+  return null;
+}
+
 function validateUserMessage(value: string): string {
   const normalized = value.trim();
   if (normalized.length === 0) {

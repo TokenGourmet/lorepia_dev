@@ -19,7 +19,10 @@
     startFirstChatStream,
     type FirstChatStreamHandle,
   } from "$lib/providers/stream";
-  import { FIRST_CHAT_MAX_INPUT_BYTES } from "$lib/providers/first-chat-request";
+  import {
+    FIRST_CHAT_MAX_INPUT_BYTES,
+    firstChatInputBlockReason,
+  } from "$lib/providers/first-chat-request";
   import {
     loadOrCreateFirstChat,
     toChatMessage,
@@ -51,6 +54,13 @@
   let nativeBackActive = $state(false);
 
   let messages = $state<ChatMessage[]>([]);
+  const sendBlockReason = $derived(
+    storageUnavailable
+      ? "로컬 저장소를 사용할 수 없어 메시지를 보낼 수 없습니다."
+      : chatId === null
+        ? "대화를 준비하는 중이라 아직 메시지를 보낼 수 없습니다."
+        : activeProviderProfile.sendBlockReason,
+  );
 
   function backHref(): string | null {
     const candidate = (page.state as { backHref?: unknown }).backHref;
@@ -110,6 +120,7 @@
       messages = [
         ...boundedTailById(loaded.items.map(toChatMessage)),
       ];
+      storageUnavailable = false;
     } catch {
       if (!disposed && epoch === historyEpoch) {
         storageUnavailable = true;
@@ -163,11 +174,11 @@
     activeDeltaBuffer = null;
   }
 
-  function handleSend(text: string): void {
+  function handleSend(text: string): boolean {
     const profile = activeProviderProfile.current;
     const targetChatId = chatId;
     if (activeStream !== null || profile === null || targetChatId === null) {
-      return;
+      return false;
     }
 
     historyEpoch += 1;
@@ -283,6 +294,7 @@
         };
       });
     }
+    return true;
   }
 
   function handleCancel(): void {
@@ -352,7 +364,14 @@
   <title>LorePia — 대화</title>
 </svelte:head>
 
-<div class="screen">
+<div
+  class="screen"
+  use:contentSwipeBack={{
+    onBack: navigateBack,
+    getUnderlay: () => activateBackSwipeSurface(backHref()),
+    enabled: !nativeBackActive,
+  }}
+>
   <header class="top">
     <a
       class="back"
@@ -409,11 +428,6 @@
   <div
     class="scroll"
     bind:this={scrollRegion}
-    use:contentSwipeBack={{
-      onBack: navigateBack,
-      getUnderlay: () => activateBackSwipeSurface(backHref()),
-      enabled: !nativeBackActive,
-    }}
   >
     {#if messages.length === 0}
       <div class="empty-thread">
@@ -441,15 +455,10 @@
       onSend={handleSend}
       onCancel={handleCancel}
       busy={activeStream !== null}
-      disabled={activeProviderProfile.current === null || chatId === null}
+      blockedReason={sendBlockReason}
+      validate={firstChatInputBlockReason}
       maxLength={FIRST_CHAT_MAX_INPUT_BYTES}
-      placeholder={storageUnavailable
-        ? "로컬 저장소를 사용할 수 없습니다"
-        : chatId === null
-          ? "대화를 불러오는 중"
-          : activeProviderProfile.current === null
-        ? "설정에서 API 키와 모델을 준비하세요"
-        : "메시지 보내기"}
+      placeholder="메시지 보내기"
     />
     <svg
       class="keyboard-spacer"

@@ -1,4 +1,8 @@
-import type { ApiKeyProviderId, LlmProviderId } from "./catalog";
+import {
+  getLlmProvider,
+  type ApiKeyProviderId,
+  type LlmProviderId,
+} from "./catalog";
 
 export const MAX_MODEL_ID_BYTES = 256;
 
@@ -7,7 +11,7 @@ export type ActiveProviderProfile = Readonly<{
   modelId: string;
 }>;
 
-type CredentialState = boolean | null;
+export type CredentialState = boolean | null | "error";
 
 const modelIds = $state<Partial<Record<ApiKeyProviderId, string>>>({});
 const credentials = $state<Partial<Record<ApiKeyProviderId, CredentialState>>>({});
@@ -89,6 +93,36 @@ export const activeProviderProfile = {
       selectedProviderId,
       modelIds[selectedProviderId] ?? "",
     );
+  },
+  get sendBlockReason(): string | null {
+    const providerId = selectedProviderId;
+    const provider = getLlmProvider(providerId);
+    if (providerId === "google-vertex-ai") {
+      return `${provider.label}는 OAuth 연결이 아직 지원되지 않아 메시지를 보낼 수 없습니다.`;
+    }
+
+    const credential = credentials[providerId] ?? null;
+    if (credential === null) {
+      return `${provider.authLabel} 상태를 확인하는 중이라 아직 메시지를 보낼 수 없습니다.`;
+    }
+    if (credential === "error") {
+      return `${provider.authLabel} 상태를 확인하지 못해 메시지를 보낼 수 없습니다. 설정에서 다시 확인해 주세요.`;
+    }
+    if (credential === false) {
+      return `${provider.authLabel}가 설정되지 않아 메시지를 보낼 수 없습니다.`;
+    }
+
+    const modelError = modelIdValidationMessage(
+      providerId,
+      modelIds[providerId] ?? "",
+    );
+    if (modelError === "모델 ID를 입력하세요.") {
+      return "모델 ID가 설정되지 않아 메시지를 보낼 수 없습니다.";
+    }
+    if (modelError !== null) {
+      return `모델 설정이 올바르지 않아 메시지를 보낼 수 없습니다. ${modelError}`;
+    }
+    return null;
   },
   select(providerId: LlmProviderId): void {
     selectedProviderId = providerId;

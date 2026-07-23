@@ -80,6 +80,14 @@ export function shouldCommitContentBack(
   );
 }
 
+export function needsExplicitContentBackCapture(
+  pointerType: string,
+): boolean {
+  // Touch and pen pointers already receive implicit capture. Android WebView
+  // cancels the stream if setPointerCapture() is redundantly called mid-pan.
+  return pointerType !== "touch" && pointerType !== "pen";
+}
+
 export function contentBackReleaseVelocity(
   samples: readonly ContentBackSample[],
   releaseTime: number,
@@ -175,6 +183,7 @@ export function contentSwipeBack(
   let options = initialOptions;
   let phase: GesturePhase = "idle";
   let pointerId: number | null = null;
+  let touchId: number | null = null;
   let startX = 0;
   let startY = 0;
   let distance = 0;
@@ -185,6 +194,7 @@ export function contentSwipeBack(
   let underlayStyles: StoredVisualStyles | null = null;
   let animationFrame: number | null = null;
   let releaseTimer: ReturnType<typeof setTimeout> | null = null;
+  let touchUserSelect: string | null = null;
   let destroyed = false;
   let listenersAttached = false;
 
@@ -230,6 +240,9 @@ export function contentSwipeBack(
       node.closest<HTMLElement>("[data-back-swipe-foreground]") ?? node;
     underlay = options.getUnderlay?.() ?? null;
     foregroundStyles = storeVisualStyles(foreground);
+    if (foreground === node && touchUserSelect !== null) {
+      foregroundStyles.userSelect = touchUserSelect;
+    }
     underlayStyles =
       underlay === null ? null : storeVisualStyles(underlay);
 
@@ -295,13 +308,28 @@ export function contentSwipeBack(
     foregroundStyles = null;
     underlayStyles = null;
     distance = 0;
+    restoreTouchSelection();
+  }
+
+  function suppressTouchSelection(): void {
+    if (touchUserSelect !== null) return;
+    touchUserSelect = node.style.userSelect;
+    node.style.userSelect = "none";
+  }
+
+  function restoreTouchSelection(): void {
+    if (touchUserSelect === null) return;
+    node.style.userSelect = touchUserSelect;
+    touchUserSelect = null;
   }
 
   function clearPointer(): void {
     pointerId = null;
+    touchId = null;
     startX = 0;
     startY = 0;
     samples = [];
+    restoreTouchSelection();
   }
 
   function finishCancel(): void {
@@ -359,6 +387,10 @@ export function contentSwipeBack(
     if (phase !== "idle" || pointerId !== null) return;
     if (options.enabled === false) return;
     if (!event.isPrimary) return;
+    // Android WebView cancels a touch PointerEvent as soon as its transformed
+    // ancestor begins following the pan. Its TouchEvent stream remains intact,
+    // so touch input is handled by the dedicated path below.
+    if (event.pointerType === "touch") return;
     if (event.pointerType === "mouse" && event.button !== 0) return;
     if (startsOnBlockedContent(event.target, node)) return;
 
@@ -386,11 +418,13 @@ export function contentSwipeBack(
 
       phase = "dragging";
       beginVisuals();
-      try {
-        node.setPointerCapture(event.pointerId);
-      } catch {
-        // Synthetic pointers and an already released pointer can still be
-        // followed while they remain over the content region.
+      if (needsExplicitContentBackCapture(event.pointerType)) {
+        try {
+          node.setPointerCapture(event.pointerId);
+        } catch {
+          // Synthetic pointers and an already released pointer can still be
+          // followed while they remain over the content region.
+        }
       }
     }
 
@@ -435,6 +469,125 @@ export function contentSwipeBack(
     finishCancel();
   }
 
+  function findTouch(
+    touches: TouchList,
+    identifier: number,
+  ): Touch | null {
+    for (let index = 0; index < touches.length; index += 1) {
+      const touch = touches.item(index);
+      if (touch?.identifier === identifier) return touch;
+    }
+    return null;
+  }
+
+  function handleTouchStart(event: TouchEvent): void {
+    if (touchId !== null) {
+      if (event.touches.length !== 1) {
+        if (phase === "dragging") {
+          flushVisuals();
+          finishCancel();
+        } else {
+          abandonPossibleGesture();
+        }
+      }
+      return;
+    }
+    if (phase !== "idle" || pointerId !== null) return;
+    if (options.enabled === false || event.touches.length !== 1) return;
+    if (startsOnBlockedContent(event.target, node)) return;
+
+    const touch = event.touches.item(0);
+    if (touch === null) return;
+    suppressTouchSelection();
+    touchId = touch.identifier;
+    startX = touch.clientX;
+    startY = touch.clientY;
+    distance = 0;
+    samples = [];
+    appendSample(touch.clientX, event.timeStamp);
+    phase = "possible";
+  }
+
+  function handleTouchMove(event: TouchEvent): void {
+    if (touchId === null) return;
+    if (event.touches.length !== 1) {
+      if (phase === "dragging") {
+        flushVisuals();
+        finishCancel();
+      } else {
+        abandonPossibleGesture();
+      }
+      return;
+    }
+
+    const touch = findTouch(event.touches, touchId);
+    if (touch === null) return;
+    const dx = touch.clientX - startX;
+    const dy = touch.clientY - startY;
+
+    if (phase === "possible") {
+      const intent = classifyContentBackIntent(dx, dy);
+      if (intent === "pending") return;
+      if (intent === "reject") {
+        abandonPossibleGesture();
+        return;
+      }
+      phase = "dragging";
+      beginVisuals();
+    }
+
+    if (phase !== "dragging") return;
+    event.preventDefault();
+    appendSample(touch.clientX, event.timeStamp);
+    scheduleVisuals(dx);
+  }
+
+  function handleTouchEnd(event: TouchEvent): void {
+    if (touchId === null) return;
+    const touch = findTouch(event.changedTouches, touchId);
+    if (touch === null) return;
+    if (event.touches.length > 0) {
+      if (phase === "dragging") {
+        flushVisuals();
+        finishCancel();
+      } else {
+        abandonPossibleGesture();
+      }
+      return;
+    }
+    if (phase === "possible") {
+      abandonPossibleGesture();
+      return;
+    }
+    if (phase !== "dragging") return;
+
+    appendSample(touch.clientX, event.timeStamp);
+    distance = touch.clientX - startX;
+    flushVisuals();
+    const velocity = contentBackReleaseVelocity(samples, event.timeStamp);
+    if (shouldCommitContentBack(distance, visualWidth(), velocity)) {
+      finishCommit();
+    } else {
+      finishCancel();
+    }
+  }
+
+  function handleTouchCancel(event: TouchEvent): void {
+    if (touchId === null) return;
+    if (
+      event.changedTouches.length > 0 &&
+      findTouch(event.changedTouches, touchId) === null
+    ) {
+      return;
+    }
+    if (phase === "dragging") {
+      flushVisuals();
+      finishCancel();
+    } else {
+      abandonPossibleGesture();
+    }
+  }
+
   function attachFallbackListeners(): void {
     if (listenersAttached) return;
     listenersAttached = true;
@@ -446,6 +599,18 @@ export function contentSwipeBack(
       "lostpointercapture",
       handleLostPointerCapture,
     );
+    node.addEventListener("touchstart", handleTouchStart, {
+      passive: true,
+    });
+    node.addEventListener("touchmove", handleTouchMove, {
+      passive: false,
+    });
+    node.addEventListener("touchend", handleTouchEnd, {
+      passive: true,
+    });
+    node.addEventListener("touchcancel", handleTouchCancel, {
+      passive: true,
+    });
   }
 
   function detachFallbackListeners(): void {
@@ -459,6 +624,10 @@ export function contentSwipeBack(
       "lostpointercapture",
       handleLostPointerCapture,
     );
+    node.removeEventListener("touchstart", handleTouchStart);
+    node.removeEventListener("touchmove", handleTouchMove);
+    node.removeEventListener("touchend", handleTouchEnd);
+    node.removeEventListener("touchcancel", handleTouchCancel);
   }
 
   function resetFallbackGesture(): void {

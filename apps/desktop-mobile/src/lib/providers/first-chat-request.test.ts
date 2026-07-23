@@ -4,6 +4,7 @@ import type { ApiKeyProviderId } from "./catalog";
 import {
   FIRST_CHAT_MAX_INPUT_BYTES,
   buildFirstChatCommand,
+  firstChatInputBlockReason,
 } from "./first-chat-request";
 
 const providers: ApiKeyProviderId[] = [
@@ -64,6 +65,20 @@ describe("first chat command", () => {
         "a".repeat(FIRST_CHAT_MAX_INPUT_BYTES + 1),
       ),
     ).toThrow("FIRST_CHAT_MESSAGE_TOO_LARGE");
+  });
+
+  it("explains UTF-8 input failures before the composer drops its draft", () => {
+    expect(firstChatInputBlockReason("안녕하세요")).toBeNull();
+    expect(firstChatInputBlockReason("bad\0message")).toBe(
+      "메시지에 사용할 수 없는 문자가 포함되어 있어 보낼 수 없습니다.",
+    );
+    expect(
+      firstChatInputBlockReason(
+        "가".repeat(Math.floor(FIRST_CHAT_MAX_INPUT_BYTES / 3) + 1),
+      ),
+    ).toBe(
+      "메시지는 UTF-8 65,536바이트 이하여야 합니다.",
+    );
   });
 
   it("rejects a profile that cannot pass the native model contract", () => {
