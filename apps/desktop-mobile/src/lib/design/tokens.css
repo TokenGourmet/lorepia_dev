@@ -47,6 +47,12 @@
   --dur-base: 200ms;
   --dur-slow: 320ms;
   --ease-out: cubic-bezier(0.2, 0, 0, 1);
+  --ease-liquid: cubic-bezier(0.16, 1, 0.3, 1.08);
+
+  --glass-radius: 24px;
+  --glass-blur: 18px;
+  --glass-saturation: 1.28;
+  --glass-contrast: 1.04;
 
   --font-ui:
     "Pretendard Variable", Pretendard, -apple-system, BlinkMacSystemFont,
@@ -96,6 +102,24 @@ body > div {
   --invert-surface: var(--ink-invert);
   --invert-text: var(--ink-on-invert);
   --cursor-color: var(--ink-strong);
+
+  --glass-fill: rgba(255, 255, 255, 0.26);
+  --glass-chrome-fill: rgba(250, 249, 245, 0.54);
+  --glass-panel-fill: rgba(255, 255, 255, 0.64);
+  --glass-fallback-fill: rgba(250, 249, 245, 0.94);
+  --glass-border: rgba(255, 255, 255, 0.7);
+  --glass-focus-border: rgba(75, 73, 66, 0.42);
+  --glass-specular: rgba(255, 255, 255, 0.82);
+  --glass-side-light: rgba(255, 255, 255, 0.18);
+  --glass-edge-shade: rgba(31, 30, 28, 0.08);
+  --glass-shadow:
+    0 14px 36px rgba(31, 30, 28, 0.13),
+    0 2px 8px rgba(31, 30, 28, 0.08);
+  --glass-shadow-pressed:
+    0 7px 18px rgba(31, 30, 28, 0.11),
+    0 1px 4px rgba(31, 30, 28, 0.07);
+  --glass-control-fill: rgba(255, 255, 255, 0.42);
+  --glass-control-border: rgba(255, 255, 255, 0.64);
 }
 
 [data-theme="dark"] {
@@ -112,6 +136,24 @@ body > div {
   --invert-surface: var(--cream-invert);
   --invert-text: var(--cream-on-invert);
   --cursor-color: var(--cream-strong);
+
+  --glass-fill: rgba(55, 54, 50, 0.44);
+  --glass-chrome-fill: rgba(31, 30, 28, 0.58);
+  --glass-panel-fill: rgba(55, 54, 50, 0.7);
+  --glass-fallback-fill: rgba(38, 38, 36, 0.96);
+  --glass-border: rgba(255, 255, 255, 0.16);
+  --glass-focus-border: rgba(236, 233, 224, 0.44);
+  --glass-specular: rgba(255, 255, 255, 0.24);
+  --glass-side-light: rgba(255, 255, 255, 0.08);
+  --glass-edge-shade: rgba(0, 0, 0, 0.28);
+  --glass-shadow:
+    0 16px 40px rgba(0, 0, 0, 0.36),
+    0 2px 10px rgba(0, 0, 0, 0.24);
+  --glass-shadow-pressed:
+    0 8px 20px rgba(0, 0, 0, 0.3),
+    0 1px 5px rgba(0, 0, 0, 0.2);
+  --glass-control-fill: rgba(255, 255, 255, 0.11);
+  --glass-control-border: rgba(255, 255, 255, 0.14);
 }
 
 @media (prefers-color-scheme: dark) {
@@ -129,5 +171,23 @@ body > div {
     --invert-surface: var(--cream-invert);
     --invert-text: var(--cream-on-invert);
     --cursor-color: var(--cream-strong);
+
+    --glass-fill: rgba(55, 54, 50, 0.44);
+    --glass-chrome-fill: rgba(31, 30, 28, 0.58);
+    --glass-panel-fill: rgba(55, 54, 50, 0.7);
+    --glass-fallback-fill: rgba(38, 38, 36, 0.96);
+    --glass-border: rgba(255, 255, 255, 0.16);
+    --glass-focus-border: rgba(236, 233, 224, 0.44);
+    --glass-specular: rgba(255, 255, 255, 0.24);
+    --glass-side-light: rgba(255, 255, 255, 0.08);
+    --glass-edge-shade: rgba(0, 0, 0, 0.28);
+    --glass-shadow:
+      0 16px 40px rgba(0, 0, 0, 0.36),
+      0 2px 10px rgba(0, 0, 0, 0.24);
+    --glass-shadow-pressed:
+      0 8px 20px rgba(0, 0, 0, 0.3),
+      0 1px 5px rgba(0, 0, 0, 0.2);
+    --glass-control-fill: rgba(255, 255, 255, 0.11);
+    --glass-control-border: rgba(255, 255, 255, 0.14);
   }
 }
