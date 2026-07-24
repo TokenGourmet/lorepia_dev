@@ -26,7 +26,10 @@ export const PRODUCT_COMMANDS = Object.freeze([
 ]);
 
 const CORE_WINDOW_PERMISSIONS = new Set(["core:window:allow-destroy"]);
-const EXACT_PLUGIN_PERMISSIONS = new Set(["native-back:default"]);
+const EXACT_PLUGIN_PERMISSIONS = new Set([
+  "native-back:default",
+  "native-chrome:default",
+]);
 const EXACT_CSP = Object.freeze({
   "default-src": "'self' customprotocol: asset:",
   "base-uri": "'none'",

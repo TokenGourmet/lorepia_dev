@@ -1,0 +1,21 @@
+[package]
+name = "tauri-plugin-native-chrome"
+description = "LorePia mobile native navigation chrome bridge"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+authors.workspace = true
+repository.workspace = true
+links = "tauri-plugin-native-chrome"
+build = "build.rs"
+
+[dependencies]
+serde.workspace = true
+tauri.workspace = true
+thiserror = "=2.0.19"
+
+[build-dependencies]
+tauri-plugin = { version = "=2.6.3", features = ["build"] }
+
+[dev-dependencies]
+serde_json.workspace = true

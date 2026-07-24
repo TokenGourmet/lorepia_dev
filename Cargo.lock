@@ -2209,6 +2209,7 @@ dependencies = [
  "tauri",
  "tauri-build",
  "tauri-plugin-native-back",
+ "tauri-plugin-native-chrome",
  "tempfile",
  "tokio",
  "tokio-util",
@@ -4225,6 +4226,17 @@ name = "tauri-plugin-native-back"
 version = "0.1.0"
 dependencies = [
  "serde",
+ "tauri",
+ "tauri-plugin",
+ "thiserror 2.0.19",
+]
+
+[[package]]
+name = "tauri-plugin-native-chrome"
+version = "0.1.0"
+dependencies = [
+ "serde",
+ "serde_json",
  "tauri",
  "tauri-plugin",
  "thiserror 2.0.19",

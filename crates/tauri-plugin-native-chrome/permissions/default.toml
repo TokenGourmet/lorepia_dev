@@ -1,0 +1,6 @@
+[default]
+description = "Allows the trusted LorePia WebView to coordinate mobile native navigation chrome."
+permissions = [
+    "allow-set-state",
+    "allow-status",
+]

@@ -28,6 +28,7 @@ serde_json.workspace = true
 subtle = "=2.6.1"
 tauri.workspace = true
 tauri-plugin-native-back = { path = "../../../crates/tauri-plugin-native-back" }
+tauri-plugin-native-chrome = { path = "../../../crates/tauri-plugin-native-chrome" }
 tokio = { version = "=1.53.0", features = ["rt", "sync", "time"] }
 tokio-util = { version = "=0.7.18", features = ["rt"] }
 url = "=2.5.8"

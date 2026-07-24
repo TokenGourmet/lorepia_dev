@@ -33,10 +33,29 @@
     isAndroidNativeBackRoute,
     planAndroidNativeBack,
   } from "$lib/ui/native-back-routing";
+  import {
+    connectNativeTabSelection,
+    createNativeChromeStateSync,
+    createNativeTabNavigationSync,
+    hrefForNativeTab,
+    nativeTabForHref,
+    setNativeChromeState,
+    type NativeChromeStateSync,
+    type NativeChromeStatus,
+    type NativeTabNavigationSync,
+    type NativeTabId,
+  } from "$lib/ui/native-chrome";
 
   let { children } = $props();
   let DevSizeTool = $state<Component | null>(null);
   let shellElement = $state<HTMLElement | null>(null);
+  let nativeChromeMounted = $state(false);
+  let nativeChromeCompact = $state(false);
+  let nativeChromeActive = $state(false);
+  let lastNativeTab = $state<NativeTabId>("library");
+  let nativeChromeSync: NativeChromeStateSync | null = null;
+  let nativeTabNavigationSync: NativeTabNavigationSync | null = null;
+  let nativeBackCompletionFrame: number | null = null;
 
   // Tabs are for everyday destinations, the iOS way: import and the site
   // preview are reached from Home, and 계정 carries the account card plus
@@ -91,6 +110,40 @@
   const activeIndex = $derived(
     NAV_ITEMS.findIndex((item) => isActive(item.href)),
   );
+
+  function acceptNativeChromeStatus(
+    status: NativeChromeStatus,
+  ): void {
+    if (!nativeChromeMounted) return;
+    if (status.supported) {
+      nativeChromeActive =
+        status.active && status.compact;
+    } else if (!nativeChromeActive) {
+      // Initial failure and pre-iOS 26 both keep the Web dock. Once UIKit has
+      // taken ownership, a transient later bridge error must not reveal a
+      // duplicate Web dock over a still-live native one.
+      nativeChromeActive = false;
+    }
+  }
+
+  function handleNativeTabSelection(tab: NativeTabId): void {
+    const href = hrefForNativeTab(tab);
+    if (href !== null) {
+      nativeTabNavigationSync?.request(href);
+    }
+  }
+
+  function completeNativeBackAfterPaint(): void {
+    if (nativeBackCompletionFrame !== null) {
+      cancelAnimationFrame(nativeBackCompletionFrame);
+    }
+    nativeBackCompletionFrame = requestAnimationFrame(() => {
+      nativeBackCompletionFrame = requestAnimationFrame(() => {
+        nativeBackCompletionFrame = null;
+        void completeNativeBack();
+      });
+    });
+  }
 
   function localHref(url: URL): string {
     return `${url.pathname}${url.search}${url.hash}`;
@@ -172,7 +225,10 @@
       );
     } else if (platform === "ios") {
       if (!to.url.pathname.startsWith("/chat")) {
-        void completeNativeBack();
+        // Keep UIKit's previous-page snapshot through the first committed
+        // browser paint. Removing it in afterNavigate itself can expose one
+        // blank WebView frame between the native pop and Svelte's paint.
+        completeNativeBackAfterPaint();
       } else if (to.url.pathname !== "/chat") {
         void setNativeBackEnabled(false);
       }
@@ -185,6 +241,25 @@
     void pathname;
     librarySearch.close();
     dockChrome.restore();
+  });
+
+  // Native mobile chrome owns only the compact four-tab shell. Route history
+  // and the selected destination stay in SvelteKit, while updates are
+  // serialized and deduped so native taps cannot race route commits.
+  $effect(() => {
+    const directTab = nativeTabForHref(pathname);
+    if (directTab !== null) {
+      lastNativeTab = directTab;
+    }
+    if (!nativeChromeMounted || nativeChromeSync === null) return;
+
+    nativeChromeSync.update({
+      visible: nativeChromeCompact && !isDetailScreen,
+      selectedTab: directTab ?? lastNativeTab,
+      minimized: false,
+      appearance: appPreferences.current.theme,
+      compact: nativeChromeCompact,
+    });
   });
 
   async function hydrateProductSession(): Promise<void> {
@@ -215,13 +290,44 @@
     let mounted = true;
     let removeCloseGuard: (() => void) | null = null;
     let disconnectAndroidNativeBack = (): void => undefined;
+    let disconnectNativeTab = (): void => undefined;
+    let removeNativeChromeLayout = (): void => undefined;
 
-    if (nativePlatform() === "android") {
+    const platform = nativePlatform();
+    if (platform === "android") {
       disconnectAndroidNativeBack =
         connectNativeBackCommit(handleAndroidNativeBack);
       void setNativeBackEnabled(
         isAndroidNativeBackRoute(page.url.pathname),
       );
+    }
+    if (platform === "ios" || platform === "android") {
+      const compactQuery = window.matchMedia("(max-width: 699px)");
+      const syncNativeChromeLayout = (): void => {
+        nativeChromeCompact = compactQuery.matches;
+      };
+      nativeChromeSync = createNativeChromeStateSync(
+        acceptNativeChromeStatus,
+      );
+      nativeTabNavigationSync = createNativeTabNavigationSync(
+        (href) => isActive(href),
+        (href) => goto(href),
+      );
+      disconnectNativeTab = connectNativeTabSelection(
+        handleNativeTabSelection,
+      );
+      syncNativeChromeLayout();
+      compactQuery.addEventListener(
+        "change",
+        syncNativeChromeLayout,
+      );
+      removeNativeChromeLayout = (): void => {
+        compactQuery.removeEventListener(
+          "change",
+          syncNativeChromeLayout,
+        );
+      };
+      nativeChromeMounted = true;
     }
 
     if (
@@ -275,8 +381,30 @@
       mounted = false;
       DevSizeTool = null;
       disconnectAndroidNativeBack();
-      if (nativePlatform() === "android") {
+      disconnectNativeTab();
+      removeNativeChromeLayout();
+      const platform = nativePlatform();
+      if (platform === "android") {
         void setNativeBackEnabled(false);
+      }
+      if (platform === "ios" || platform === "android") {
+        void setNativeChromeState({
+          visible: false,
+          selectedTab: lastNativeTab,
+          minimized: false,
+          appearance: appPreferences.current.theme,
+          compact: nativeChromeCompact,
+        });
+      }
+      nativeChromeMounted = false;
+      nativeChromeActive = false;
+      nativeChromeSync?.dispose();
+      nativeChromeSync = null;
+      nativeTabNavigationSync?.dispose();
+      nativeTabNavigationSync = null;
+      if (nativeBackCompletionFrame !== null) {
+        cancelAnimationFrame(nativeBackCompletionFrame);
+        nativeBackCompletionFrame = null;
       }
       removeCloseGuard?.();
       window.removeEventListener("pagehide", flushPreferences);
@@ -299,11 +427,18 @@
   <div
     class="shell"
     class:detail={isDetailScreen}
+    class:native-chrome-active={nativeChromeActive}
     bind:this={shellElement}
     data-back-swipe-foreground
   >
     <div class="dockrow" class:minimized={dockChrome.minimized}>
-      <nav class="appnav" data-active={activeIndex} aria-label="주요 메뉴">
+      <nav
+        class="appnav"
+        data-active={activeIndex}
+        aria-label="주요 메뉴"
+        aria-hidden={nativeChromeActive && nativeChromeCompact}
+        inert={nativeChromeActive && nativeChromeCompact}
+      >
         {#if activeIndex >= 0}
           <span class="indicator" aria-hidden="true"></span>
         {/if}
@@ -561,18 +696,59 @@
     );
   }
 
-  /* Android's committed wrapper already pads the WebView, so only the dock
-     height may contribute here (mirrors the tokens.css inset-owner rule). */
+  /* Android's committed wrapper already pads the WebView. Once the native
+     dock owns compact navigation, reserve its 80dp body, 16dp outer margin,
+     and the shared 8px content clearance. CSS px and Android dp share the
+     same viewport unit here. */
   :global([data-native-inset-owner="android-view-padding"])
-    .shell:not(.detail)
+    .shell.native-chrome-active:not(.detail)
     .content {
-    /* env() is 0 inside the padded WebView, so the dock sits at the sp-4
-       floor here — mirror that, not the sp-3 inset ride. */
-    --safe-bottom: calc(var(--size-tabbar) + var(--sp-4) + var(--sp-2));
+    --safe-bottom: calc(80px + var(--sp-4) + var(--sp-2));
+  }
+
+  /* The standalone system UITabBar overlays the shared WebView. Reserve the
+     standard 49pt tab body, the home-indicator inset, and one content gap. */
+  :global([data-native-platform="ios"])
+    .shell.native-chrome-active:not(.detail)
+    .content {
+    --safe-bottom: calc(
+      env(safe-area-inset-bottom, 0px) + 49px + var(--sp-2)
+    );
   }
 
   .shell.detail .dockrow {
     display: none;
+  }
+
+  @media (max-width: 699px) {
+    /* The Web dock remains mounted as a fail-open fallback and as the visual
+       dock inside DOM-captured non-chat back underlays. It leaves layout,
+       hit-testing, and the accessibility tree only after UIKit confirms
+       ownership of the compact dock. */
+    .shell.native-chrome-active:not(.detail) > .dockrow {
+      display: none;
+    }
+
+    .back-swipe-underlay
+      :global(
+        [data-back-swipe-captured-surface].native-chrome-active:not(
+            .detail
+          ) > .dockrow
+      ) {
+      display: flex;
+    }
+
+    /* UIKit draws the live neutral selection lens above this captured fallback.
+       Keep the clone untinted so peach cannot bleed through the native glass
+       while an interactive back transition reveals the previous screen. */
+    .back-swipe-underlay
+      :global(
+        [data-back-swipe-captured-surface].native-chrome-active:not(
+            .detail
+          ) > .dockrow .indicator
+      ) {
+      background: transparent;
+    }
   }
 
   /* The selection reads iOS 26-style: a soft tint capsule glides to sit

@@ -6,6 +6,7 @@
   "permissions": [
     "core:window:allow-destroy",
     "native-back:default",
+    "native-chrome:default",
     "allow-get-product-bootstrap",
     "allow-get-provider-credential-status",
     "allow-save-provider-api-key",

@@ -15,6 +15,18 @@ private final class SetEnabledArgs: Decodable {
 }
 
 final class NativeBackPlugin: Plugin, UINavigationControllerDelegate {
+    private static let nativeChromeWillInstallTabShellNotification =
+        Notification.Name(
+            "dev.lorepia.nativeChrome.willInstallTabShell"
+        )
+    private static let prepareChromeUnderlayNotification =
+        Notification.Name("dev.lorepia.nativeBack.prepareChromeUnderlay")
+    private static let clearChromeUnderlayNotification =
+        Notification.Name("dev.lorepia.nativeBack.clearChromeUnderlay")
+    private static let willAcquireWebViewNotification =
+        Notification.Name("dev.lorepia.nativeBack.willAcquireWebView")
+    private static let didReleaseWebViewNotification =
+        Notification.Name("dev.lorepia.nativeBack.didReleaseWebView")
     private static let commitScript =
         "window.dispatchEvent(new Event('lorepia:native-back'))"
     private static let roomInfoScript =
@@ -26,17 +38,34 @@ final class NativeBackPlugin: Plugin, UINavigationControllerDelegate {
     private weak var webview: WKWebView?
     private weak var rootViewController: UIViewController?
     private var navigationController: UINavigationController?
+    private var ownsNavigationController = false
     private var sourceController: UIViewController?
     private var destinationController: UIViewController?
     private var sourceSnapshot: UIView?
     private var active = false
     private var gestureEnabled = false
+    private var sourceTabBarVisible = false
+    private var nativeChromeObserver: NSObjectProtocol?
+    private var snapshotGeneration = 0
+    private var webViewLeaseActive = false
+    private var pendingSnapshotCompletions: [
+        (Result<Void, Error>) -> Void
+    ] = []
 
     @objc override public func load(webview: WKWebView) {
         self.webview = webview
         self.rootViewController = manager.viewController
         webview.allowsBackForwardNavigationGestures = false
+        registerNativeChromeObserver()
         logger.notice("Native back plugin loaded")
+    }
+
+    deinit {
+        if let nativeChromeObserver {
+            NotificationCenter.default.removeObserver(
+                nativeChromeObserver
+            )
+        }
     }
 
     @objc public func complete(_ invoke: Invoke) {
@@ -58,12 +87,20 @@ final class NativeBackPlugin: Plugin, UINavigationControllerDelegate {
     }
 
     @objc public func prepare(_ invoke: Invoke) {
-        resolveOnMain(invoke) {
+        DispatchQueue.main.async {
             guard self.isSystemGestureSupported else {
-                return self.currentStatus()
+                invoke.resolve(self.currentStatus())
+                return
             }
-            try self.prepareTransition()
-            return self.currentStatus()
+
+            self.prepareTransition { result in
+                switch result {
+                case .success:
+                    invoke.resolve(self.currentStatus())
+                case let .failure(error):
+                    self.rejectCoordination(invoke, error: error)
+                }
+            }
         }
     }
 
@@ -103,6 +140,7 @@ final class NativeBackPlugin: Plugin, UINavigationControllerDelegate {
         navigationController.setNavigationBarHidden(true, animated: false)
         attachWebView(to: sourceController, beneathSnapshot: true)
         destinationController = nil
+        releaseWebViewLease()
 
         webview?.evaluateJavaScript(Self.commitScript) { [weak self] _, error in
             if let error {
@@ -137,20 +175,23 @@ final class NativeBackPlugin: Plugin, UINavigationControllerDelegate {
             do {
                 invoke.resolve(try operation())
             } catch {
-                invoke.reject(
-                    "Unable to coordinate native back navigation",
-                    code: "NATIVE_BACK_COORDINATION_FAILED",
-                    error: error
-                )
+                self.rejectCoordination(invoke, error: error)
             }
         }
     }
 
-    private func installNavigationHostIfNeeded() throws {
-        if navigationController != nil {
-            return
-        }
+    private func rejectCoordination(
+        _ invoke: Invoke,
+        error: Error
+    ) {
+        invoke.reject(
+            "Unable to coordinate native back navigation",
+            code: "NATIVE_BACK_COORDINATION_FAILED",
+            error: error
+        )
+    }
 
+    private func installNavigationHostIfNeeded() throws {
         guard let webview else {
             throw NativeBackError.webViewUnavailable
         }
@@ -158,20 +199,32 @@ final class NativeBackPlugin: Plugin, UINavigationControllerDelegate {
             throw NativeBackError.rootViewControllerUnavailable
         }
 
-        let sourceController = UIViewController()
-        sourceController.view.backgroundColor = .systemBackground
-        let backItem = UIBarButtonItem(
-            title: "",
-            style: .plain,
-            target: nil,
-            action: nil
-        )
-        backItem.accessibilityLabel = "이전 화면으로 돌아가기"
-        if #available(iOS 26.0, *) {
-            backItem.hidesSharedBackground = true
+        if active, navigationController != nil {
+            return
         }
-        sourceController.navigationItem.backBarButtonItem = backItem
-        sourceController.navigationItem.backButtonDisplayMode = .minimal
+
+        if
+            let sharedNavigation =
+                selectedTabNavigationController(
+                    in: rootViewController
+                ),
+            let sharedSource =
+                sharedNavigation.viewControllers.first
+        {
+            adoptSharedNavigationHost(
+                sharedNavigation,
+                sourceController: sharedSource,
+                webview: webview
+            )
+            return
+        }
+
+        if navigationController != nil {
+            return
+        }
+
+        let sourceController = UIViewController()
+        configureSourceController(sourceController)
 
         let navigationController = UINavigationController(
             rootViewController: sourceController
@@ -203,12 +256,162 @@ final class NativeBackPlugin: Plugin, UINavigationControllerDelegate {
         self.rootViewController = rootViewController
         self.sourceController = sourceController
         self.navigationController = navigationController
+        ownsNavigationController = true
         attachWebView(to: sourceController, beneathSnapshot: false)
         webview.allowsBackForwardNavigationGestures = false
         configureGestureCompetition(
             webview: webview,
             navigationController: navigationController
         )
+    }
+
+    private func selectedTabNavigationController(
+        in rootViewController: UIViewController
+    ) -> UINavigationController? {
+        for child in rootViewController.children {
+            guard let tabs = child as? UITabBarController else {
+                continue
+            }
+            guard let selected = tabs.selectedViewController else {
+                continue
+            }
+            if let navigation = descendantNavigationController(
+                in: selected
+            ) {
+                return navigation
+            }
+        }
+        return nil
+    }
+
+    private func descendantNavigationController(
+        in controller: UIViewController
+    ) -> UINavigationController? {
+        if let navigation = controller as? UINavigationController {
+            return navigation
+        }
+        for child in controller.children {
+            if let navigation = descendantNavigationController(in: child) {
+                return navigation
+            }
+        }
+        return nil
+    }
+
+    private func adoptSharedNavigationHost(
+        _ navigationController: UINavigationController,
+        sourceController: UIViewController,
+        webview: WKWebView
+    ) {
+        if self.navigationController !== navigationController {
+            if ownsNavigationController {
+                releaseOwnedNavigationHost()
+            } else {
+                self.navigationController?.delegate = nil
+            }
+        }
+
+        configureSourceController(sourceController)
+        navigationController.delegate = self
+        configureNavigationBar(navigationController)
+        navigationController.setViewControllers(
+            [sourceController],
+            animated: false
+        )
+        navigationController.setNavigationBarHidden(
+            true,
+            animated: false
+        )
+
+        self.navigationController = navigationController
+        self.sourceController = sourceController
+        ownsNavigationController = false
+        attachWebView(to: sourceController, beneathSnapshot: false)
+        webview.allowsBackForwardNavigationGestures = false
+        configureGestureCompetition(
+            webview: webview,
+            navigationController: navigationController
+        )
+        logger.notice("Native back adopted the selected tab navigation host")
+    }
+
+    private func configureSourceController(
+        _ sourceController: UIViewController
+    ) {
+        sourceController.view.backgroundColor = .systemBackground
+        let backItem = UIBarButtonItem(
+            title: "",
+            style: .plain,
+            target: nil,
+            action: nil
+        )
+        backItem.accessibilityLabel = "이전 화면으로 돌아가기"
+        if #available(iOS 26.0, *) {
+            backItem.hidesSharedBackground = true
+        }
+        sourceController.navigationItem.backBarButtonItem = backItem
+        sourceController.navigationItem.backButtonDisplayMode = .minimal
+    }
+
+    private func registerNativeChromeObserver() {
+        guard nativeChromeObserver == nil else {
+            return
+        }
+        nativeChromeObserver = NotificationCenter.default.addObserver(
+            forName: Self.nativeChromeWillInstallTabShellNotification,
+            object: nil,
+            queue: .main
+        ) { [weak self] _ in
+            self?.releaseOwnedNavigationHost()
+        }
+    }
+
+    private func releaseOwnedNavigationHost() {
+        guard
+            ownsNavigationController,
+            !active,
+            let navigationController,
+            let rootViewController =
+                rootViewController ?? manager.viewController
+        else {
+            return
+        }
+
+        cancelSnapshotPreparation()
+        let releasedWebView = webview
+        releasedWebView?.removeFromSuperview()
+        navigationController.delegate = nil
+        navigationController.willMove(toParent: nil)
+        navigationController.view.removeFromSuperview()
+        navigationController.removeFromParent()
+
+        if let releasedWebView {
+            releasedWebView.translatesAutoresizingMaskIntoConstraints = false
+            rootViewController.view.addSubview(releasedWebView)
+            NSLayoutConstraint.activate([
+                releasedWebView.leadingAnchor.constraint(
+                    equalTo: rootViewController.view.leadingAnchor
+                ),
+                releasedWebView.trailingAnchor.constraint(
+                    equalTo: rootViewController.view.trailingAnchor
+                ),
+                releasedWebView.topAnchor.constraint(
+                    equalTo: rootViewController.view.topAnchor
+                ),
+                releasedWebView.bottomAnchor.constraint(
+                    equalTo: rootViewController.view.bottomAnchor
+                ),
+            ])
+        }
+
+        self.navigationController = nil
+        sourceController = nil
+        destinationController = nil
+        sourceSnapshot?.removeFromSuperview()
+        sourceSnapshot = nil
+        ownsNavigationController = false
+        gestureEnabled = false
+        logger.notice("Native back released its fallback navigation host")
     }
 
     private func configureNavigationBar(
@@ -329,29 +532,184 @@ final class NativeBackPlugin: Plugin, UINavigationControllerDelegate {
         logger.notice("Native content pop gesture priority configured")
     }
 
-    private func prepareTransition() throws {
-        try installNavigationHostIfNeeded()
+    private func prepareTransition(
+        completion: @escaping (Result<Void, Error>) -> Void
+    ) {
+        do {
+            try installNavigationHostIfNeeded()
+        } catch {
+            completion(.failure(error))
+            return
+        }
 
         guard !active else {
+            completion(.success(()))
             return
         }
         guard
             let webview,
             let sourceController
         else {
-            throw NativeBackError.navigationHostUnavailable
+            completion(.failure(NativeBackError.navigationHostUnavailable))
+            return
+        }
+
+        if !pendingSnapshotCompletions.isEmpty {
+            pendingSnapshotCompletions.append(completion)
+            return
+        }
+        snapshotGeneration &+= 1
+        let generation = snapshotGeneration
+        pendingSnapshotCompletions.append(completion)
+
+        sourceController.view.layoutIfNeeded()
+        webview.layoutIfNeeded()
+        if #available(iOS 18.0, *) {
+            sourceTabBarVisible =
+                !(navigationController?.tabBarController?
+                    .isTabBarHidden ?? true)
+        } else {
+            sourceTabBarVisible = false
+        }
+
+        let configuration = WKSnapshotConfiguration()
+        configuration.rect = webview.bounds
+        configuration.afterScreenUpdates = true
+        webview.takeSnapshot(with: configuration) {
+            [weak self, weak webview, weak sourceController] image, error in
+            DispatchQueue.main.async {
+                guard let self else {
+                    return
+                }
+                guard self.snapshotGeneration == generation else {
+                    return
+                }
+                guard
+                    let webview,
+                    let sourceController,
+                    self.webview === webview,
+                    self.sourceController === sourceController
+                else {
+                    self.finishSnapshotPreparation(
+                        generation: generation,
+                        result: .failure(
+                            NativeBackError.navigationHostUnavailable
+                        )
+                    )
+                    return
+                }
+
+                if let error {
+                    self.logger.error(
+                        "WKWebView snapshot failed; using hierarchy fallback: \(error.localizedDescription, privacy: .public)"
+                    )
+                }
+
+                guard
+                    let snapshotImage =
+                        image ?? self.drawHierarchySnapshot(of: webview)
+                else {
+                    self.finishSnapshotPreparation(
+                        generation: generation,
+                        result: .failure(
+                            NativeBackError.snapshotCaptureFailed
+                        )
+                    )
+                    return
+                }
+
+                self.finishPreparingTransition(
+                    snapshotImage: snapshotImage,
+                    webview: webview,
+                    sourceController: sourceController
+                )
+                self.finishSnapshotPreparation(
+                    generation: generation,
+                    result: .success(())
+                )
+            }
+        }
+    }
+
+    private func finishSnapshotPreparation(
+        generation: Int,
+        result: Result<Void, Error>
+    ) {
+        guard snapshotGeneration == generation else {
+            return
+        }
+        let completions = pendingSnapshotCompletions
+        pendingSnapshotCompletions.removeAll()
+        for completion in completions {
+            completion(result)
+        }
+    }
+
+    private func cancelSnapshotPreparation() {
+        guard !pendingSnapshotCompletions.isEmpty else {
+            return
+        }
+        snapshotGeneration &+= 1
+        let completions = pendingSnapshotCompletions
+        pendingSnapshotCompletions.removeAll()
+        for completion in completions {
+            completion(
+                .failure(NativeBackError.snapshotPreparationCancelled)
+            )
+        }
+    }
+
+    private func drawHierarchySnapshot(of webview: WKWebView) -> UIImage? {
+        guard
+            webview.bounds.width > 0,
+            webview.bounds.height > 0
+        else {
+            return nil
+        }
+
+        var didDrawHierarchy = false
+        let renderer = UIGraphicsImageRenderer(bounds: webview.bounds)
+        let image = renderer.image { _ in
+            didDrawHierarchy = webview.drawHierarchy(
+                in: webview.bounds,
+                afterScreenUpdates: true
+            )
+        }
+        return didDrawHierarchy ? image : nil
+    }
+
+    private func finishPreparingTransition(
+        snapshotImage: UIImage,
+        webview: WKWebView,
+        sourceController: UIViewController
+    ) {
+        guard !active else {
+            return
         }
 
         sourceSnapshot?.removeFromSuperview()
-        let snapshot = webview.snapshotView(afterScreenUpdates: false)
-            ?? UIView(frame: sourceController.view.bounds)
+        acquireWebViewLease()
+        NotificationCenter.default.post(
+            name: Self.prepareChromeUnderlayNotification,
+            object: sourceController.view
+        )
+        let snapshot = UIImageView(image: snapshotImage)
         snapshot.frame = sourceController.view.bounds
         snapshot.autoresizingMask = [.flexibleWidth, .flexibleHeight]
-        sourceController.view.addSubview(snapshot)
+        snapshot.contentMode = .scaleToFill
+        snapshot.clipsToBounds = true
+        snapshot.isUserInteractionEnabled = false
+        snapshot.isAccessibilityElement = false
+        // Keep the native dock underlay live above the WebView snapshot. The
+        // destination controller covers both until UIKit begins its
+        // interactive pop, at which point the previous page and its dock move
+        // together instead of the dock popping in after navigation commits.
+        sourceController.view.insertSubview(snapshot, at: 0)
         sourceSnapshot = snapshot
 
         let destinationController = UIViewController()
         destinationController.view.backgroundColor = .systemBackground
+        destinationController.hidesBottomBarWhenPushed = true
         destinationController.navigationItem.titleView =
             makeRoomTitleHitTarget()
         attachWebView(to: destinationController, beneathSnapshot: false)
@@ -363,6 +721,15 @@ final class NativeBackPlugin: Plugin, UINavigationControllerDelegate {
     }
 
     private func completeTransition() {
+        cancelSnapshotPreparation()
+        guard
+            active
+                || destinationController != nil
+                || sourceSnapshot != nil
+        else {
+            return
+        }
+
         gestureEnabled = false
 
         if
@@ -389,7 +756,35 @@ final class NativeBackPlugin: Plugin, UINavigationControllerDelegate {
         destinationController = nil
         sourceSnapshot?.removeFromSuperview()
         sourceSnapshot = nil
+        sourceTabBarVisible = false
+        NotificationCenter.default.post(
+            name: Self.clearChromeUnderlayNotification,
+            object: nil
+        )
+        releaseWebViewLease()
         logger.notice("Native navigation transition completed")
+    }
+
+    private func acquireWebViewLease() {
+        guard !webViewLeaseActive, let webview else {
+            return
+        }
+        webViewLeaseActive = true
+        NotificationCenter.default.post(
+            name: Self.willAcquireWebViewNotification,
+            object: webview
+        )
+    }
+
+    private func releaseWebViewLease() {
+        guard webViewLeaseActive, let webview else {
+            return
+        }
+        webViewLeaseActive = false
+        NotificationCenter.default.post(
+            name: Self.didReleaseWebViewNotification,
+            object: webview
+        )
     }
 
     private func attachWebView(
@@ -441,6 +836,10 @@ final class NativeBackPlugin: Plugin, UINavigationControllerDelegate {
         }
 
         if enabled {
+            if #available(iOS 18.0, *), sourceTabBarVisible {
+                navigationController.tabBarController?
+                    .setTabBarHidden(false, animated: false)
+            }
             navigationController.setNavigationBarHidden(
                 false,
                 animated: false
@@ -489,6 +888,8 @@ final class NativeBackPlugin: Plugin, UINavigationControllerDelegate {
 private enum NativeBackError: LocalizedError {
     case navigationHostUnavailable
     case rootViewControllerUnavailable
+    case snapshotCaptureFailed
+    case snapshotPreparationCancelled
     case webViewUnavailable
 
     var errorDescription: String? {
@@ -497,6 +898,10 @@ private enum NativeBackError: LocalizedError {
             return "The native navigation host is unavailable."
         case .rootViewControllerUnavailable:
             return "The Tauri root view controller is unavailable."
+        case .snapshotCaptureFailed:
+            return "The previous WebView surface could not be captured."
+        case .snapshotPreparationCancelled:
+            return "The previous-page snapshot preparation was cancelled."
         case .webViewUnavailable:
             return "The Tauri WKWebView is unavailable."
         }

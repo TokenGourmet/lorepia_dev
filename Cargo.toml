@@ -16,6 +16,7 @@ members = [
   "crates/lorepia-safety",
   "crates/lorepia-storage",
   "crates/tauri-plugin-native-back",
+  "crates/tauri-plugin-native-chrome",
   "crates/lorepia-tool-runtime",
   "tools/lorepia-loadgen",
 ]
