@@ -4,7 +4,10 @@
 
   import "$lib/design/tokens.css";
 
-  import { SAMPLE_CHARACTERS } from "$lib/characters/sample";
+  import {
+    SAMPLE_CHARACTERS,
+    type CharacterSummary,
+  } from "$lib/characters/sample";
   import { librarySearch } from "$lib/characters/library-search.svelte";
   import { matchesQuery } from "$lib/characters/search";
   import { formatMessageTime } from "$lib/design/time-of-day";
@@ -20,12 +23,36 @@
     requestProductBootstrap,
     type ProductBootstrap,
   } from "$lib/product-bootstrap";
+  import { toChatMessage } from "$lib/storage/chat-history";
+  import {
+    storageClient,
+    type ChatCursor,
+    type StoredChat,
+  } from "$lib/storage/client";
 
   let bootstrap = $state<ProductBootstrap | null>(null);
   let errorMessage = $state<string | null>(null);
   let loading = $state(true);
 
-  const characters = SAMPLE_CHARACTERS;
+  type PersistedPreview = Readonly<{
+    lastMessage: string;
+    lastAt: Date;
+  }>;
+
+  type LibraryCharacter = CharacterSummary &
+    Readonly<{
+      chatPreview: PersistedPreview | null;
+    }>;
+
+  let persistedPreviews = $state<
+    Partial<Record<string, PersistedPreview>>
+  >({});
+  const characters = $derived<LibraryCharacter[]>(
+    SAMPLE_CHARACTERS.map((character) => ({
+      ...character,
+      chatPreview: persistedPreviews[character.id] ?? null,
+    })),
+  );
 
   /* Search is local to the library. On phones a trailing toolbar button
      becomes an integrated toolbar field; wide layouts keep their field
@@ -37,7 +64,14 @@
 
   const matches = $derived(
     characters.filter((character) =>
-      matchesQuery(character, librarySearch.query),
+      matchesQuery(
+        {
+          name: character.name,
+          tagline: character.tagline,
+          lastMessage: character.chatPreview?.lastMessage ?? "",
+        },
+        librarySearch.query,
+      ),
     ),
   );
 
@@ -52,11 +86,18 @@
     (narrowLayout ? mobileSearchInput : desktopSearchInput)?.focus();
   }
 
-  async function openChat(event: MouseEvent): Promise<void> {
+  function chatHref(characterId: string): string {
+    return `/chat?character=${encodeURIComponent(characterId)}`;
+  }
+
+  async function openChat(
+    event: MouseEvent,
+    characterId: string,
+  ): Promise<void> {
     event.preventDefault();
     const nativeStatus = await prepareNativeBack();
     try {
-      await goto("/chat", {
+      await goto(chatHref(characterId), {
         state: {
           backHref: `${window.location.pathname}${window.location.search}${window.location.hash}`,
         },
@@ -103,6 +144,65 @@
     }
   }
 
+  async function loadPersistedPreviews(): Promise<void> {
+    const characterIds = new Set(
+      SAMPLE_CHARACTERS.map((character) => character.id),
+    );
+    const latestChats = new Map<string, StoredChat>();
+    let before: ChatCursor | null = null;
+
+    try {
+      for (let pageIndex = 0; pageIndex < 100; pageIndex += 1) {
+        const listed = await storageClient.listChats(100, before);
+        for (const chat of listed.items) {
+          if (
+            characterIds.has(chat.characterId) &&
+            !latestChats.has(chat.characterId)
+          ) {
+            latestChats.set(chat.characterId, chat);
+          }
+        }
+        if (
+          latestChats.size === characterIds.size ||
+          listed.nextCursor === null
+        ) {
+          break;
+        }
+        before = listed.nextCursor;
+      }
+
+      const loaded = await Promise.allSettled(
+        [...latestChats.entries()].map(
+          async ([characterId, chat]): Promise<
+            readonly [string, PersistedPreview] | null
+          > => {
+            const messagePage = await storageClient.loadChatMessages(chat.id, 1);
+            const message = messagePage.items.at(-1);
+            if (message === undefined) return null;
+            return [
+              characterId,
+              {
+                lastMessage: toChatMessage(message).text,
+                lastAt: new Date(message.createdAtMs),
+              },
+            ] as const;
+          },
+        ),
+      );
+
+      const next: Partial<Record<string, PersistedPreview>> = {};
+      for (const result of loaded) {
+        if (result.status === "fulfilled" && result.value !== null) {
+          const [characterId, preview] = result.value;
+          next[characterId] = preview;
+        }
+      }
+      persistedPreviews = next;
+    } catch {
+      // Library samples remain usable if local persistence is unavailable.
+    }
+  }
+
   onMount(() => {
     const narrowQuery = window.matchMedia("(max-width: 699px)");
     const syncLayout = (): void => {
@@ -112,6 +212,7 @@
     syncLayout();
     narrowQuery.addEventListener("change", syncLayout);
     void loadBootstrap();
+    void loadPersistedPreviews();
 
     return () => {
       narrowQuery.removeEventListener("change", syncLayout);
@@ -325,15 +426,23 @@
     <ol class="list" id="library-list">
       {#each matches as character (character.id)}
         <li>
-          <a class="row" href="/chat" onclick={openChat}>
+          <a
+            class="row"
+            href={chatHref(character.id)}
+            onclick={(event) => openChat(event, character.id)}
+          >
             <Avatar initial={character.initial} size={48} />
             <span class="body">
               <span class="line">
                 <span class="name">{character.name}</span>
                 <span class="meta">
-                  <time class="when" datetime={character.lastAt.toISOString()}
-                    >{formatMessageTime(character.lastAt)}</time
-                  >
+                  {#if character.chatPreview}
+                    <time
+                      class="when"
+                      datetime={character.chatPreview.lastAt.toISOString()}
+                      >{formatMessageTime(character.chatPreview.lastAt)}</time
+                    >
+                  {/if}
                   <svg
                     class="chev"
                     viewBox="0 0 24 24"
@@ -350,7 +459,11 @@
                   </svg>
                 </span>
               </span>
-              <span class="preview">{character.lastMessage}</span>
+              {#if character.chatPreview}
+                <span class="preview">{character.chatPreview.lastMessage}</span>
+              {:else}
+                <span class="preview introduction">{character.tagline}</span>
+              {/if}
             </span>
           </a>
         </li>
@@ -396,7 +509,7 @@
   }
 
   .status.error button {
-    min-height: 32px;
+    min-height: var(--size-touch);
     padding: 0 var(--sp-3);
     border: 0.5px solid var(--hairline);
     border-radius: var(--r-pill);
@@ -477,7 +590,7 @@
   .integratedfield input {
     flex: 1;
     min-width: 0;
-    height: 40px;
+    height: var(--size-touch);
     border: 0;
     padding: 0;
     background: transparent;
@@ -532,7 +645,7 @@
     align-items: center;
     gap: var(--sp-2);
     box-sizing: border-box;
-    height: 36px;
+    height: var(--size-touch);
     padding: 0 var(--sp-3);
     border-radius: var(--r-block);
     background: var(--surface-bubble);
@@ -542,6 +655,7 @@
   .search input {
     flex: 1;
     min-width: 0;
+    height: var(--size-touch);
     border: 0;
     padding: 0;
     background: transparent;
@@ -566,28 +680,22 @@
   }
 
   .clear {
+    position: relative;
     display: inline-flex;
     align-items: center;
     justify-content: center;
     flex-shrink: 0;
-    width: 18px;
-    height: 18px;
+    width: var(--size-touch);
+    height: var(--size-touch);
     padding: 0;
     border: 0;
     border-radius: var(--r-pill);
-    background: var(--text-faint);
+    background: transparent;
     color: var(--surface-page);
     cursor: pointer;
   }
 
-  .integratedfield .clear {
-    position: relative;
-    width: 36px;
-    height: 36px;
-    background: transparent;
-  }
-
-  .integratedfield .clear::before {
+  .clear::before {
     content: "";
     position: absolute;
     width: 18px;
@@ -596,7 +704,7 @@
     background: var(--text-faint);
   }
 
-  .integratedfield .clear svg {
+  .clear svg {
     position: relative;
   }
 
@@ -744,6 +852,10 @@
     -webkit-line-clamp: 2;
     line-clamp: 2;
     overflow: hidden;
+  }
+
+  .preview.introduction {
+    color: var(--text-faint);
   }
 
   .empty {

@@ -1,0 +1,233 @@
+[
+  {
+    "role": "StaticText",
+    "name": "LorePia — 서재",
+    "description": ""
+  },
+  {
+    "role": "navigation",
+    "name": "주요 메뉴",
+    "description": ""
+  },
+  {
+    "role": "heading",
+    "name": "서재",
+    "description": ""
+  },
+  {
+    "role": "link",
+    "name": "홈",
+    "description": "",
+    "focused": true
+  },
+  {
+    "role": "link",
+    "name": "서재",
+    "description": ""
+  },
+  {
+    "role": "link",
+    "name": "생성",
+    "description": ""
+  },
+  {
+    "role": "link",
+    "name": "계정",
+    "description": ""
+  },
+  {
+    "role": "button",
+    "name": "캐릭터 검색",
+    "description": ""
+  },
+  {
+    "role": "StaticText",
+    "name": "서재",
+    "description": ""
+  },
+  {
+    "role": "StaticText",
+    "name": "코어 v0.1.0 · 기기 로컬 저장",
+    "description": ""
+  },
+  {
+    "role": "StaticText",
+    "name": "홈",
+    "description": ""
+  },
+  {
+    "role": "StaticText",
+    "name": "서재",
+    "description": ""
+  },
+  {
+    "role": "StaticText",
+    "name": "생성",
+    "description": ""
+  },
+  {
+    "role": "StaticText",
+    "name": "계정",
+    "description": ""
+  },
+  {
+    "role": "link",
+    "name": "세라핀 새벽 12:15 아직 대화가 없습니다.",
+    "description": ""
+  },
+  {
+    "role": "link",
+    "name": "카이 새벽 1:27 아직 대화가 없습니다.",
+    "description": ""
+  },
+  {
+    "role": "link",
+    "name": "미라 저녁 6:32 새로 생긴 골목을 찾았어. 이번에는 같이 걸어볼래?",
+    "description": ""
+  },
+  {
+    "role": "link",
+    "name": "윤슬 아침 9:05 네 편지는 오늘 아침 잔잔한 파도 위에서 발견했어.",
+    "description": ""
+  },
+  {
+    "role": "link",
+    "name": "로엔 낮 3:48 이 정도 흔적은 남겨두는 편이 더 아름다울 것 같아.",
+    "description": ""
+  },
+  {
+    "role": "link",
+    "name": "아델 밤 11:51 서두르지 않아도 돼요. 이 열차는 당신을 기다리니까요.",
+    "description": ""
+  },
+  {
+    "role": "link",
+    "name": "노아 새벽 12:26 다음 곡은 오늘 조금 오래 깨어 있는 너를 위한 거야.",
+    "description": ""
+  },
+  {
+    "role": "link",
+    "name": "이솔 아침 7:14 어젯밤 네가 본 꿈, 별자리 하나와 꼭 닮아 있었어.",
+    "description": ""
+  },
+  {
+    "role": "StaticText",
+    "name": "세라핀",
+    "description": ""
+  },
+  {
+    "role": "StaticText",
+    "name": "아직 대화가 없습니다.",
+    "description": ""
+  },
+  {
+    "role": "StaticText",
+    "name": "카이",
+    "description": ""
+  },
+  {
+    "role": "StaticText",
+    "name": "아직 대화가 없습니다.",
+    "description": ""
+  },
+  {
+    "role": "StaticText",
+    "name": "미라",
+    "description": ""
+  },
+  {
+    "role": "StaticText",
+    "name": "새로 생긴 골목을 찾았어. 이번에는 같이 걸어볼래?",
+    "description": ""
+  },
+  {
+    "role": "StaticText",
+    "name": "윤슬",
+    "description": ""
+  },
+  {
+    "role": "StaticText",
+    "name": "네 편지는 오늘 아침 잔잔한 파도 위에서 발견했어.",
+    "description": ""
+  },
+  {
+    "role": "StaticText",
+    "name": "로엔",
+    "description": ""
+  },
+  {
+    "role": "StaticText",
+    "name": "이 정도 흔적은 남겨두는 편이 더 아름다울 것 같아.",
+    "description": ""
+  },
+  {
+    "role": "StaticText",
+    "name": "아델",
+    "description": ""
+  },
+  {
+    "role": "StaticText",
+    "name": "서두르지 않아도 돼요. 이 열차는 당신을 기다리니까요.",
+    "description": ""
+  },
+  {
+    "role": "StaticText",
+    "name": "노아",
+    "description": ""
+  },
+  {
+    "role": "StaticText",
+    "name": "다음 곡은 오늘 조금 오래 깨어 있는 너를 위한 거야.",
+    "description": ""
+  },
+  {
+    "role": "StaticText",
+    "name": "이솔",
+    "description": ""
+  },
+  {
+    "role": "StaticText",
+    "name": "어젯밤 네가 본 꿈, 별자리 하나와 꼭 닮아 있었어.",
+    "description": ""
+  },
+  {
+    "role": "StaticText",
+    "name": "새벽 12:15",
+    "description": ""
+  },
+  {
+    "role": "StaticText",
+    "name": "새벽 1:27",
+    "description": ""
+  },
+  {
+    "role": "StaticText",
+    "name": "저녁 6:32",
+    "description": ""
+  },
+  {
+    "role": "StaticText",
+    "name": "아침 9:05",
+    "description": ""
+  },
+  {
+    "role": "StaticText",
+    "name": "낮 3:48",
+    "description": ""
+  },
+  {
+    "role": "StaticText",
+    "name": "밤 11:51",
+    "description": ""
+  },
+  {
+    "role": "StaticText",
+    "name": "새벽 12:26",
+    "description": ""
+  },
+  {
+    "role": "StaticText",
+    "name": "아침 7:14",
+    "description": ""
+  }
+]

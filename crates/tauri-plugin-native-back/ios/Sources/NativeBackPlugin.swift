@@ -269,7 +269,7 @@ final class NativeBackPlugin: Plugin, UINavigationControllerDelegate {
         let target = UIControl()
         target.backgroundColor = .clear
         target.isAccessibilityElement = true
-        target.accessibilityLabel = "세라핀"
+        target.accessibilityLabel = "대화 설정 열기"
         target.accessibilityTraits = .button
         target.addTarget(
             self,

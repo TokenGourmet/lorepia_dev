@@ -1,7 +1,11 @@
 import { describe, expect, it, vi } from "vitest";
 
 import type { MessagePage } from "./client";
-import { loadOrCreateFirstChat, toChatMessage } from "./chat-history";
+import {
+  loadOrCreateCharacterChat,
+  loadOrCreateFirstChat,
+  toChatMessage,
+} from "./chat-history";
 
 const chat = {
   id: "a".repeat(32),
@@ -56,6 +60,28 @@ describe("persistent first chat history", () => {
     });
 
     expect(createChat).toHaveBeenCalledWith("seraphine", "세라핀과의 대화");
+  });
+
+  it("finds and creates chats for the selected character", async () => {
+    const kaiChat = {
+      ...chat,
+      id: "d".repeat(32),
+      characterId: "kai",
+      title: "카이와의 대화",
+    };
+    const createChat = vi.fn(async () => kaiChat);
+
+    await loadOrCreateCharacterChat("kai", "카이와의 대화", {
+      createChat,
+      listChats: vi.fn(async () => ({ items: [chat], nextCursor: null })),
+      loadChatMessages: vi.fn(async () => ({
+        items: [],
+        hasMore: false,
+        olderCursor: null,
+      })),
+    });
+
+    expect(createChat).toHaveBeenCalledWith("kai", "카이와의 대화");
   });
 
   it("scans beyond the first 100 chats before deciding to create", async () => {

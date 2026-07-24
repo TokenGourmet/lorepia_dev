@@ -5,22 +5,39 @@
 
   import { SAMPLE_CHARACTERS } from "$lib/characters/sample";
   import Avatar from "$lib/ui/Avatar.svelte";
+  import { activateBackSwipeSurface } from "$lib/ui/back-swipe-surface";
   import LargeTitleHeader from "$lib/ui/LargeTitleHeader.svelte";
   import { edgeSwipeBack } from "$lib/ui/edge-back";
 
   // Placeholder for the site-backed storefront; swaps to live community
   // cards once the sharing service is wired.
   const featured = SAMPLE_CHARACTERS.slice(0, 5);
+
+  function navigateBack(event?: MouseEvent): void {
+    event?.preventDefault();
+    void goto("/home", { replaceState: true });
+  }
 </script>
 
 <svelte:head>
   <title>LorePia — 커뮤니티</title>
 </svelte:head>
 
-<div class="screen" use:edgeSwipeBack={{ onBack: () => goto("/home") }}>
+<div
+  class="screen"
+  use:edgeSwipeBack={{
+    onBack: navigateBack,
+    getUnderlay: () => activateBackSwipeSurface("/home"),
+  }}
+>
   <LargeTitleHeader title="커뮤니티">
     {#snippet leading()}
-      <a class="back" href="/home" aria-label="홈으로 돌아가기">
+      <a
+        class="back"
+        href="/home"
+        aria-label="홈으로 돌아가기"
+        onclick={navigateBack}
+      >
         <svg
           viewBox="0 0 24 24"
           width="20"

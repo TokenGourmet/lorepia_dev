@@ -1,6 +1,6 @@
 [package]
 name = "tauri-plugin-native-back"
-description = "LorePia iOS 26 native interactive back navigation bridge"
+description = "LorePia iOS and Android native interactive back navigation bridge"
 version.workspace = true
 edition.workspace = true
 license.workspace = true

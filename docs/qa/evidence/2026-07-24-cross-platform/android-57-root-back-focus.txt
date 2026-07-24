@@ -1,0 +1,2 @@
+  mCurrentFocus=Window{9869f2b u0 dev.lorepia.client/dev.lorepia.client.MainActivity}
+  mFocusedApp=ActivityRecord{70120634 u0 dev.lorepia.client/.MainActivity t866}

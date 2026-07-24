@@ -1,4 +1,4 @@
-interface BackSwipeSnapshot {
+interface CapturedBackSwipeSurface {
   href: string;
   root: HTMLElement;
 }
@@ -13,7 +13,21 @@ const REFERENCE_ATTRIBUTES = [
 ] as const;
 
 let surfaceHost: HTMLElement | null = null;
-let snapshot: BackSwipeSnapshot | null = null;
+let capturedSurfaces: CapturedBackSwipeSurface[] = [];
+
+function latestCapturedSurface(): CapturedBackSwipeSurface | null {
+  return capturedSurfaces.at(-1) ?? null;
+}
+
+function capturedSurfaceForHref(
+  href: string,
+): CapturedBackSwipeSurface | null {
+  for (let index = capturedSurfaces.length - 1; index >= 0; index -= 1) {
+    const surface = capturedSurfaces[index];
+    if (surface.href === href) return surface;
+  }
+  return null;
+}
 
 function copyRuntimeState(source: HTMLElement, clone: HTMLElement): void {
   const sourceElements = [
@@ -55,10 +69,10 @@ function copyRuntimeState(source: HTMLElement, clone: HTMLElement): void {
   }
 }
 
-function sanitizeSnapshot(root: HTMLElement): void {
+function makeCapturedSurfaceInert(root: HTMLElement): void {
   root.inert = true;
   root.setAttribute("aria-hidden", "true");
-  root.setAttribute("data-back-swipe-snapshot", "");
+  root.setAttribute("data-back-swipe-captured-surface", "");
 
   for (const element of [root, ...root.querySelectorAll<HTMLElement>("*")]) {
     element.removeAttribute("id");
@@ -76,8 +90,13 @@ export function captureBackSwipeSurface(
 ): void {
   const clone = source.cloneNode(true) as HTMLElement;
   copyRuntimeState(source, clone);
-  sanitizeSnapshot(clone);
-  snapshot = { href, root: clone };
+  makeCapturedSurfaceInert(clone);
+  // This is a non-raster, inert DOM clone with captured form and scroll state.
+  // It is a visual surface only, not the still-running previous route.
+  capturedSurfaces = [
+    ...capturedSurfaces.filter((surface) => surface.href !== href),
+    { href, root: clone },
+  ];
   surfaceHost?.replaceChildren();
   surfaceHost?.removeAttribute("data-ready");
 }
@@ -85,24 +104,45 @@ export function captureBackSwipeSurface(
 export function activateBackSwipeSurface(
   expectedHref: string | null,
 ): HTMLElement | null {
+  const capturedSurface =
+    expectedHref === null
+      ? null
+      : capturedSurfaceForHref(expectedHref);
   if (
     expectedHref === null ||
     surfaceHost === null ||
-    snapshot === null ||
-    snapshot.href !== expectedHref
+    capturedSurface === null
   ) {
     return null;
   }
 
-  if (surfaceHost.firstElementChild !== snapshot.root) {
-    surfaceHost.replaceChildren(snapshot.root);
+  if (surfaceHost.firstElementChild !== capturedSurface.root) {
+    surfaceHost.replaceChildren(capturedSurface.root);
   }
   surfaceHost.setAttribute("data-ready", "true");
   return surfaceHost;
 }
 
+export function activateLatestBackSwipeSurface(): HTMLElement | null {
+  const capturedSurface = latestCapturedSurface();
+  if (surfaceHost === null || capturedSurface === null) return null;
+  if (surfaceHost.firstElementChild !== capturedSurface.root) {
+    surfaceHost.replaceChildren(capturedSurface.root);
+  }
+  surfaceHost.setAttribute("data-ready", "true");
+  return surfaceHost;
+}
+
+export function completeBackSwipeSurface(href: string): void {
+  const capturedSurface = latestCapturedSurface();
+  if (capturedSurface?.href !== href) return;
+  capturedSurfaces = capturedSurfaces.slice(0, -1);
+  surfaceHost?.replaceChildren();
+  surfaceHost?.removeAttribute("data-ready");
+}
+
 export function clearBackSwipeSurface(): void {
-  snapshot = null;
+  capturedSurfaces = [];
   surfaceHost?.replaceChildren();
   surfaceHost?.removeAttribute("data-ready");
 }

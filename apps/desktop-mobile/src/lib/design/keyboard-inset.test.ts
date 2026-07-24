@@ -1,6 +1,9 @@
 import { describe, expect, it } from "vitest";
 
-import { computeKeyboardInset } from "./keyboard-inset.svelte";
+import {
+  computeKeyboardInset,
+  shouldMeasureWebKeyboardInset,
+} from "./keyboard-inset.svelte";
 
 describe("computeKeyboardInset", () => {
   it("measures the keyboard as the missing visual viewport height", () => {
@@ -21,5 +24,11 @@ describe("computeKeyboardInset", () => {
 
   it("rounds fractional viewport heights to whole pixels", () => {
     expect(computeKeyboardInset(844, 507.6, 0)).toBe(336);
+  });
+
+  it("does not duplicate an IME inset owned by the Android WebView host", () => {
+    expect(shouldMeasureWebKeyboardInset("android-view-padding")).toBe(false);
+    expect(shouldMeasureWebKeyboardInset(undefined)).toBe(true);
+    expect(shouldMeasureWebKeyboardInset("ios-safe-area")).toBe(true);
   });
 });

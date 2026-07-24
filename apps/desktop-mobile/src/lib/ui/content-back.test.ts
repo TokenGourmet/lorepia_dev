@@ -3,8 +3,12 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import {
   classifyContentBackIntent,
   contentBackReleaseVelocity,
+  contentBackVisualState,
+  contentBackWheelDelta,
   contentSwipeBack,
   needsExplicitContentBackCapture,
+  renderedContentBackDistance,
+  shouldApplyNativeBackProgress,
   shouldCommitContentBack,
 } from "./content-back";
 
@@ -59,6 +63,57 @@ describe("iOS 26 content backswipe", () => {
     ).toBe(0);
   });
 
+  it("reads the rendered displacement in pixels when a settle is interrupted", () => {
+    expect(renderedContentBackDistance(180, 0, 1, 12)).toBe(180);
+    expect(renderedContentBackDistance(-180, 0, -1, 12)).toBe(180);
+    expect(
+      renderedContentBackDistance(Number.NaN, 0, 1, 12),
+    ).toBe(12);
+  });
+
+  it("maps every input source onto one curved foreground and captured underlay contract", () => {
+    expect(contentBackVisualState(0)).toEqual({
+      progress: 0,
+      foregroundXPercent: 0,
+      cornerRadius: 0,
+      underlayXPercent: -7,
+      underlayScale: 0.965,
+      shade: 0.14,
+    });
+    const midpoint = contentBackVisualState(0.5);
+    expect(midpoint).toMatchObject({
+      progress: 0.5,
+      foregroundXPercent: 50,
+      cornerRadius: 26,
+      underlayXPercent: -3.5,
+      shade: 0.07,
+    });
+    expect(midpoint.underlayScale).toBeCloseTo(0.9825);
+    expect(contentBackVisualState(2)).toEqual({
+      progress: 1,
+      foregroundXPercent: 100,
+      cornerRadius: 26,
+      underlayXPercent: 0,
+      underlayScale: 1,
+      shade: 0,
+    });
+    const mirrored = contentBackVisualState(0.5, -1);
+    expect(mirrored).toMatchObject({
+      progress: 0.5,
+      foregroundXPercent: -50,
+      cornerRadius: 26,
+      underlayXPercent: 3.5,
+      shade: 0.07,
+    });
+    expect(mirrored.underlayScale).toBeCloseTo(0.9825);
+    expect(contentBackWheelDelta(-18)).toBe(18);
+    expect(contentBackWheelDelta(12)).toBe(-12);
+    expect(shouldApplyNativeBackProgress("start")).toBe(true);
+    expect(shouldApplyNativeBackProgress("progress")).toBe(true);
+    expect(shouldApplyNativeBackProgress("cancel")).toBe(false);
+    expect(shouldApplyNativeBackProgress("commit")).toBe(false);
+  });
+
   it("fully detaches the web fallback while native back is active", () => {
     const listeners = new Map<string, Set<EventListener>>();
     const node = {
@@ -83,7 +138,7 @@ describe("iOS 26 content backswipe", () => {
     expect(node.style.touchAction).toBe("pan-y");
     expect(
       [...listeners.values()].reduce((total, set) => total + set.size, 0),
-    ).toBe(9);
+    ).toBe(10);
 
     action.update({
       enabled: false,
@@ -110,16 +165,22 @@ describe("iOS 26 content backswipe", () => {
     class FakeElement {
       clientWidth = 360;
       parentElement = null;
+      private attributes = new Map<string, string>();
+      private properties = new Map<string, string>();
       style = {
         touchAction: "auto",
         translate: "",
         transition: "",
         willChange: "",
-        boxShadow: "",
         userSelect: "text",
-        getPropertyValue: () => "",
-        setProperty: () => undefined,
-        removeProperty: () => undefined,
+        getPropertyValue: (name: string) =>
+          this.properties.get(name) ?? "",
+        setProperty: (name: string, value: string) => {
+          this.properties.set(name, value);
+        },
+        removeProperty: (name: string) => {
+          this.properties.delete(name);
+        },
       };
 
       addEventListener(type: string, listener: EventListener): void {
@@ -140,12 +201,28 @@ describe("iOS 26 content backswipe", () => {
         return false;
       }
 
-      getBoundingClientRect(): Pick<DOMRect, "width"> {
-        return { width: 360 };
+      getBoundingClientRect(): Pick<DOMRect, "width" | "left"> {
+        return { width: 360, left: 0 };
       }
 
       hasPointerCapture(): boolean {
         return false;
+      }
+
+      getAttribute(name: string): string | null {
+        return this.attributes.get(name) ?? null;
+      }
+
+      setAttribute(name: string, value: string): void {
+        this.attributes.set(name, value);
+      }
+
+      removeAttribute(name: string): void {
+        this.attributes.delete(name);
+      }
+
+      property(name: string): string {
+        return this.properties.get(name) ?? "";
       }
     }
 
@@ -165,8 +242,12 @@ describe("iOS 26 content backswipe", () => {
     );
 
     const node = new FakeElement() as unknown as HTMLElement;
+    const underlay = new FakeElement() as unknown as HTMLElement;
     const onBack = vi.fn();
-    const action = contentSwipeBack(node, { onBack });
+    const action = contentSwipeBack(node, {
+      onBack,
+      getUnderlay: () => underlay,
+    });
     const touch = (identifier: number, clientX: number, clientY = 20) => ({
       identifier,
       clientX,
@@ -197,6 +278,22 @@ describe("iOS 26 content backswipe", () => {
       timeStamp: 50,
       preventDefault: vi.fn(),
     });
+    vi.advanceTimersByTime(0);
+    expect(
+      (node as unknown as FakeElement).property(
+        "--back-transition-x",
+      ),
+    ).toBe(`${(160 / 360) * 100}%`);
+    expect(
+      (node as unknown as FakeElement).getAttribute(
+        "data-back-transition-state",
+      ),
+    ).toBe("interactive");
+    expect(
+      (underlay as unknown as FakeElement).property(
+        "--back-transition-underlay-scale",
+      ),
+    ).toBe(`${0.965 + (160 / 360) * 0.035}`);
     dispatch("touchstart", {
       target: node,
       touches: touchList(touch(1, 170), touch(2, 180)),
@@ -207,6 +304,11 @@ describe("iOS 26 content backswipe", () => {
     expect(onBack).not.toHaveBeenCalled();
     expect(node.style.translate).toBe("");
     expect(node.style.userSelect).toBe("text");
+    expect(
+      (underlay as unknown as FakeElement).property(
+        "--back-transition-underlay-scale",
+      ),
+    ).toBe("");
 
     action.destroy();
   });

@@ -9,6 +9,12 @@ export function computeKeyboardInset(
   return inset > 0 ? inset : 0;
 }
 
+export function shouldMeasureWebKeyboardInset(
+  nativeInsetOwner: string | undefined,
+): boolean {
+  return nativeInsetOwner !== "android-view-padding";
+}
+
 let inset = $state(0);
 
 export const keyboardInset = {
@@ -18,6 +24,19 @@ export const keyboardInset = {
   start(): (() => void) | undefined {
     if (typeof window === "undefined") {
       return undefined;
+    }
+    const nativeInsetOwner =
+      typeof document === "undefined"
+        ? undefined
+        : document.documentElement.dataset.nativeInsetOwner;
+    if (!shouldMeasureWebKeyboardInset(nativeInsetOwner)) {
+      // The Android host applies system-bar and IME padding to the WebView.
+      // A visualViewport spacer here would apply the same IME twice on
+      // WebView versions that also report the reduced viewport.
+      inset = 0;
+      return () => {
+        inset = 0;
+      };
     }
     const viewport = window.visualViewport;
     if (!viewport) {

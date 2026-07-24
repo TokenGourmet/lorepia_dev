@@ -20,6 +20,7 @@
     activeProviderProfile,
   } from "$lib/providers/active-profile.svelte";
   import { appPreferences } from "$lib/storage/app-preferences.svelte";
+  import DeviceSupportPane from "./DeviceSupportPane.svelte";
 
   const themeOptions: { value: ThemePreference; label: string }[] = [
     { value: "system", label: "시스템" },
@@ -57,10 +58,22 @@
   let credentialBusy = $state(false);
   let credentialError = $state<string | null>(null);
   let keyDraft = $state("");
+  let preferenceRetryBusy = $state(false);
 
   function selectProvider(providerId: LlmProviderId): void {
+    if (getLlmProvider(providerId).status === "configuration-only") return;
     activeProviderProfile.select(providerId);
     appPreferences.setProvider(providerId);
+  }
+
+  async function retryPreferences(): Promise<void> {
+    if (preferenceRetryBusy) return;
+    preferenceRetryBusy = true;
+    try {
+      await appPreferences.retry();
+    } finally {
+      preferenceRetryBusy = false;
+    }
   }
 
   function updateModelId(value: string): void {
@@ -159,7 +172,45 @@
       credentialBusy = false;
     }
   }
+
+  async function retryCredentialStatus(): Promise<void> {
+    if (credentialBusy || !isApiKeyProvider) return;
+    credentialBusy = true;
+    credentialError = null;
+    try {
+      await refreshCredentialStatus(selectedProviderId);
+    } finally {
+      credentialBusy = false;
+    }
+  }
 </script>
+
+{#if appPreferences.unavailable || preferenceRetryBusy}
+  <div
+    class="persistence-alert"
+    role={appPreferences.unavailable ? "alert" : "status"}
+    aria-live="polite"
+  >
+    <span>
+      <strong
+        >{preferenceRetryBusy
+          ? "설정 저장소를 다시 확인하고 있습니다"
+          : "설정을 기기에 저장하지 못했습니다"}</strong
+      >
+      <small
+        >{preferenceRetryBusy
+          ? "이 화면의 변경사항은 그대로 유지됩니다."
+          : "현재 화면의 변경사항은 유지됩니다. 저장소 연결을 다시 시도하세요."}</small
+      >
+    </span>
+    <button
+      class="retry-button lp-state-layer"
+      type="button"
+      onclick={retryPreferences}
+      disabled={preferenceRetryBusy}>다시 시도</button
+    >
+  </div>
+{/if}
 
 <!-- The account card leads the sheet, App Store style. Signed out it pitches
      the site link-up; once accounts exist it becomes avatar + name + status
@@ -183,10 +234,10 @@
       </svg>
     </span>
     <div class="account-txt">
-      <strong>로그인하고 카드를 공유하세요</strong>
-      <small>사이트 연동 후 캐릭터 카드를 올리고 받을 수 있습니다</small>
+      <strong>계정 연동은 준비 중입니다</strong>
+      <small>연동 후 캐릭터 카드를 올리고 받을 수 있습니다</small>
     </div>
-    <button class="account-cta" type="button" disabled>로그인</button>
+    <span class="account-cta" aria-label="계정 연동 지원 예정">지원 예정</span>
   </div>
 </section>
 
@@ -270,7 +321,9 @@
   <div class="connection-heading">
     <span class="label">LLM 제공자</span>
     <span class="status" class:configured={selectedProfileReady}
-      >{selectedProfileReady
+      >{selectedProvider.status === "configuration-only"
+        ? "지원 예정"
+        : selectedProfileReady
         ? "사용 준비됨"
         : credentialConfigured === true
           ? "모델 선택 필요"
@@ -282,13 +335,18 @@
     <legend>LLM 제공자 선택</legend>
     <div class="provider-grid">
       {#each LLM_PROVIDER_CATALOG as provider (provider.id)}
-        <label class:selected={selectedProviderId === provider.id}>
+        <label
+          class:selected={selectedProviderId === provider.id}
+          class:unavailable={provider.status === "configuration-only"}
+          aria-disabled={provider.status === "configuration-only"}
+        >
           <input
             type="radio"
             name="llm-provider"
             value={provider.id}
             checked={selectedProviderId === provider.id}
-            disabled={credentialBusy}
+            disabled={credentialBusy ||
+              provider.status === "configuration-only"}
             onchange={() => selectProvider(provider.id)}
           />
           <span>{provider.label}</span>
@@ -297,7 +355,7 @@
           {:else if provider.id === "google-gemini"}
             <small aria-hidden="true">Developer API</small>
           {:else if provider.id === "google-vertex-ai"}
-            <small aria-hidden="true">Google Cloud</small>
+            <small>지원 예정 · Google Cloud</small>
           {/if}
         </label>
       {/each}
@@ -309,9 +367,20 @@
       <div>
         <strong>{selectedProvider.label}</strong>
         <p>{selectedProvider.description}</p>
+        <div
+          class="provider-doc"
+          aria-label={`${selectedProvider.label} 공식 문서 주소`}
+        >
+          <span>공식 문서 주소</span>
+          <code>{selectedProvider.documentationUrl}</code>
+        </div>
       </div>
       <span class="candidate"
-        >{selectedProfileReady ? "첫 대화 연결" : "구성 중"}</span
+        >{selectedProvider.status === "configuration-only"
+          ? "지원 예정"
+          : selectedProfileReady
+            ? "첫 대화 연결"
+            : "구성 중"}</span
       >
     </div>
 
@@ -326,90 +395,105 @@
       </div>
       <div>
         <dt>모델</dt>
-        <dd>{modelId.trim() || "공식 모델 ID를 직접 입력"}</dd>
+        <dd>
+          {selectedProvider.status === "configuration-only"
+            ? "아직 구성할 수 없음"
+            : modelId.trim() || "공식 모델 ID를 직접 입력"}
+        </dd>
       </div>
     </dl>
 
-    <div class="required-settings">
-      <h3>필요한 설정</h3>
-      {#each selectedProvider.setupFields as field (field.id)}
-        {#if field.id === "modelId" && isApiKeyProvider}
-          <label class="setting-input" for="provider-model-id">
-            <span>{field.label}</span>
-            <input
-              id="provider-model-id"
-              type="text"
-              value={modelId}
-              placeholder="제공자의 공식 모델 ID"
-              autocomplete="off"
-              spellcheck="false"
-              maxlength={MAX_MODEL_ID_BYTES}
-              aria-invalid={modelId.length > 0 && modelError !== null}
-              oninput={(event) => updateModelId(event.currentTarget.value)}
-            />
-            <small class:error={modelId.length > 0 && modelError !== null}
-              >{modelId.length > 0 && modelError !== null
-                ? modelError
-                : "키는 포함하지 말고 모델 식별자만 입력하세요."}</small
-            >
-          </label>
-        {:else}
-          <div class="field-preview">
-            <span>{field.label}</span>
-            <small>{field.placeholder}</small>
-          </div>
-        {/if}
-      {/each}
-    </div>
-
-    {#if isApiKeyProvider}
-      <div class="key-entry">
-        <label class="key-label" for="provider-key"
-          >{selectedProvider.authLabel}</label
-        >
-        <div class="key-line">
-          <input
-            id="provider-key"
-            type="password"
-            placeholder="입력 후 저장하면 기기 보안 저장소로만 이동"
-            autocomplete="off"
-            bind:value={keyDraft}
-            disabled={credentialBusy}
-          />
-          <button
-            class="save"
-            type="button"
-            onclick={saveKey}
-            disabled={credentialBusy || keyDraft.trim().length === 0}
-            >저장</button
-          >
-        </div>
-        <div class="key-status">
-          {#if credentialConfigured === true}
-            <span class="chip ok">저장됨 · 값은 다시 표시되지 않음</span>
-            <button
-              class="remove lp-state-layer"
-              type="button"
-              onclick={removeKey}
-              disabled={credentialBusy}>키 삭제</button
-            >
-          {:else if credentialConfigured === false}
-            <span class="chip">저장된 키 없음</span>
-          {:else if credentialConfigured === "error"}
-            <span class="chip">상태 확인 실패</span>
-          {:else}
-            <span class="chip">상태 확인 중</span>
-          {/if}
-        </div>
-        {#if credentialError}
-          <p class="key-error" role="alert">{credentialError}</p>
-        {/if}
+    {#if selectedProvider.status === "configuration-only"}
+      <div class="provider-unavailable" role="status">
+        <strong>현재 버전에서는 연결할 수 없습니다</strong>
+        <p>
+          Google Cloud OAuth와 프로젝트·리전 저장 흐름이 제품에 연결된 뒤
+          활성화됩니다. 지금은 설정값을 받거나 저장하지 않습니다.
+        </p>
       </div>
     {:else}
-      <div class="field-preview protected">
-        <span>{selectedProvider.authLabel}</span>
-        <small>Google OAuth 흐름이 구현되기 전까지 연결할 수 없습니다</small>
+      <div class="required-settings">
+        <h3>필요한 설정</h3>
+        {#each selectedProvider.setupFields as field (field.id)}
+          {#if field.id === "modelId" && isApiKeyProvider}
+            <label class="setting-input" for="provider-model-id">
+              <span>{field.label}</span>
+              <input
+                id="provider-model-id"
+                type="text"
+                value={modelId}
+                placeholder="공식 문서의 모델 ID를 직접 입력"
+                autocomplete="off"
+                spellcheck="false"
+                maxlength={MAX_MODEL_ID_BYTES}
+                aria-invalid={modelId.length > 0 && modelError !== null}
+                oninput={(event) => updateModelId(event.currentTarget.value)}
+              />
+              <small class:error={modelId.length > 0 && modelError !== null}
+                >{modelId.length > 0 && modelError !== null
+                  ? modelError
+                  : "키는 포함하지 말고 모델 식별자만 입력하세요."}</small
+              >
+            </label>
+          {:else}
+            <div class="field-preview">
+              <span>{field.label}</span>
+              <small>{field.placeholder}</small>
+            </div>
+          {/if}
+        {/each}
       </div>
+
+      {#if isApiKeyProvider}
+        <div class="key-entry">
+          <label class="key-label" for="provider-key"
+            >{selectedProvider.authLabel}</label
+          >
+          <div class="key-line">
+            <input
+              id="provider-key"
+              type="password"
+              placeholder="입력 후 저장하면 기기 보안 저장소로만 이동"
+              autocomplete="off"
+              bind:value={keyDraft}
+              disabled={credentialBusy}
+            />
+            <button
+              class="save"
+              type="button"
+              onclick={saveKey}
+              disabled={credentialBusy || keyDraft.trim().length === 0}
+              >저장</button
+            >
+          </div>
+          <div class="key-status">
+            {#if credentialConfigured === true}
+              <span class="chip ok">저장됨 · 값은 다시 표시되지 않음</span>
+              <button
+                class="remove lp-state-layer"
+                type="button"
+                onclick={removeKey}
+                disabled={credentialBusy}>키 삭제</button
+              >
+            {:else if credentialConfigured === false}
+              <span class="chip">저장된 키 없음</span>
+            {:else if credentialConfigured === "error"}
+              <span class="chip">상태 확인 실패</span>
+              <button
+                class="retry-button compact lp-state-layer"
+                type="button"
+                onclick={retryCredentialStatus}
+                disabled={credentialBusy}>다시 시도</button
+              >
+            {:else}
+              <span class="chip">상태 확인 중</span>
+            {/if}
+          </div>
+          {#if credentialError}
+            <p class="key-error" role="alert">{credentialError}</p>
+          {/if}
+        </div>
+      {/if}
     {/if}
   </div>
 
@@ -422,14 +506,7 @@
 
 <section>
   <h2>데이터</h2>
-  <p class="note">
-    모든 대화와 캐릭터는 기기에만 저장됩니다. 외부로 나가는 요청은 사용자가
-    선택한 LLM 호출뿐입니다.
-  </p>
-  <p class="note">
-    가져온 카드의 스크립트는 보존만 되며, 검증된 실행 경계가 준비되기 전까지
-    실행되지 않습니다.
-  </p>
+  <DeviceSupportPane />
 </section>
 
 <section>
@@ -486,6 +563,56 @@
 </section>
 
 <style>
+  .persistence-alert {
+    margin: var(--sp-2) var(--sp-4) 0;
+    padding: var(--sp-3) var(--sp-4);
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: var(--sp-3);
+    border: 0.5px solid var(--danger);
+    border-radius: var(--r-block);
+    background: var(--danger-soft);
+    color: var(--text-strong);
+  }
+
+  .persistence-alert > span {
+    min-width: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+  }
+
+  .persistence-alert strong {
+    font-size: var(--fs-ui);
+    font-weight: 600;
+  }
+
+  .persistence-alert small {
+    color: var(--text-mid);
+    font-size: var(--fs-caption);
+    line-height: 1.4;
+  }
+
+  .retry-button {
+    min-height: var(--size-touch);
+    flex-shrink: 0;
+    padding: 0 var(--sp-3);
+    border: 0.5px solid var(--hairline);
+    border-radius: var(--r-pill);
+    background: var(--surface-card);
+    color: var(--text-strong);
+    font-family: var(--font-ui);
+    font-size: var(--fs-label);
+    font-weight: 600;
+    cursor: pointer;
+  }
+
+  .retry-button:disabled {
+    opacity: 0.45;
+    cursor: default;
+  }
+
   section {
     padding: 0 var(--sp-4);
     margin-top: var(--sp-4);
@@ -551,19 +678,15 @@
     flex-shrink: 0;
     min-height: 32px;
     padding: 0 var(--sp-3);
+    display: inline-flex;
+    align-items: center;
     border: 0;
     border-radius: var(--r-pill);
-    background: var(--tint);
-    color: #fff;
+    background: var(--surface-field);
+    color: var(--text-mid);
     font-family: var(--font-ui);
     font-size: var(--fs-label);
     font-weight: 600;
-    cursor: pointer;
-  }
-
-  .account-cta:disabled {
-    opacity: 0.35;
-    cursor: default;
   }
 
   h2 {
@@ -723,6 +846,17 @@
     color: var(--tint);
   }
 
+  .provider-grid label.unavailable {
+    cursor: default;
+    opacity: 0.58;
+  }
+
+  .provider-grid label.unavailable.selected {
+    border-color: var(--warning);
+    box-shadow: inset 0 0 0 1px var(--warning);
+    background: var(--warning-soft);
+  }
+
   .provider-detail {
     margin-top: var(--sp-3);
     padding: var(--sp-4);
@@ -749,6 +883,28 @@
     color: var(--text-mid);
     font-size: var(--fs-label);
     line-height: 1.5;
+  }
+
+  .provider-doc {
+    margin-top: var(--sp-2);
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    font-size: var(--fs-label);
+  }
+
+  .provider-doc span {
+    color: var(--text-mid);
+  }
+
+  .provider-doc code {
+    color: var(--tint);
+    font-family: var(--font-ui);
+    font-size: var(--fs-caption);
+    line-height: 1.5;
+    overflow-wrap: anywhere;
+    -webkit-user-select: text;
+    user-select: text;
   }
 
   dl {
@@ -782,6 +938,27 @@
 
   .required-settings {
     margin-top: var(--sp-3);
+  }
+
+  .provider-unavailable {
+    margin-top: var(--sp-3);
+    padding: var(--sp-3);
+    border: 0.5px solid var(--warning);
+    border-radius: var(--r-block);
+    background: var(--warning-soft);
+  }
+
+  .provider-unavailable strong {
+    color: var(--text-strong);
+    font-size: var(--fs-ui);
+    font-weight: 600;
+  }
+
+  .provider-unavailable p {
+    margin: var(--sp-1) 0 0;
+    color: var(--text-mid);
+    font-size: var(--fs-label);
+    line-height: 1.5;
   }
 
   .required-settings h3 {
@@ -820,7 +997,7 @@
   }
 
   .setting-input input {
-    min-height: 36px;
+    min-height: var(--size-touch);
     margin: var(--sp-1) 0;
     box-sizing: border-box;
     padding: 0 var(--sp-2);
@@ -839,10 +1016,6 @@
 
   .setting-input small.error {
     color: var(--danger, #a33);
-  }
-
-  .field-preview.protected {
-    border-style: dashed;
   }
 
   .key-entry {
@@ -940,7 +1113,7 @@
   }
 
   .remove {
-    min-height: 32px;
+    min-height: var(--size-touch);
     padding: 0 var(--sp-2);
     border: none;
     background: transparent;
@@ -984,7 +1157,7 @@
   }
 
   .segment button {
-    min-height: 30px;
+    min-height: var(--size-touch);
     padding: 0 var(--sp-3);
     border: none;
     border-radius: 8px;

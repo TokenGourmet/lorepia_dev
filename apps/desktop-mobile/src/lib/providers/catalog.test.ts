@@ -62,9 +62,12 @@ describe("LLM provider catalog", () => {
           : "first-chat-ready",
       );
       expect(provider.setupFields[0]?.id).toBe("modelId");
-      expect(provider.setupFields[0]?.placeholder).toContain("연결 후");
+      expect(provider.setupFields[0]?.placeholder).toContain("직접 입력");
       expect(JSON.stringify(provider)).not.toMatch(/defaultModel|customEndpoint/i);
     }
+    expect(getLlmProvider("deepseek").description).not.toMatch(
+      /목록.*조회|조회.*목록/,
+    );
   });
 
   it("creates a non-secret draft only", () => {

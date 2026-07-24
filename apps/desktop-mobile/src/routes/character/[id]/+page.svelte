@@ -6,6 +6,7 @@
 
   import { findSampleCharacter } from "$lib/characters/sample";
   import Avatar from "$lib/ui/Avatar.svelte";
+  import { activateBackSwipeSurface } from "$lib/ui/back-swipe-surface";
   import { edgeSwipeBack } from "$lib/ui/edge-back";
   import {
     completeNativeBack,
@@ -13,12 +14,17 @@
   } from "$lib/ui/native-back";
 
   const character = $derived(findSampleCharacter(page.params.id ?? ""));
+  const chatHref = $derived(
+    character
+      ? `/chat?character=${encodeURIComponent(character.id)}`
+      : "/chat",
+  );
 
   async function openChat(event: MouseEvent): Promise<void> {
     event.preventDefault();
     const nativeStatus = await prepareNativeBack();
     try {
-      await goto("/chat", {
+      await goto(chatHref, {
         state: {
           backHref: `${window.location.pathname}${window.location.search}${window.location.hash}`,
         },
@@ -29,15 +35,31 @@
       }
     }
   }
+
+  function navigateBack(event?: MouseEvent): void {
+    event?.preventDefault();
+    void goto("/", { replaceState: true });
+  }
 </script>
 
 <svelte:head>
   <title>LorePia — {character ? character.name : "캐릭터"}</title>
 </svelte:head>
 
-<div class="screen" use:edgeSwipeBack={{ onBack: () => goto("/") }}>
+<div
+  class="screen"
+  use:edgeSwipeBack={{
+    onBack: navigateBack,
+    getUnderlay: () => activateBackSwipeSurface("/"),
+  }}
+>
   <header class="top">
-    <a class="back" href="/" aria-label="서재로 돌아가기">
+    <a
+      class="back"
+      href="/"
+      aria-label="서재로 돌아가기"
+      onclick={navigateBack}
+    >
       <svg
         viewBox="0 0 24 24"
         width="20"
@@ -83,7 +105,7 @@
     </dl>
 
     <div class="actions">
-      <a class="start" href="/chat" onclick={openChat}>대화 시작</a>
+      <a class="start" href={chatHref} onclick={openChat}>대화 시작</a>
     </div>
   {:else}
     <section class="missing">

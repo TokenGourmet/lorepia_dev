@@ -1,0 +1,2 @@
+949:      mInputShown=false
+1386:  mIsInputViewShown=true mStatusIcon=0

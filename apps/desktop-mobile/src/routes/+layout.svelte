@@ -1,5 +1,9 @@
 <script lang="ts">
-  import { afterNavigate, beforeNavigate } from "$app/navigation";
+  import {
+    afterNavigate,
+    beforeNavigate,
+    goto,
+  } from "$app/navigation";
   import { onMount, type Component } from "svelte";
   import { getCurrentWindow } from "@tauri-apps/api/window";
   import { page } from "$app/state";
@@ -18,11 +22,17 @@
     backSwipeSurfaceHost,
     captureBackSwipeSurface,
     clearBackSwipeSurface,
+    completeBackSwipeSurface,
   } from "$lib/ui/back-swipe-surface";
   import {
     completeNativeBack,
+    connectNativeBackCommit,
     setNativeBackEnabled,
   } from "$lib/ui/native-back";
+  import {
+    isAndroidNativeBackRoute,
+    planAndroidNativeBack,
+  } from "$lib/ui/native-back-routing";
 
   let { children } = $props();
   let DevSizeTool = $state<Component | null>(null);
@@ -57,14 +67,25 @@
   };
 
   const pathname = $derived(page.url.pathname);
-  const isDetailScreen = $derived(
-    pathname.startsWith("/chat") ||
-      pathname.startsWith("/character") ||
-      pathname.startsWith("/import") ||
-      pathname.startsWith("/community"),
-  );
+  function isDetailPath(path: string): boolean {
+    return (
+      path.startsWith("/chat") ||
+      path.startsWith("/character") ||
+      path.startsWith("/import") ||
+      path.startsWith("/community")
+    );
+  }
+
+  const isDetailScreen = $derived(isDetailPath(pathname));
   function isActive(href: string): boolean {
     return href === "/" ? pathname === "/" : pathname.startsWith(href);
+  }
+
+  function suppressNativeAppLinkPreview(event: Event): void {
+    const platform = document.documentElement.dataset.nativePlatform;
+    if (platform === "ios" || platform === "android") {
+      event.preventDefault();
+    }
   }
 
   const activeIndex = $derived(
@@ -75,27 +96,86 @@
     return `${url.pathname}${url.search}${url.hash}`;
   }
 
-  /* Preserve the exact rendered source surface just before SvelteKit
-     unmounts it. The clone is visual-only and inert; browser history remains
-     the authority for where the interactive pop actually navigates. */
+  function detailStackDepth(path: string): number {
+    if (path.startsWith("/chat/report")) return 4;
+    if (path.startsWith("/chat/info")) return 3;
+    if (path === "/chat") return 2;
+    if (
+      path.startsWith("/character/") ||
+      path === "/import" ||
+      path === "/community"
+    ) {
+      return 1;
+    }
+    return 0;
+  }
+
+  function nativePlatform(): string | undefined {
+    return document.documentElement.dataset.nativePlatform;
+  }
+
+  function handleAndroidNativeBack(): void {
+    const openDialog =
+      document.querySelector<HTMLDialogElement>("dialog[open]");
+    if (openDialog !== null) {
+      const cancel = new Event("cancel", { cancelable: true });
+      if (openDialog.dispatchEvent(cancel) && openDialog.open) {
+        openDialog.close("cancel");
+      }
+      return;
+    }
+
+    const plan = planAndroidNativeBack(
+      page.url,
+      page.state,
+      window.history.length,
+    );
+    if (plan === null) {
+      void setNativeBackEnabled(false);
+      return;
+    }
+    if (plan.kind === "history") {
+      window.history.back();
+      return;
+    }
+    void goto(plan.href, { replaceState: true });
+  }
+
+  /* Capture a non-raster DOM visual surface just before SvelteKit unmounts the
+     route. The clone is inert and does not pretend the old route is still
+     running; browser history remains the authority for actual navigation. */
   beforeNavigate(({ from, to }) => {
     if (
       shellElement !== null &&
       from !== null &&
       to !== null &&
-      to.url.pathname === "/chat" &&
-      !from.url.pathname.startsWith("/chat")
+      isDetailPath(to.url.pathname) &&
+      detailStackDepth(to.url.pathname) >
+        detailStackDepth(from.url.pathname)
     ) {
       captureBackSwipeSurface(shellElement, localHref(from.url));
     }
   });
 
   afterNavigate(({ to }) => {
-    if (to !== null && !to.url.pathname.startsWith("/chat")) {
+    if (to === null) return;
+
+    completeBackSwipeSurface(localHref(to.url));
+    if (!isDetailPath(to.url.pathname)) {
       clearBackSwipeSurface();
-      void completeNativeBack();
-    } else if (to !== null && to.url.pathname !== "/chat") {
-      void setNativeBackEnabled(false);
+    }
+
+    const platform = nativePlatform();
+    if (platform === "android") {
+      void setNativeBackEnabled(
+        isAndroidNativeBackRoute(to.url.pathname),
+      );
+    } else if (platform === "ios") {
+      if (!to.url.pathname.startsWith("/chat")) {
+        void completeNativeBack();
+      } else if (to.url.pathname !== "/chat") {
+        void setNativeBackEnabled(false);
+      }
     }
   });
 
@@ -134,6 +214,15 @@
     void hydrateProductSession();
     let mounted = true;
     let removeCloseGuard: (() => void) | null = null;
+    let disconnectAndroidNativeBack = (): void => undefined;
+
+    if (nativePlatform() === "android") {
+      disconnectAndroidNativeBack =
+        connectNativeBackCommit(handleAndroidNativeBack);
+      void setNativeBackEnabled(
+        isAndroidNativeBackRoute(page.url.pathname),
+      );
+    }
 
     if (
       import.meta.env.DEV &&
@@ -185,6 +274,10 @@
     return () => {
       mounted = false;
       DevSizeTool = null;
+      disconnectAndroidNativeBack();
+      if (nativePlatform() === "android") {
+        void setNativeBackEnabled(false);
+      }
       removeCloseGuard?.();
       window.removeEventListener("pagehide", flushPreferences);
       document.removeEventListener(
@@ -219,6 +312,8 @@
             href={item.href}
             class="navitem"
             aria-current={isActive(item.href) ? "page" : undefined}
+            oncontextmenu={suppressNativeAppLinkPreview}
+            ondragstart={suppressNativeAppLinkPreview}
           >
             <svg
               viewBox="0 0 24 24"
@@ -257,6 +352,48 @@
     initial-value: 0.12;
   }
 
+  @property --back-transition-progress {
+    syntax: "<number>";
+    inherits: false;
+    initial-value: 0;
+  }
+
+  @property --back-transition-x {
+    syntax: "<length-percentage>";
+    inherits: false;
+    initial-value: 0%;
+  }
+
+  @property --back-transition-radius {
+    syntax: "<length>";
+    inherits: false;
+    initial-value: 0px;
+  }
+
+  @property --back-transition-underlay-x {
+    syntax: "<length-percentage>";
+    inherits: false;
+    initial-value: -7%;
+  }
+
+  @property --back-transition-underlay-scale {
+    syntax: "<number>";
+    inherits: false;
+    initial-value: 0.965;
+  }
+
+  @property --back-transition-shadow-x {
+    syntax: "<length>";
+    inherits: false;
+    initial-value: -18px;
+  }
+
+  @property --back-transition-origin-x {
+    syntax: "<percentage>";
+    inherits: false;
+    initial-value: 0%;
+  }
+
   .stage {
     position: relative;
     height: 100%;
@@ -273,23 +410,31 @@
     visibility: hidden;
     pointer-events: none;
     background: var(--surface-page);
+    transform-origin: var(--back-transition-origin-x) center;
   }
 
   :global(.back-swipe-underlay[data-ready="true"]) {
     visibility: visible;
   }
 
+  :global(.back-swipe-underlay[data-back-transition-state]) {
+    translate: var(--back-transition-underlay-x) 0;
+    scale: var(--back-transition-underlay-scale);
+  }
+
   .back-swipe-underlay::after {
     content: "";
     position: absolute;
     inset: 0;
+    z-index: 2;
     background: #000;
     opacity: var(--back-swipe-shade);
     pointer-events: none;
   }
 
-  .back-swipe-underlay :global([data-back-swipe-snapshot]),
-  .back-swipe-underlay :global([data-back-swipe-snapshot] *) {
+  .back-swipe-underlay :global([data-back-swipe-captured-surface]),
+  .back-swipe-underlay
+    :global([data-back-swipe-captured-surface] *) {
     animation: none !important;
     transition: none !important;
     caret-color: transparent !important;
@@ -300,6 +445,22 @@
     z-index: 1;
     height: 100%;
     background: var(--surface-page);
+  }
+
+  :global(.shell[data-back-transition-state]) {
+    translate: var(--back-transition-x) 0;
+    border-radius: var(--back-transition-radius);
+    overflow: clip;
+    box-shadow:
+      var(--back-transition-shadow-x) 0 46px
+      rgb(0 0 0 / 0.2);
+  }
+
+  :global(.shell[data-back-transition-state="interactive"]),
+  :global(
+      .back-swipe-underlay[data-back-transition-state="interactive"]
+    ) {
+    transition: none !important;
   }
 
   .content {
@@ -363,6 +524,13 @@
     transition:
       transform var(--dur-base) var(--ease-out),
       height var(--dur-base) var(--ease-out);
+  }
+
+  :global(:root[data-native-platform="ios"]) .navitem,
+  :global(:root[data-native-platform="android"]) .navitem {
+    -webkit-user-select: none;
+    user-select: none;
+    -webkit-touch-callout: none;
   }
 
   /* iOS 26 minimize: while content scrolls down the dock compacts to an

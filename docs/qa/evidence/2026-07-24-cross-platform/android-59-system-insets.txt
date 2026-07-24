@@ -1,0 +1,8 @@
+        InsetsSource id=d4c70000 type=statusBars frame=[0,0][1080,63] visible=true flags= sideHint=TOP boundingRects=null
+        InsetsSourceControl: {3 mType=ime mSurfacePosition=Point(0, 63) mInsetsHint=Insets{left=0, top=0, right=0, bottom=883}}
+        InsetsSourceControl: {d4c70000 mType=statusBars initiallyVisible mSurfacePosition=Point(0, 0) mInsetsHint=Insets{left=0, top=63, right=0, bottom=0}}
+        InsetsSourceControl: {684f0001 mType=navigationBars initiallyVisible mSurfacePosition=Point(0, 2277) mInsetsHint=Insets{left=0, top=0, right=0, bottom=63}}
+        mControl=InsetsSourceControl mId=684f0001 mType=navigationBars mLeash=Surface(name=Surface(name=fb39789 Taskbar)/@0xfa96ef2 - animation-leash of insets_animation)/@0xa07a6a mInitiallyVisible=true mSurfacePosition=Point(0, 2277) mInsetsHint=Insets{left=0, top=0, right=0, bottom=63} mSkipAnimationOnce=false mImeStatsToken=null
+        mInsetsHint=Insets{left=0, top=0, right=0, bottom=63}
+        mControl=InsetsSourceControl mId=3 mType=ime mLeash=Surface(name=Surface(name=16bae77 InputMethod)/@0xc60e602 - animation-leash of insets_animation)/@0x19c9b5b mInitiallyVisible=false mSurfacePosition=Point(0, 63) mInsetsHint=Insets{left=0, top=0, right=0, bottom=883} mSkipAnimationOnce=false mImeStatsToken=null
+        mInsetsHint=Insets{left=0, top=0, right=0, bottom=883} stale

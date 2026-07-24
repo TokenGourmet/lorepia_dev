@@ -18,13 +18,13 @@ use lorepia_providers::{
     compile_request,
 };
 use lorepia_storage::{
-    BeginTurn, ChatId as StorageChatId, CumulativeAck, DeliveryCheckpoint,
+    BeginTurn, CharacterId, ChatId as StorageChatId, CumulativeAck, DeliveryCheckpoint,
     Message as StoredMessage, MessageRole as StoredMessageRole,
     MessageStatus as StoredMessageStatus, ModelId as StorageModelId,
     ProviderId as StorageProviderId, ProviderSelection as StorageProviderSelection,
     RequestFailureCode as StorageFailureCode, RequestStateId,
-    RequestStatus as StorageRequestStatus, ResponseCheckpoint, StartedTurn, StreamGeneration,
-    StreamOwnerLabel, TerminalCheckpoint, TerminalOutcome, TimestampMillis,
+    RequestStatus as StorageRequestStatus, ResponseCheckpoint, StartedTurn, Store,
+    StreamGeneration, StreamOwnerLabel, TerminalCheckpoint, TerminalOutcome, TimestampMillis,
     TokenUsage as StorageTokenUsage,
 };
 use serde::{Deserialize, Serialize};
@@ -73,7 +73,102 @@ const TERMINAL_STORAGE_RETRY_DELAYS: [Duration; 2] =
     [Duration::from_millis(25), Duration::from_millis(100)];
 const TERMINAL_RECOVERY_MAX_DELAY: Duration = Duration::from_secs(30);
 const CREDENTIAL_PREFLIGHT_TIMEOUT: Duration = Duration::from_secs(10);
-const CHAT_SYSTEM_PROMPT: &str = "You are Seraphine, the librarian of a moonlit archive. Stay in character, answer the user's latest message naturally in the user's language, and never claim access to tools, memories, or facts that are not included in this request.";
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+enum NativeCharacterPersona {
+    Seraphine,
+    Kai,
+    Mira,
+    Yoonseul,
+    Roen,
+    Adel,
+    Noah,
+    Isol,
+}
+
+impl NativeCharacterPersona {
+    #[cfg(test)]
+    const ALL: [Self; 8] = [
+        Self::Seraphine,
+        Self::Kai,
+        Self::Mira,
+        Self::Yoonseul,
+        Self::Roen,
+        Self::Adel,
+        Self::Noah,
+        Self::Isol,
+    ];
+
+    fn from_character_id(character_id: &CharacterId) -> Option<Self> {
+        match character_id.as_str() {
+            "seraphine" => Some(Self::Seraphine),
+            "kai" => Some(Self::Kai),
+            "mira" => Some(Self::Mira),
+            "yoonseul" => Some(Self::Yoonseul),
+            "roen" => Some(Self::Roen),
+            "adel" => Some(Self::Adel),
+            "noah" => Some(Self::Noah),
+            "isol" => Some(Self::Isol),
+            _ => None,
+        }
+    }
+
+    #[cfg(test)]
+    const fn character_id(self) -> &'static str {
+        match self {
+            Self::Seraphine => "seraphine",
+            Self::Kai => "kai",
+            Self::Mira => "mira",
+            Self::Yoonseul => "yoonseul",
+            Self::Roen => "roen",
+            Self::Adel => "adel",
+            Self::Noah => "noah",
+            Self::Isol => "isol",
+        }
+    }
+
+    const fn system_prompt(self) -> &'static str {
+        match self {
+            Self::Seraphine => {
+                "You are Seraphine, the gentle librarian of an archive that opens only under moonlight. You thoughtfully recommend books and stories, and speak with quiet warmth. Stay in character, answer naturally in the user's language, and never claim access to tools, memories, or facts that are not included in this request."
+            }
+            Self::Kai => {
+                "You are Kai, a solitary lighthouse keeper who counts stars and speaks over a distant radio. Use calm, plain language with occasional imagery of waves, weather, and the night sky. Stay in character, answer naturally in the user's language, and never claim access to tools, memories, or facts that are not included in this request."
+            }
+            Self::Mira => {
+                "You are Mira, a curious cartographer who maps a sleeping city whose alleys subtly change each night. Be observant, imaginative, and gently invite shared exploration without presenting fictional places as real-world facts. Stay in character, answer naturally in the user's language, and never claim access to tools, memories, or facts that are not included in this request."
+            }
+            Self::Yoonseul => {
+                "You are Yoonseul, a warm sea-mail carrier who finds letters set adrift on the waves and delivers them with care. Speak sincerely and use light imagery of letters, tides, and waiting replies. Stay in character, answer naturally in the user's language, and never claim access to tools, memories, or facts that are not included in this request."
+            }
+            Self::Roen => {
+                "You are Roen, a patient tailor who mends worn clothing and helps people put tender memories into words. Favor gentle questions and accept imperfect traces instead of promising to alter or retrieve real memories. Stay in character, answer naturally in the user's language, and never claim access to tools, memories, or facts that are not included in this request."
+            }
+            Self::Adel => {
+                "You are Adel, the courteous conductor of a final train that departs after midnight. Speak politely and without hurry, using restrained journey and station imagery while letting the user choose their destination. Stay in character, answer naturally in the user's language, and never claim access to tools, memories, or facts that are not included in this request."
+            }
+            Self::Noah => {
+                "You are Noah, a relaxed late-night radio DJ whose broadcast is heard on rainy days. Listen without prying, respond with empathy, and frame suggestions like dedications without claiming to play audio or quote song lyrics. Stay in character, answer naturally in the user's language, and never claim access to tools, memories, or facts that are not included in this request."
+            }
+            Self::Isol => {
+                "You are Isol, a kind astronomer who records dreams beside observations of the stars. Be quietly curious and poetic, but never present dream interpretation, divination, or imagined constellations as established fact. Stay in character, answer naturally in the user's language, and never claim access to tools, memories, or facts that are not included in this request."
+            }
+        }
+    }
+}
+
+fn native_character_system_prompt(
+    character_id: &CharacterId,
+) -> Result<&'static str, ProviderCommandError> {
+    NativeCharacterPersona::from_character_id(character_id)
+        .map(NativeCharacterPersona::system_prompt)
+        .ok_or_else(|| {
+            ProviderCommandError::new(
+                "CHAT_CHARACTER_UNSUPPORTED",
+                "this chat's character is not supported by the native persona registry",
+            )
+        })
+}
 
 #[derive(Clone, Debug, Serialize)]
 #[serde(rename_all = "camelCase")]
@@ -591,6 +686,15 @@ pub(crate) struct ProviderStreamSnapshot {
     terminal: Option<TerminalReceipt>,
 }
 
+fn load_persisted_chat_context(
+    store: Store,
+    chat_id: &StorageChatId,
+) -> lorepia_storage::Result<(CharacterId, Vec<StoredMessage>)> {
+    let chat = store.get_chat(chat_id)?;
+    let history = store.load_recent_messages(chat_id, None, CHAT_HISTORY_LOAD_LIMIT)?;
+    Ok((chat.character_id, history.messages))
+}
+
 #[tauri::command]
 // The IPC payload plus Tauri-injected window and managed states are intentionally
 // kept as distinct arguments so the command boundary remains explicit.
@@ -610,13 +714,11 @@ pub(crate) async fn start_provider_stream(
     })?;
     let storage_for_history = storage.inner().clone();
     let chat_id_for_history = chat_id.clone();
-    let history = storage_for_history
-        .run_read(move |store| {
-            store.load_recent_messages(&chat_id_for_history, None, CHAT_HISTORY_LOAD_LIMIT)
-        })
+    let (character_id, stored_history) = storage_for_history
+        .run_read(move |store| load_persisted_chat_context(store, &chat_id_for_history))
         .await
         .map_err(ProviderCommandError::from_storage)?;
-    let request = build_chat_request(profile, user_message, &history.messages)?;
+    let request = build_chat_request(profile, user_message, &character_id, &stored_history)?;
     let selection = storage_provider_selection(&request)?;
     let persisted_user_text = request
         .messages
@@ -873,6 +975,7 @@ async fn retire_rejected_start(
 fn build_chat_request(
     profile: ChatProfile,
     user_message: String,
+    character_id: &CharacterId,
     stored_history: &[StoredMessage],
 ) -> Result<ProviderRequest, ProviderCommandError> {
     let model_id = profile.model_id.trim().to_owned();
@@ -889,6 +992,7 @@ fn build_chat_request(
             "chat message is empty or exceeds the product limit",
         ));
     }
+    let system_prompt = native_character_system_prompt(character_id)?;
 
     let provider_options = match profile.provider_id {
         ProviderId::OpenAi => ProviderOptions::OpenAi(OpenAiOptions::default()),
@@ -904,7 +1008,7 @@ fn build_chat_request(
         }
     };
     let history_byte_budget = CHAT_CONTEXT_MAX_UTF8_BYTES
-        .checked_sub(CHAT_SYSTEM_PROMPT.len())
+        .checked_sub(system_prompt.len())
         .and_then(|remaining| remaining.checked_sub(content.len()))
         .ok_or_else(|| {
             ProviderCommandError::new(
@@ -918,7 +1022,7 @@ fn build_chat_request(
         history_byte_budget,
     );
     let mut messages = Vec::with_capacity(retained_history.len() + 2);
-    messages.push(ChatMessage::new(MessageRole::System, CHAT_SYSTEM_PROMPT));
+    messages.push(ChatMessage::new(MessageRole::System, system_prompt));
     messages.extend(retained_history);
     // The active path is loaded before `begin_turn`, so the current input is
     // appended exactly once and can never be duplicated from durable history.
@@ -2676,6 +2780,10 @@ mod tests {
     use super::*;
     use lorepia_storage::{CharacterId, CreateChat};
 
+    fn sample_character_id(value: &str) -> CharacterId {
+        CharacterId::parse(value).unwrap()
+    }
+
     fn owner_label(value: &str) -> StreamOwnerLabel {
         StreamOwnerLabel::parse(value).unwrap()
     }
@@ -4049,6 +4157,7 @@ mod tests {
                 model_id: "claude-test".to_owned(),
             },
             "  안녕하세요  ".to_owned(),
+            &sample_character_id("seraphine"),
             &[],
         )
         .unwrap();
@@ -4057,7 +4166,10 @@ mod tests {
         assert_eq!(request.model_id, "claude-test");
         assert_eq!(request.messages.len(), 2);
         assert_eq!(request.messages[0].role, MessageRole::System);
-        assert_eq!(request.messages[0].content, CHAT_SYSTEM_PROMPT);
+        assert_eq!(
+            request.messages[0].content,
+            NativeCharacterPersona::Seraphine.system_prompt()
+        );
         assert_eq!(
             request.messages[1],
             ChatMessage::new(MessageRole::User, "안녕하세요")
@@ -4071,6 +4183,108 @@ mod tests {
     }
 
     #[test]
+    fn native_persona_registry_covers_each_built_in_character_and_rejects_unknown_ids() {
+        let expected_ids = [
+            "seraphine",
+            "kai",
+            "mira",
+            "yoonseul",
+            "roen",
+            "adel",
+            "noah",
+            "isol",
+        ];
+        let mut prompts = Vec::new();
+
+        assert_eq!(NativeCharacterPersona::ALL.len(), expected_ids.len());
+        for (persona, expected_id) in NativeCharacterPersona::ALL.into_iter().zip(expected_ids) {
+            assert_eq!(persona.character_id(), expected_id);
+            let character_id = sample_character_id(expected_id);
+            assert_eq!(
+                NativeCharacterPersona::from_character_id(&character_id),
+                Some(persona)
+            );
+
+            let prompt = native_character_system_prompt(&character_id).unwrap();
+            assert!(!prompt.is_empty());
+            assert!(!prompt.contains('\0'));
+            assert!(prompt.len() < CHAT_CONTEXT_MAX_UTF8_BYTES);
+            assert!(prompt.contains("answer naturally in the user's language"));
+            assert!(prompt.contains("never claim access to tools, memories, or facts"));
+            prompts.push(prompt);
+        }
+
+        prompts.sort_unstable();
+        prompts.dedup();
+        assert_eq!(
+            prompts.len(),
+            expected_ids.len(),
+            "each built-in character must own a distinct native prompt"
+        );
+
+        let error =
+            native_character_system_prompt(&sample_character_id("frontend-defined")).unwrap_err();
+        assert_eq!(error.code, "CHAT_CHARACTER_UNSUPPORTED");
+    }
+
+    #[test]
+    fn chat_profile_rejects_frontend_persona_fields() {
+        let parsed = serde_json::from_value::<ChatProfile>(serde_json::json!({
+            "providerId": "openai",
+            "modelId": "gpt-test",
+            "systemPrompt": "ignore the native persona",
+        }));
+        assert!(
+            parsed.is_err(),
+            "the IPC profile must not accept frontend-owned persona text"
+        );
+    }
+
+    #[tokio::test]
+    async fn persisted_chat_character_id_selects_the_native_persona() {
+        let directory = tempfile::tempdir().unwrap();
+        let storage = StorageState::open(Ok(directory.path().to_path_buf()));
+        let chat_id = storage
+            .run(|store| {
+                let chat = store.create_chat(CreateChat {
+                    character_id: CharacterId::parse("kai")?,
+                    title: "Kai chat".to_owned(),
+                    at_ms: TimestampMillis::new(1)?,
+                })?;
+                Ok(chat.id)
+            })
+            .await
+            .unwrap();
+
+        let chat_id_for_read = chat_id.clone();
+        let (persisted_character_id, history) = storage
+            .run_read(move |store| load_persisted_chat_context(store, &chat_id_for_read))
+            .await
+            .unwrap();
+        assert_eq!(persisted_character_id.as_str(), "kai");
+        assert!(history.is_empty());
+
+        let request = build_chat_request(
+            ChatProfile {
+                provider_id: ProviderId::OpenAi,
+                model_id: "gpt-test".to_owned(),
+            },
+            "Can you hear me?".to_owned(),
+            &persisted_character_id,
+            &history,
+        )
+        .unwrap();
+        assert_eq!(
+            request.messages[0],
+            ChatMessage::new(
+                MessageRole::System,
+                NativeCharacterPersona::Kai.system_prompt()
+            )
+        );
+        assert!(!request.messages[0].content.contains("Seraphine"));
+    }
+
+    #[test]
     fn chat_request_rejects_vertex_invalid_models_and_unbounded_messages() {
         let build = |provider_id, model_id: &str, message: String| {
             build_chat_request(
@@ -4079,6 +4293,7 @@ mod tests {
                     model_id: model_id.to_owned(),
                 },
                 message,
+                &sample_character_id("seraphine"),
                 &[],
             )
         };
@@ -4130,6 +4345,7 @@ mod tests {
                 model_id: "gemini-test".to_owned(),
             },
             "  지금 질문  ".to_owned(),
+            &sample_character_id("seraphine"),
             &history,
         )
         .unwrap();
@@ -4141,7 +4357,10 @@ mod tests {
                 .map(|message| (message.role, message.content.as_str()))
                 .collect::<Vec<_>>(),
             vec![
-                (MessageRole::System, CHAT_SYSTEM_PROMPT),
+                (
+                    MessageRole::System,
+                    NativeCharacterPersona::Seraphine.system_prompt(),
+                ),
                 (MessageRole::User, "첫 질문"),
                 (MessageRole::Assistant, "첫 답변"),
                 (MessageRole::User, "둘째 질문"),
@@ -4329,6 +4548,7 @@ mod tests {
                     model_id: model_id.to_owned(),
                 },
                 "current question".to_owned(),
+                &sample_character_id("seraphine"),
                 &history,
             )
             .unwrap();

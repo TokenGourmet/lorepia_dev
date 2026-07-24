@@ -17,17 +17,52 @@ describe("first chat surface", () => {
 
   it("loads the canonical SQLite history and refreshes it after terminal", () => {
     expect(source).toContain('from "$lib/storage/chat-history"');
-    expect(source).toContain("loadOrCreateFirstChat()");
+    expect(source).toContain("loadOrCreateCharacterChat(");
+    expect(source).toContain("targetCharacterId");
     expect(source).toContain("storageClient.loadChatMessages(targetChatId)");
     expect(source).toContain("void reloadHistory(targetChatId)");
     expect(source).toContain("if (nativeTurnStarted)");
     expect(source).not.toContain('id: "m1"');
   });
 
+  it("loads native history pages beyond the newest 200 messages", () => {
+    expect(source).toContain("loaded.olderCursor");
+    expect(source).toContain("loaded.hasMore");
+    expect(source).toContain(
+      "storageClient.loadChatMessages(\n        targetChatId,\n        MAX_MESSAGE_PAGE,\n        requestedCursor,",
+    );
+    expect(source).toContain("prependOlderMessages(");
+    expect(source).toContain("preservedPrependScrollTop(");
+    expect(source).toContain("suppressNextAutoScroll");
+    expect(source).toContain("이전 메시지 불러오기");
+    expect(source).toContain("이전 메시지를 불러오지 못했습니다.");
+    expect(source).toContain("대화의 처음입니다");
+  });
+
   it("terminates stale native owner streams before reload reads history", () => {
     expect(source).toContain("resetProviderStreamOwner");
     expect(source).toMatch(
-      /await resetProviderStreamOwner\(\);[\s\S]*await appPreferences\.hydrate\(\);[\s\S]*loadOrCreateFirstChat\(\)/,
+      /await resetProviderStreamOwner\(\);[\s\S]*await appPreferences\.hydrate\(\);[\s\S]*loadOrCreateCharacterChat\(/,
+    );
+  });
+
+  it("binds the selected library character to storage and room identity", () => {
+    expect(source).toContain('page.url.searchParams.get("character")');
+    expect(source).toContain("findSampleCharacter(requestedCharacterId)");
+    expect(source).toContain("characterChatTitle(character.name)");
+    expect(source).toContain("href={infoHref}");
+    expect(source).toContain("onclick={openInfo}");
+    expect(source).toContain("backHref: chatHref");
+    expect(source).toContain("{character.tagline}");
+  });
+
+  it("resets the room when only the character query changes", () => {
+    expect(source).toContain("function activateCharacter(");
+    expect(source).toContain(
+      "untrack(() => activateCharacter(targetCharacterId, targetTitle))",
+    );
+    expect(source).toMatch(
+      /initializedCharacterId = targetCharacterId;[\s\S]*handle\.cancel\(\)[\s\S]*chatId = null;[\s\S]*messages = \[\];[\s\S]*initializeHistory\(targetCharacterId, targetTitle\)/,
     );
   });
 
@@ -71,6 +106,20 @@ describe("first chat surface", () => {
     expect(source).toMatch(
       /<div\s+class="scroll"\s+bind:this=\{scrollRegion\}\s*>/,
     );
+    expect(source).toContain("usesNativeBackChrome(");
+    expect(source).toContain(
+      "document.documentElement.dataset.nativePlatform",
+    );
+    expect(source).toMatch(
+      /<a\s+class="back"[^>]*aria-hidden=\{nativeBackActive\}[^>]*tabindex=\{nativeBackActive \? -1 : undefined\}[^>]*>/u,
+    );
+    expect(source).toMatch(
+      /nativeBackActive =\s*shouldOptimisticallyArmNativeBack\(nativePlatform\);[\s\S]*void connectNativeBack\(/u,
+    );
+    expect(source).toMatch(
+      /if \(nativePlatform === "ios"\) \{\s*void connectNativeBack\(/u,
+    );
+    expect(source).toContain("enabled: !nativeBackActive");
   });
 
   it("batches streaming deltas per frame and drains them before terminal", () => {

@@ -1,0 +1,376 @@
+
+> @lorepia/desktop-mobile@0.1.0 check
+> svelte-kit sync && svelte-check --tsconfig ./tsconfig.json
+
+Loading svelte-check in workspace: /Users/codexer/LorePia_dev/apps/desktop-mobile
+Getting Svelte diagnostics...
+
+svelte-check found 0 errors and 0 warnings
+
+> @lorepia/desktop-mobile@0.1.0 test
+> vitest run && node --test scripts/strict-csp-svelte-preprocess.node-test.mjs scripts/verify-android-wrapper-security.node-test.mjs scripts/verify-native-product-dependency-boundary.node-test.mjs scripts/verify-native-security-boundary.node-test.mjs scripts/verify-release-artifact-boundary.node-test.mjs
+
+
+ RUN  v4.1.10 /Users/codexer/LorePia_dev/apps/desktop-mobile
+
+
+ Test Files  31 passed (31)
+      Tests  226 passed (226)
+   Start at  06:50:35
+   Duration  1.82s (transform 7.66s, setup 0ms, import 9.77s, tests 274ms, environment 10ms)
+
+TAP version 13
+# Subtest: moves the generated SvelteKit announcer style into compiled CSS
+ok 1 - moves the generated SvelteKit announcer style into compiled CSS
+  ---
+  duration_ms: 0.48275
+  type: 'test'
+  ...
+# Subtest: rejects product-authored inline style attributes and directives
+ok 2 - rejects product-authored inline style attributes and directives
+  ---
+  duration_ms: 0.195792
+  type: 'test'
+  ...
+# Subtest: fails closed when the generated announcer template drifts
+ok 3 - fails closed when the generated announcer template drifts
+  ---
+  duration_ms: 0.053167
+  type: 'test'
+  ...
+# Subtest: the committed product Android wrapper keeps the release boundary
+ok 4 - the committed product Android wrapper keeps the release boundary
+  ---
+  duration_ms: 2.921
+  type: 'test'
+  ...
+# Subtest: accepts only the two intended app-owned subdirectories
+ok 5 - accepts only the two intended app-owned subdirectories
+  ---
+  duration_ms: 0.861875
+  type: 'test'
+  ...
+# Subtest: rejects Tauri's broad external-storage template mapping
+ok 6 - rejects Tauri's broad external-storage template mapping
+  ---
+  duration_ms: 0.297959
+  type: 'test'
+  ...
+# Subtest: rejects a cache-root mapping even though cache is app-owned
+ok 7 - rejects a cache-root mapping even though cache is app-owned
+  ---
+  duration_ms: 0.110667
+  type: 'test'
+  ...
+# Subtest: rejects additional path mappings
+ok 8 - rejects additional path mappings
+  ---
+  duration_ms: 0.20275
+  type: 'test'
+  ...
+# Subtest: rejects a paired-tag path mapping that tries to evade the policy
+ok 9 - rejects a paired-tag path mapping that tries to evade the policy
+  ---
+  duration_ms: 0.068708
+  type: 'test'
+  ...
+# Subtest: keeps the normal phone and tablet launcher
+ok 10 - keeps the normal phone and tablet launcher
+  ---
+  duration_ms: 0.127875
+  type: 'test'
+  ...
+# Subtest: rejects OS backup that contradicts the local-only product disclosure
+ok 11 - rejects OS backup that contradicts the local-only product disclosure
+  ---
+  duration_ms: 0.181458
+  type: 'test'
+  ...
+# Subtest: rejects stale backup-rule attributes even when backup is disabled
+ok 12 - rejects stale backup-rule attributes even when backup is disabled
+  ---
+  duration_ms: 0.610542
+  type: 'test'
+  ...
+# Subtest: rejects an unintended Android TV launcher
+ok 13 - rejects an unintended Android TV launcher
+  ---
+  duration_ms: 0.657875
+  type: 'test'
+  ...
+# Subtest: rejects the Android TV feature even without its launcher category
+ok 14 - rejects the Android TV feature even without its launcher category
+  ---
+  duration_ms: 0.264208
+  type: 'test'
+  ...
+# Subtest: rejects removal of the normal phone and tablet launcher
+ok 15 - rejects removal of the normal phone and tablet launcher
+  ---
+  duration_ms: 0.070834
+  type: 'test'
+  ...
+# Subtest: accepts the product closure without executable script runtimes
+ok 16 - accepts the product closure without executable script runtimes
+  ---
+  duration_ms: 2.182208
+  type: 'test'
+  ...
+# Subtest: rejects a transitive spike even if its package name looks harmless
+ok 17 - rejects a transitive spike even if its package name looks harmless
+  ---
+  duration_ms: 0.559292
+  type: 'test'
+  ...
+# Subtest: rejects a native QuickJS or Lua runtime but ignores dev-only tools
+ok 18 - rejects a native QuickJS or Lua runtime but ignores dev-only tools
+  ---
+  duration_ms: 1.092583
+  type: 'test'
+  ...
+# Subtest: rejects runtime sys crates with library prefixes
+ok 19 - rejects runtime sys crates with library prefixes
+  ---
+  duration_ms: 0.312042
+  type: 'test'
+  ...
+# Subtest: the repository keeps an exact native command, capability, and CSP boundary
+ok 20 - the repository keeps an exact native command, capability, and CSP boundary
+  ---
+  duration_ms: 16.141542
+  type: 'test'
+  ...
+# Subtest: rejects an added native command even if permissions were not regenerated
+ok 21 - rejects an added native command even if permissions were not regenerated
+  ---
+  duration_ms: 0.991667
+  type: 'test'
+  ...
+# Subtest: rejects wildcard WebView capability and a relaxed release CSP
+ok 22 - rejects wildcard WebView capability and a relaxed release CSP
+  ---
+  duration_ms: 0.431792
+  type: 'test'
+  ...
+# Subtest: rejects a missing or mismatched generated permission
+ok 23 - rejects a missing or mismatched generated permission
+  ---
+  duration_ms: 0.716458
+  type: 'test'
+  ...
+# Subtest: fixture headers distinguish actual ELF, Mach-O, and PE inputs
+ok 24 - fixture headers distinguish actual ELF, Mach-O, and PE inputs
+  ---
+  duration_ms: 1.7825
+  type: 'test'
+  ...
+# Subtest: accepts clean native fixtures only after their platform inspector succeeds
+ok 25 - accepts clean native fixtures only after their platform inspector succeeds
+  ---
+  duration_ms: 9.015083
+  type: 'test'
+  ...
+# Subtest: rejects forbidden QuickJS and Lua bytes even when symbols are stripped from inspector output
+ok 26 - rejects forbidden QuickJS and Lua bytes even when symbols are stripped from inspector output
+  ---
+  duration_ms: 3.483917
+  type: 'test'
+  ...
+# Subtest: distinguishes an incidental wasm magic substring from a complete embedded module
+ok 27 - distinguishes an incidental wasm magic substring from a complete embedded module
+  ---
+  duration_ms: 2.870666
+  type: 'test'
+  ...
+# Subtest: rejects a forbidden linked dependency reported only by the native inspector
+ok 28 - rejects a forbidden linked dependency reported only by the native inspector
+  ---
+  duration_ms: 2.555042
+  type: 'test'
+  ...
+# Subtest: reports NOT RUN instead of passing when the required native inspector is unavailable
+ok 29 - reports NOT RUN instead of passing when the required native inspector is unavailable
+  ---
+  duration_ms: 2.192458
+  type: 'test'
+  ...
+# Subtest: scans a macOS app native executable and every packaged resource
+ok 30 - scans a macOS app native executable and every packaged resource
+  ---
+  duration_ms: 11.593792
+  type: 'test'
+  ...
+# Subtest: opens APK native libraries and resources instead of trusting the archive filename
+ok 31 - opens APK native libraries and resources instead of trusting the archive filename
+  ---
+  duration_ms: 4.8965
+  type: 'test'
+  ...
+# Subtest: rejects QuickJS in an APK native library and Lua or script-runner AAB resources
+ok 32 - rejects QuickJS in an APK native library and Lua or script-runner AAB resources
+  ---
+  duration_ms: 7.045292
+  type: 'test'
+  ...
+# Subtest: fails closed for native-looking archive entries that are not real native formats
+ok 33 - fails closed for native-looking archive entries that are not real native formats
+  ---
+  duration_ms: 1.535625
+  type: 'test'
+  ...
+1..33
+# tests 33
+# suites 0
+# pass 33
+# fail 0
+# cancelled 0
+# skipped 0
+# todo 0
+# duration_ms 132.146584
+
+> @lorepia/desktop-mobile@0.1.0 build
+> npm run build:web && npm run verify:built-boundary
+
+
+> @lorepia/desktop-mobile@0.1.0 build:web
+> vite build
+
+vite v8.1.5 building ssr environment for production...
+[2Ktransforming...✓ 212 modules transformed.
+rendering chunks...
+vite v8.1.5 building client environment for production...
+[2Ktransforming...✓ 237 modules transformed.
+rendering chunks...
+computing gzip size...
+.svelte-kit/output/client/_app/version.json                                     0.02 kB │ gzip:  0.04 kB
+.svelte-kit/output/client/.vite/manifest.json                                  11.83 kB │ gzip:  1.57 kB
+.svelte-kit/output/client/_app/immutable/assets/app.C9QamrhW.css                0.16 kB │ gzip:  0.14 kB
+.svelte-kit/output/client/_app/immutable/assets/Avatar.eSwoZzhe.css             0.54 kB │ gzip:  0.26 kB
+.svelte-kit/output/client/_app/immutable/assets/10.mBdvhlzn.css                 1.42 kB │ gzip:  0.59 kB
+.svelte-kit/output/client/_app/immutable/assets/LargeTitleHeader.FfBb-UG3.css   1.51 kB │ gzip:  0.59 kB
+.svelte-kit/output/client/_app/immutable/assets/9.D3UEdkmb.css                  1.67 kB │ gzip:  0.63 kB
+.svelte-kit/output/client/_app/immutable/assets/8.C3f81Hqi.css                  2.75 kB │ gzip:  0.94 kB
+.svelte-kit/output/client/_app/immutable/assets/4.CVGbLw86.css                  3.63 kB │ gzip:  1.08 kB
+.svelte-kit/output/client/_app/immutable/assets/11.67HDNlMS.css                 3.89 kB │ gzip:  1.11 kB
+.svelte-kit/output/client/_app/immutable/assets/6.D5bI0M-P.css                  4.52 kB │ gzip:  1.24 kB
+.svelte-kit/output/client/_app/immutable/assets/7.a3VXC52k.css                  4.93 kB │ gzip:  1.24 kB
+.svelte-kit/output/client/_app/immutable/assets/0.39DmMjuU.css                  5.45 kB │ gzip:  1.43 kB
+.svelte-kit/output/client/_app/immutable/assets/tokens.06NxK0R4.css             5.69 kB │ gzip:  1.88 kB
+.svelte-kit/output/client/_app/immutable/assets/2.DFew5U1V.css                  8.50 kB │ gzip:  1.83 kB
+.svelte-kit/output/client/_app/immutable/assets/5.B3YJzwSG.css                 12.09 kB │ gzip:  2.71 kB
+.svelte-kit/output/client/_app/immutable/assets/3.DXQpXHJE.css                 16.93 kB │ gzip:  2.89 kB
+.svelte-kit/output/client/_app/immutable/chunks/Ph6iwYvc.js                     0.02 kB │ gzip:  0.04 kB
+.svelte-kit/output/client/_app/immutable/chunks/oThWisCF.js                     0.03 kB │ gzip:  0.05 kB
+.svelte-kit/output/client/_app/immutable/chunks/xihTtKlq.js                     0.06 kB │ gzip:  0.08 kB
+.svelte-kit/output/client/_app/immutable/entry/start.BrnncBCS.js                0.08 kB │ gzip:  0.09 kB
+.svelte-kit/output/client/_app/immutable/chunks/Cl3UxZBf.js                     0.19 kB │ gzip:  0.17 kB
+.svelte-kit/output/client/_app/immutable/chunks/DpbVA4Ua.js                     0.27 kB │ gzip:  0.19 kB
+.svelte-kit/output/client/_app/immutable/chunks/6-W8sPiu.js                     0.33 kB │ gzip:  0.18 kB
+.svelte-kit/output/client/_app/immutable/nodes/1.DNhuT5Eh.js                    0.37 kB │ gzip:  0.26 kB
+.svelte-kit/output/client/_app/immutable/chunks/CZf0CREx.js                     0.40 kB │ gzip:  0.29 kB
+.svelte-kit/output/client/_app/immutable/chunks/Q31j47In.js                     0.42 kB │ gzip:  0.27 kB
+.svelte-kit/output/client/_app/immutable/chunks/CRKZG8J_.js                     0.62 kB │ gzip:  0.43 kB
+.svelte-kit/output/client/_app/immutable/chunks/BkWIQhn8.js                     0.88 kB │ gzip:  0.44 kB
+.svelte-kit/output/client/_app/immutable/chunks/pxFePRoB.js                     1.15 kB │ gzip:  0.62 kB
+.svelte-kit/output/client/_app/immutable/chunks/B0LLAi3S.js                     1.32 kB │ gzip:  0.58 kB
+.svelte-kit/output/client/_app/immutable/chunks/Bjy-W4x2.js                     1.36 kB │ gzip:  0.65 kB
+.svelte-kit/output/client/_app/immutable/chunks/BXQJoyFE.js                     1.49 kB │ gzip:  0.84 kB
+.svelte-kit/output/client/_app/immutable/chunks/BzbXQSd2.js                     1.50 kB │ gzip:  0.67 kB
+.svelte-kit/output/client/_app/immutable/nodes/9.Bc45k-X6.js                    1.68 kB │ gzip:  1.00 kB
+.svelte-kit/output/client/_app/immutable/chunks/DxEK1kPB.js                     1.93 kB │ gzip:  0.82 kB
+.svelte-kit/output/client/_app/immutable/chunks/D76sj9Rg.js                     1.96 kB │ gzip:  1.02 kB
+.svelte-kit/output/client/_app/immutable/nodes/8.C8Lk9gZ4.js                    2.03 kB │ gzip:  1.15 kB
+.svelte-kit/output/client/_app/immutable/nodes/10.DZcghiYZ.js                   2.18 kB │ gzip:  0.82 kB
+.svelte-kit/output/client/_app/immutable/nodes/4.DBMLKgQL.js                    2.88 kB │ gzip:  1.49 kB
+.svelte-kit/output/client/_app/immutable/nodes/11.CauPgVhY.js                   3.03 kB │ gzip:  1.58 kB
+.svelte-kit/output/client/_app/immutable/chunks/CV46crSm.js                     3.45 kB │ gzip:  1.76 kB
+.svelte-kit/output/client/_app/immutable/entry/app.MZ0VF552.js                  6.15 kB │ gzip:  2.51 kB
+.svelte-kit/output/client/_app/immutable/nodes/6.Is18yxRu.js                    6.84 kB │ gzip:  2.75 kB
+.svelte-kit/output/client/_app/immutable/chunks/BZycz9pl.js                     7.34 kB │ gzip:  2.87 kB
+.svelte-kit/output/client/_app/immutable/chunks/C_sKvrZo.js                     9.52 kB │ gzip:  2.69 kB
+.svelte-kit/output/client/_app/immutable/nodes/2.YpG3uI3-.js                   10.24 kB │ gzip:  4.03 kB
+.svelte-kit/output/client/_app/immutable/nodes/7.DG3dO14M.js                   11.55 kB │ gzip:  4.84 kB
+.svelte-kit/output/client/_app/immutable/chunks/Bkkr0kH5.js                    12.17 kB │ gzip:  4.37 kB
+.svelte-kit/output/client/_app/immutable/nodes/0.DRhbYlR-.js                   18.34 kB │ gzip:  5.42 kB
+.svelte-kit/output/client/_app/immutable/nodes/3.Bm6bhBVO.js                   23.02 kB │ gzip:  7.89 kB
+.svelte-kit/output/client/_app/immutable/chunks/B-JecooB.js                    26.92 kB │ gzip: 10.40 kB
+.svelte-kit/output/client/_app/immutable/nodes/5.C1ZkPd17.js                   35.53 kB │ gzip: 12.15 kB
+.svelte-kit/output/client/_app/immutable/chunks/CXGl5l4T.js                    47.35 kB │ gzip: 18.07 kB
+
+✓ built in 1.01s
+computing gzip size...
+.svelte-kit/output/server/.vite/manifest.json                                   11.09 kB │ gzip:  1.37 kB
+.svelte-kit/output/server/_app/immutable/assets/internal.C9QamrhW.css            0.16 kB │ gzip:  0.14 kB
+.svelte-kit/output/server/_app/immutable/assets/Avatar.eSwoZzhe.css              0.54 kB │ gzip:  0.26 kB
+.svelte-kit/output/server/_app/immutable/assets/_page.mBdvhlzn.css               1.42 kB │ gzip:  0.59 kB
+.svelte-kit/output/server/_app/immutable/assets/LargeTitleHeader.CRQ0LlGn.css    1.46 kB │ gzip:  0.58 kB
+.svelte-kit/output/server/_app/immutable/assets/_page.D3UEdkmb.css               1.67 kB │ gzip:  0.63 kB
+.svelte-kit/output/server/_app/immutable/assets/_page.C3f81Hqi.css               2.75 kB │ gzip:  0.94 kB
+.svelte-kit/output/server/_app/immutable/assets/_page.Cd16-Jz1.css               3.58 kB │ gzip:  1.07 kB
+.svelte-kit/output/server/_app/immutable/assets/_page.67HDNlMS.css               3.89 kB │ gzip:  1.11 kB
+.svelte-kit/output/server/_app/immutable/assets/_page.CUU5vLBd.css               4.49 kB │ gzip:  1.23 kB
+.svelte-kit/output/server/_app/immutable/assets/_page.a3VXC52k.css               4.93 kB │ gzip:  1.24 kB
+.svelte-kit/output/server/_app/immutable/assets/_layout.cAp39tBo.css             5.40 kB │ gzip:  1.42 kB
+.svelte-kit/output/server/_app/immutable/assets/tokens.B3vtpLiS.css              5.51 kB │ gzip:  1.84 kB
+.svelte-kit/output/server/_app/immutable/assets/_page.Bk0NVHkb.css               8.40 kB │ gzip:  1.82 kB
+.svelte-kit/output/server/_app/immutable/assets/_page.B5cPBAaG.css              11.87 kB │ gzip:  2.69 kB
+.svelte-kit/output/server/_app/immutable/assets/_page.DgeKyD2T.css              16.88 kB │ gzip:  2.88 kB
+.svelte-kit/output/server/chunks/navigation.js                                   0.03 kB │ gzip:  0.05 kB
+.svelte-kit/output/server/entries/pages/_layout.ts.js                            0.07 kB │ gzip:  0.09 kB
+.svelte-kit/output/server/env.js                                                 0.22 kB │ gzip:  0.14 kB
+.svelte-kit/output/server/chunks/dock-chrome.svelte.js                           0.24 kB │ gzip:  0.18 kB
+.svelte-kit/output/server/chunks/env.js                                          0.28 kB │ gzip:  0.17 kB
+.svelte-kit/output/server/chunks/room-prefs.svelte.js                            0.31 kB │ gzip:  0.21 kB
+.svelte-kit/output/server/chunks/library-search.svelte.js                        0.32 kB │ gzip:  0.20 kB
+.svelte-kit/output/server/internal.js                                            0.40 kB │ gzip:  0.19 kB
+.svelte-kit/output/server/entries/fallbacks/error.svelte.js                      0.42 kB │ gzip:  0.27 kB
+.svelte-kit/output/server/chunks/Avatar.js                                       0.47 kB │ gzip:  0.30 kB
+.svelte-kit/output/server/chunks/credentials.js                                  0.69 kB │ gzip:  0.36 kB
+.svelte-kit/output/server/chunks/internal.js                                     0.87 kB │ gzip:  0.38 kB
+.svelte-kit/output/server/chunks/LargeTitleHeader.js                             1.05 kB │ gzip:  0.41 kB
+.svelte-kit/output/server/chunks/time-of-day.js                                  1.21 kB │ gzip:  0.61 kB
+.svelte-kit/output/server/chunks/native-back.js                                  1.68 kB │ gzip:  0.67 kB
+.svelte-kit/output/server/entries/pages/create/_page.svelte.js                   1.83 kB │ gzip:  1.00 kB
+.svelte-kit/output/server/entries/pages/home/_page.svelte.js                     2.32 kB │ gzip:  0.83 kB
+.svelte-kit/output/server/entries/pages/community/_page.svelte.js                2.38 kB │ gzip:  1.13 kB
+.svelte-kit/output/server/chunks/state.js                                        2.45 kB │ gzip:  1.04 kB
+.svelte-kit/output/server/entries/pages/character/_id_/_page.svelte.js           2.93 kB │ gzip:  1.18 kB
+.svelte-kit/output/server/entries/pages/chat/report/_page.svelte.js              3.12 kB │ gzip:  1.42 kB
+.svelte-kit/output/server/entries/pages/import/_page.svelte.js                   3.45 kB │ gzip:  1.56 kB
+.svelte-kit/output/server/chunks/chat-history.js                                 3.84 kB │ gzip:  1.48 kB
+.svelte-kit/output/server/chunks/sample.js                                       4.05 kB │ gzip:  1.93 kB
+.svelte-kit/output/server/entries/pages/_layout.svelte.js                        4.27 kB │ gzip:  1.72 kB
+.svelte-kit/output/server/entries/pages/chat/info/_page.svelte.js                5.14 kB │ gzip:  1.75 kB
+.svelte-kit/output/server/chunks/native-support.js                               7.19 kB │ gzip:  2.08 kB
+.svelte-kit/output/server/entries/pages/_page.svelte.js                          9.35 kB │ gzip:  2.85 kB
+.svelte-kit/output/server/chunks/shared.js                                      10.59 kB │ gzip:  3.39 kB
+.svelte-kit/output/server/chunks/exports.js                                     11.35 kB │ gzip:  3.54 kB
+.svelte-kit/output/server/chunks/app-preferences.svelte.js                      12.93 kB │ gzip:  3.78 kB
+.svelte-kit/output/server/chunks/client2.js                                     15.85 kB │ gzip:  3.40 kB
+.svelte-kit/output/server/entries/pages/chat/_page.svelte.js                    17.71 kB │ gzip:  4.36 kB
+.svelte-kit/output/server/entries/pages/account/_page.svelte.js                 18.01 kB │ gzip:  4.60 kB
+.svelte-kit/output/server/chunks/internal2.js                                   21.09 kB │ gzip:  6.55 kB
+.svelte-kit/output/server/chunks/utils.js                                       31.76 kB │ gzip:  9.35 kB
+.svelte-kit/output/server/chunks/client.js                                      51.72 kB │ gzip: 15.13 kB
+.svelte-kit/output/server/remote-entry.js                                       54.47 kB │ gzip: 12.01 kB
+.svelte-kit/output/server/index.js                                             123.86 kB │ gzip: 31.43 kB
+.svelte-kit/output/server/chunks/index-server.js                               129.58 kB │ gzip: 33.62 kB
+
+[33m[PLUGIN_TIMINGS] [0mYour build spent significant time in plugins. Here is a breakdown:
+  - vite-plugin-sveltekit-guard (81%)
+  - vite-plugin-sveltekit-virtual-modules (4%)
+  - vite-plugin-svelte:compile (4%)
+See https://rolldown.rs/reference/InputOptions.checks#plugintimings for more details.
+
+✓ built in 4.53s
+
+Run npm run preview to preview your production build locally.
+
+> Using @sveltejs/adapter-static
+  Wrote site to "build"
+  ✔ done
+
+> @lorepia/desktop-mobile@0.1.0 verify:built-boundary
+> node scripts/verify-built-executable-boundary.mjs
+
+verified 55 frontend build files; DISABLED_BY_SECURITY_POLICY

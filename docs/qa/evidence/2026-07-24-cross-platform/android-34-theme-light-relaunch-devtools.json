@@ -1,0 +1,9 @@
+[ {
+   "description": "{\"attached\":true,\"empty\":false,\"height\":2340,\"never_attached\":false,\"screenX\":0,\"screenY\":0,\"visible\":true,\"width\":1080}",
+   "devtoolsFrontendUrl": "https://chrome-devtools-frontend.appspot.com/serve_rev/@49ec12cc413ffec766028509968b31d7d65fa0b7/inspector.html?ws=127.0.0.1:9223/devtools/page/72EE318E1E0CA3DBAAB7184A77E90C2B",
+   "id": "72EE318E1E0CA3DBAAB7184A77E90C2B",
+   "title": "LorePia — 서재",
+   "type": "page",
+   "url": "http://tauri.localhost/",
+   "webSocketDebuggerUrl": "ws://127.0.0.1:9223/devtools/page/72EE318E1E0CA3DBAAB7184A77E90C2B"
+} ]

@@ -1,0 +1,180 @@
+
+> @lorepia/desktop-mobile@0.1.0 tauri
+> tauri ios build --debug --target aarch64-sim --no-sign
+
+        Info `tauri-build` dependency has workspace inheritance enabled. The features array won't be automatically rewritten. Expected features: []
+        Info `tauri` dependency has workspace inheritance enabled. The features array won't be automatically rewritten. Expected features: []
+        Warn No code signing certificates found. You must add one and set the certificate development team ID on the `bundle > iOS > developmentTeam` config value or the `APPLE_DEVELOPMENT_TEAM` environment variable. To list the available certificates, run `tauri info`.
+        Info Looking up installed tauri packages to check mismatched versions...
+     Running beforeBuildCommand `node scripts/prepare-tauri-build.mjs`
+
+> @lorepia/desktop-mobile@0.1.0 build
+> npm run build:web && npm run verify:built-boundary
+
+
+> @lorepia/desktop-mobile@0.1.0 build:web
+> vite build
+
+vite v8.1.5 building ssr environment for production...
+[2Ktransforming...✓ 212 modules transformed.
+rendering chunks...
+vite v8.1.5 building client environment for production...
+[2Ktransforming...✓ 237 modules transformed.
+rendering chunks...
+computing gzip size...
+.svelte-kit/output/client/_app/version.json                                     0.02 kB │ gzip:  0.04 kB
+.svelte-kit/output/client/.vite/manifest.json                                  11.86 kB │ gzip:  1.58 kB
+.svelte-kit/output/client/_app/immutable/assets/app.C9QamrhW.css                0.16 kB │ gzip:  0.14 kB
+.svelte-kit/output/client/_app/immutable/assets/Avatar.eSwoZzhe.css             0.54 kB │ gzip:  0.26 kB
+.svelte-kit/output/client/_app/immutable/assets/10.mBdvhlzn.css                 1.42 kB │ gzip:  0.59 kB
+.svelte-kit/output/client/_app/immutable/assets/LargeTitleHeader.FfBb-UG3.css   1.51 kB │ gzip:  0.59 kB
+.svelte-kit/output/client/_app/immutable/assets/9.D3UEdkmb.css                  1.67 kB │ gzip:  0.63 kB
+.svelte-kit/output/client/_app/immutable/assets/8.C3f81Hqi.css                  2.75 kB │ gzip:  0.94 kB
+.svelte-kit/output/client/_app/immutable/assets/4.CVGbLw86.css                  3.63 kB │ gzip:  1.08 kB
+.svelte-kit/output/client/_app/immutable/assets/11.67HDNlMS.css                 3.89 kB │ gzip:  1.11 kB
+.svelte-kit/output/client/_app/immutable/assets/6.BFzX8zZy.css                  4.55 kB │ gzip:  1.23 kB
+.svelte-kit/output/client/_app/immutable/assets/7.svQ_36sp.css                  4.94 kB │ gzip:  1.23 kB
+.svelte-kit/output/client/_app/immutable/assets/tokens.06NxK0R4.css             5.69 kB │ gzip:  1.88 kB
+.svelte-kit/output/client/_app/immutable/assets/0.C255wI3H.css                  6.56 kB │ gzip:  1.63 kB
+.svelte-kit/output/client/_app/immutable/assets/2.CfPYX-RF.css                  8.46 kB │ gzip:  1.80 kB
+.svelte-kit/output/client/_app/immutable/assets/5.Wr21BbgZ.css                 12.33 kB │ gzip:  2.74 kB
+.svelte-kit/output/client/_app/immutable/assets/3.CaPNT85i.css                 16.97 kB │ gzip:  2.88 kB
+.svelte-kit/output/client/_app/immutable/chunks/oThWisCF.js                     0.03 kB │ gzip:  0.05 kB
+.svelte-kit/output/client/_app/immutable/chunks/xihTtKlq.js                     0.06 kB │ gzip:  0.08 kB
+.svelte-kit/output/client/_app/immutable/entry/start.WmxYCytT.js                0.08 kB │ gzip:  0.09 kB
+.svelte-kit/output/client/_app/immutable/chunks/Cl3UxZBf.js                     0.19 kB │ gzip:  0.17 kB
+.svelte-kit/output/client/_app/immutable/chunks/lidty68Q.js                     0.23 kB │ gzip:  0.19 kB
+.svelte-kit/output/client/_app/immutable/chunks/DpbVA4Ua.js                     0.27 kB │ gzip:  0.19 kB
+.svelte-kit/output/client/_app/immutable/chunks/Dq8OXK3V.js                     0.33 kB │ gzip:  0.18 kB
+.svelte-kit/output/client/_app/immutable/nodes/1.CDaGKL2i.js                    0.37 kB │ gzip:  0.26 kB
+.svelte-kit/output/client/_app/immutable/chunks/CZf0CREx.js                     0.40 kB │ gzip:  0.29 kB
+.svelte-kit/output/client/_app/immutable/chunks/Q31j47In.js                     0.42 kB │ gzip:  0.27 kB
+.svelte-kit/output/client/_app/immutable/chunks/CRKZG8J_.js                     0.62 kB │ gzip:  0.43 kB
+.svelte-kit/output/client/_app/immutable/chunks/pxFePRoB.js                     1.15 kB │ gzip:  0.62 kB
+.svelte-kit/output/client/_app/immutable/chunks/Bjy-W4x2.js                     1.36 kB │ gzip:  0.65 kB
+.svelte-kit/output/client/_app/immutable/chunks/BXQJoyFE.js                     1.49 kB │ gzip:  0.84 kB
+.svelte-kit/output/client/_app/immutable/chunks/kluIskEC.js                     1.66 kB │ gzip:  0.67 kB
+.svelte-kit/output/client/_app/immutable/nodes/9.Bc45k-X6.js                    1.68 kB │ gzip:  1.00 kB
+.svelte-kit/output/client/_app/immutable/chunks/DcESZ5pI.js                     1.72 kB │ gzip:  0.77 kB
+.svelte-kit/output/client/_app/immutable/chunks/DxEK1kPB.js                     1.93 kB │ gzip:  0.82 kB
+.svelte-kit/output/client/_app/immutable/chunks/D76sj9Rg.js                     1.96 kB │ gzip:  1.02 kB
+.svelte-kit/output/client/_app/immutable/nodes/8.BC_y4RLh.js                    2.03 kB │ gzip:  1.15 kB
+.svelte-kit/output/client/_app/immutable/nodes/10.DZcghiYZ.js                   2.18 kB │ gzip:  0.82 kB
+.svelte-kit/output/client/_app/immutable/chunks/Dr6trgWJ.js                     2.48 kB │ gzip:  1.33 kB
+.svelte-kit/output/client/_app/immutable/nodes/4.Cu8NRFKP.js                    2.85 kB │ gzip:  1.48 kB
+.svelte-kit/output/client/_app/immutable/nodes/11.CC2pkHMU.js                   3.03 kB │ gzip:  1.58 kB
+.svelte-kit/output/client/_app/immutable/entry/app.C5XK3mko.js                  6.18 kB │ gzip:  2.50 kB
+.svelte-kit/output/client/_app/immutable/nodes/6.Cg14955f.js                    6.84 kB │ gzip:  2.75 kB
+.svelte-kit/output/client/_app/immutable/chunks/Cv1wVvI7.js                     7.61 kB │ gzip:  2.95 kB
+.svelte-kit/output/client/_app/immutable/chunks/C_sKvrZo.js                     9.52 kB │ gzip:  2.69 kB
+.svelte-kit/output/client/_app/immutable/chunks/BQ0CKQX_.js                    10.18 kB │ gzip:  3.21 kB
+.svelte-kit/output/client/_app/immutable/nodes/2.jnpHKwSF.js                   10.58 kB │ gzip:  4.11 kB
+.svelte-kit/output/client/_app/immutable/nodes/7.DDoFcZzc.js                   11.56 kB │ gzip:  4.85 kB
+.svelte-kit/output/client/_app/immutable/chunks/pZdyImCG.js                    12.47 kB │ gzip:  4.51 kB
+.svelte-kit/output/client/_app/immutable/nodes/0.CXU90SkS.js                   18.64 kB │ gzip:  5.56 kB
+.svelte-kit/output/client/_app/immutable/nodes/3.DMb2yXv8.js                   23.04 kB │ gzip:  7.90 kB
+.svelte-kit/output/client/_app/immutable/chunks/Bx2C5d7T.js                    26.92 kB │ gzip: 10.39 kB
+.svelte-kit/output/client/_app/immutable/nodes/5.g-i9if0i.js                   28.99 kB │ gzip: 10.11 kB
+.svelte-kit/output/client/_app/immutable/chunks/CXGl5l4T.js                    47.35 kB │ gzip: 18.07 kB
+
+✓ built in 265ms
+computing gzip size...
+.svelte-kit/output/server/.vite/manifest.json                                   11.32 kB │ gzip:  1.39 kB
+.svelte-kit/output/server/_app/immutable/assets/internal.C9QamrhW.css            0.16 kB │ gzip:  0.14 kB
+.svelte-kit/output/server/_app/immutable/assets/Avatar.eSwoZzhe.css              0.54 kB │ gzip:  0.26 kB
+.svelte-kit/output/server/_app/immutable/assets/_page.mBdvhlzn.css               1.42 kB │ gzip:  0.59 kB
+.svelte-kit/output/server/_app/immutable/assets/LargeTitleHeader.CRQ0LlGn.css    1.46 kB │ gzip:  0.58 kB
+.svelte-kit/output/server/_app/immutable/assets/_page.D3UEdkmb.css               1.67 kB │ gzip:  0.63 kB
+.svelte-kit/output/server/_app/immutable/assets/_page.C3f81Hqi.css               2.75 kB │ gzip:  0.94 kB
+.svelte-kit/output/server/_app/immutable/assets/_page.Cd16-Jz1.css               3.58 kB │ gzip:  1.07 kB
+.svelte-kit/output/server/_app/immutable/assets/_page.67HDNlMS.css               3.89 kB │ gzip:  1.11 kB
+.svelte-kit/output/server/_app/immutable/assets/_page.7QdDdA9B.css               4.51 kB │ gzip:  1.22 kB
+.svelte-kit/output/server/_app/immutable/assets/_page.svQ_36sp.css               4.94 kB │ gzip:  1.23 kB
+.svelte-kit/output/server/_app/immutable/assets/tokens.B3vtpLiS.css              5.51 kB │ gzip:  1.84 kB
+.svelte-kit/output/server/_app/immutable/assets/_layout.C-lHuQ4Z.css             6.49 kB │ gzip:  1.62 kB
+.svelte-kit/output/server/_app/immutable/assets/_page.BWJDDh29.css               8.36 kB │ gzip:  1.80 kB
+.svelte-kit/output/server/_app/immutable/assets/_page.ClKcVke7.css              12.15 kB │ gzip:  2.73 kB
+.svelte-kit/output/server/_app/immutable/assets/_page.Dg3YMseJ.css              16.92 kB │ gzip:  2.87 kB
+.svelte-kit/output/server/chunks/edge-back.js                                    0.03 kB │ gzip:  0.05 kB
+.svelte-kit/output/server/entries/pages/_layout.ts.js                            0.07 kB │ gzip:  0.09 kB
+.svelte-kit/output/server/env.js                                                 0.22 kB │ gzip:  0.14 kB
+.svelte-kit/output/server/chunks/dock-chrome.svelte.js                           0.24 kB │ gzip:  0.18 kB
+.svelte-kit/output/server/chunks/env.js                                          0.28 kB │ gzip:  0.17 kB
+.svelte-kit/output/server/chunks/content-back.js                                 0.29 kB │ gzip:  0.19 kB
+.svelte-kit/output/server/chunks/room-prefs.svelte.js                            0.31 kB │ gzip:  0.21 kB
+.svelte-kit/output/server/chunks/library-search.svelte.js                        0.32 kB │ gzip:  0.20 kB
+.svelte-kit/output/server/internal.js                                            0.40 kB │ gzip:  0.19 kB
+.svelte-kit/output/server/entries/fallbacks/error.svelte.js                      0.42 kB │ gzip:  0.27 kB
+.svelte-kit/output/server/chunks/Avatar.js                                       0.47 kB │ gzip:  0.30 kB
+.svelte-kit/output/server/chunks/credentials.js                                  0.69 kB │ gzip:  0.36 kB
+.svelte-kit/output/server/chunks/internal.js                                     0.87 kB │ gzip:  0.38 kB
+.svelte-kit/output/server/chunks/LargeTitleHeader.js                             1.05 kB │ gzip:  0.41 kB
+.svelte-kit/output/server/chunks/time-of-day.js                                  1.21 kB │ gzip:  0.61 kB
+.svelte-kit/output/server/entries/pages/create/_page.svelte.js                   1.83 kB │ gzip:  1.00 kB
+.svelte-kit/output/server/chunks/native-back.js                                  2.20 kB │ gzip:  0.82 kB
+.svelte-kit/output/server/entries/pages/home/_page.svelte.js                     2.32 kB │ gzip:  0.83 kB
+.svelte-kit/output/server/entries/pages/community/_page.svelte.js                2.42 kB │ gzip:  1.14 kB
+.svelte-kit/output/server/chunks/state.js                                        2.45 kB │ gzip:  1.04 kB
+.svelte-kit/output/server/entries/pages/character/_id_/_page.svelte.js           2.93 kB │ gzip:  1.18 kB
+.svelte-kit/output/server/chunks/sample.js                                       2.99 kB │ gzip:  1.48 kB
+.svelte-kit/output/server/entries/pages/chat/report/_page.svelte.js              3.16 kB │ gzip:  1.43 kB
+.svelte-kit/output/server/entries/pages/import/_page.svelte.js                   3.49 kB │ gzip:  1.56 kB
+.svelte-kit/output/server/chunks/chat-history.js                                 3.84 kB │ gzip:  1.48 kB
+.svelte-kit/output/server/entries/pages/_layout.svelte.js                        4.73 kB │ gzip:  1.84 kB
+.svelte-kit/output/server/entries/pages/chat/info/_page.svelte.js                5.19 kB │ gzip:  1.76 kB
+.svelte-kit/output/server/chunks/native-support.js                               7.19 kB │ gzip:  2.08 kB
+.svelte-kit/output/server/entries/pages/_page.svelte.js                          9.96 kB │ gzip:  2.93 kB
+.svelte-kit/output/server/chunks/shared.js                                      10.59 kB │ gzip:  3.39 kB
+.svelte-kit/output/server/chunks/exports.js                                     11.35 kB │ gzip:  3.54 kB
+.svelte-kit/output/server/chunks/app-preferences.svelte.js                      13.62 kB │ gzip:  3.93 kB
+.svelte-kit/output/server/chunks/client2.js                                     15.85 kB │ gzip:  3.40 kB
+.svelte-kit/output/server/entries/pages/chat/_page.svelte.js                    17.82 kB │ gzip:  4.33 kB
+.svelte-kit/output/server/entries/pages/account/_page.svelte.js                 18.01 kB │ gzip:  4.60 kB
+.svelte-kit/output/server/chunks/internal2.js                                   21.09 kB │ gzip:  6.55 kB
+.svelte-kit/output/server/chunks/utils.js                                       31.76 kB │ gzip:  9.35 kB
+.svelte-kit/output/server/chunks/client.js                                      51.72 kB │ gzip: 15.13 kB
+.svelte-kit/output/server/remote-entry.js                                       54.47 kB │ gzip: 12.01 kB
+.svelte-kit/output/server/index.js                                             123.86 kB │ gzip: 31.43 kB
+.svelte-kit/output/server/chunks/index-server.js                               129.58 kB │ gzip: 33.62 kB
+
+✓ built in 1.50s
+
+Run npm run preview to preview your production build locally.
+
+> Using @sveltejs/adapter-static
+  Wrote site to "build"
+  ✔ done
+
+> @lorepia/desktop-mobile@0.1.0 verify:built-boundary
+> node scripts/verify-built-executable-boundary.mjs
+
+verified 55 frontend build files; DISABLED_BY_SECURITY_POLICY
+Setting version of project lorepia-app to: 
+    0.1.0.
+
+Also setting CFBundleVersion key (assuming it exists)
+
+Updating CFBundleVersion in Info.plist(s)...
+
+Updated CFBundleVersion in "lorepia-app.xcodeproj/../lorepia-app_iOS/Info.plist" to 0.1.0
+
+
+--- xcodebuild: WARNING: Using the first of multiple matching destinations:
+{ platform:iOS Simulator, id:dvtdevice-DVTiOSDeviceSimulatorPlaceholder-iphonesimulator:placeholder, name:Any iOS Simulator Device }
+{ platform:iOS, id:dvtdevice-DVTiPhonePlaceholder-iphoneos:placeholder, name:Any iOS Device }
+{ platform:iOS Simulator, arch:arm64, id:17E3B389-5046-4CCB-981F-2EBB51A1C953, OS:26.5, name:iPad (A16) }
+{ platform:iOS Simulator, arch:arm64, id:E68EEB9B-1ADE-4E21-A588-17FFBE67341A, OS:26.5, name:iPad Air 11-inch (M4) }
+{ platform:iOS Simulator, arch:arm64, id:7ED08551-38A1-4B14-B361-476D49A43C45, OS:26.5, name:iPad Air 13-inch (M4) }
+{ platform:iOS Simulator, arch:arm64, id:4B7096B9-76DE-4792-8FE3-0E00354E896E, OS:26.5, name:iPad Pro 11-inch (M5) }
+{ platform:iOS Simulator, arch:arm64, id:C07ADABC-0903-4642-B927-BA8CEE18641C, OS:26.5, name:iPad Pro 13-inch (M5) }
+{ platform:iOS Simulator, arch:arm64, id:5E16A9EB-7F4D-4BEC-B157-5B079F5E08AF, OS:26.5, name:iPad mini (A17 Pro) }
+{ platform:iOS Simulator, arch:arm64, id:675F06B1-229D-4C31-8995-4E135FAA6630, OS:26.5, name:iPhone 17 }
+{ platform:iOS Simulator, arch:arm64, id:C1A0BEBE-B01F-4B6E-A7D0-1897C21D0D35, OS:26.5, name:iPhone 17 Pro }
+{ platform:iOS Simulator, arch:arm64, id:02B52FCE-6E31-4D3A-8D6C-CF15335850A9, OS:26.5, name:iPhone 17 Pro Max }
+{ platform:iOS Simulator, arch:arm64, id:C12803DD-5C74-474E-BAE4-794019B4B6A9, OS:26.5, name:iPhone 17e }
+{ platform:iOS Simulator, arch:arm64, id:41B7EF2A-03E9-4927-986B-813ECDC9C966, OS:26.5, name:iPhone Air }
+{ platform:macOS, arch:arm64, variant:Designed for [iPad,iPhone], id:00008132-001A71D01406401C, name:My Mac }
+        Info connection; remote_addr=127.0.0.1:52965 conn_id=0
+    Finished 1 iOS Bundle at:
+        /Users/codexer/LorePia_dev/apps/desktop-mobile/src-tauri/gen/apple/build/arm64-sim/LorePia.app
+

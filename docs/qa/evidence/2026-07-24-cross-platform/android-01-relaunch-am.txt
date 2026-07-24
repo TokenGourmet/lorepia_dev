@@ -1,0 +1,7 @@
+Starting: Intent { cmp=dev.lorepia.client/.MainActivity }
+Status: ok
+LaunchState: COLD
+Activity: dev.lorepia.client/.MainActivity
+TotalTime: 842
+WaitTime: 844
+Complete

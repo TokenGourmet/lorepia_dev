@@ -118,25 +118,26 @@
   {/if}
 
   <div class="composer-row">
-    <!-- Messages keeps Add and the text field as neighboring, independent
-         glass controls. The plain plus glyph avoids a double circle. -->
-    <button class="extra" type="button" disabled aria-label="첨부 (준비 중)">
-      <svg
-        viewBox="0 0 24 24"
-        width="20"
-        height="20"
-        fill="none"
-        stroke="currentColor"
-        stroke-width="2"
-        stroke-linecap="round"
-        stroke-linejoin="round"
-        aria-hidden="true"
-      >
-        <path d="M12 5v14" />
-        <path d="M5 12h14" />
-      </svg>
-    </button>
     <div class="field">
+      <!-- Add belongs to the composer capsule. Its visual is deliberately
+           unframed, while the complete 44px leading slot remains a real
+           button target for the future attachment surface. -->
+      <button class="extra" type="button" disabled aria-label="첨부 (준비 중)">
+        <svg
+          viewBox="0 0 24 24"
+          width="20"
+          height="20"
+          fill="none"
+          stroke="currentColor"
+          stroke-width="2"
+          stroke-linecap="round"
+          stroke-linejoin="round"
+          aria-hidden="true"
+        >
+          <path d="M12 5v14" />
+          <path d="M5 12h14" />
+        </svg>
+      </button>
       <textarea
         rows="1"
         {placeholder}
@@ -200,7 +201,6 @@
   .composer-row {
     display: flex;
     align-items: center;
-    gap: var(--sp-2);
     min-height: var(--size-tabbar);
   }
 
@@ -209,7 +209,7 @@
     z-index: 2;
     right: 0;
     bottom: calc(100% + var(--sp-1));
-    left: calc(var(--size-touch) + var(--sp-2));
+    left: 0;
     display: flex;
     align-items: flex-start;
     gap: var(--sp-2);
@@ -232,26 +232,30 @@
   }
 
   .extra {
+    position: absolute;
+    z-index: 1;
+    left: 0;
+    bottom: 0;
     width: var(--size-touch);
     height: var(--size-touch);
     box-sizing: border-box;
     flex-shrink: 0;
-    border: 0.5px solid var(--hairline);
-    border-radius: var(--r-pill);
-    background: var(--bar-bg);
-    -webkit-backdrop-filter: blur(20px) saturate(1.6);
-    backdrop-filter: blur(20px) saturate(1.6);
-    box-shadow: var(--shadow-float);
+    border: 0;
+    border-radius: 0;
+    background: transparent;
     color: var(--text-mid);
     display: inline-flex;
     align-items: center;
     justify-content: center;
     cursor: pointer;
-    transition: transform var(--dur-base) var(--ease-spring);
+    padding: 0;
+    transition:
+      color var(--dur-fast) var(--ease-out),
+      opacity var(--dur-fast) var(--ease-out);
   }
 
   .extra:disabled {
-    opacity: 0.58;
+    opacity: 0.52;
     cursor: default;
   }
 
@@ -277,7 +281,11 @@
     resize: none;
     background: transparent;
     border: none;
-    padding: 11px 46px 11px var(--sp-2);
+    padding:
+      11px
+      calc(var(--size-touch) + 2px)
+      11px
+      calc(var(--size-touch) + 2px);
     font-family: var(--font-ui);
     font-size: 16px;
     line-height: 22px;
@@ -291,13 +299,14 @@
 
   .send {
     position: absolute;
-    right: 5px;
-    bottom: 5px;
-    width: 34px;
-    height: 34px;
+    z-index: 1;
+    right: 0;
+    bottom: 0;
+    width: var(--size-touch);
+    height: var(--size-touch);
     border: none;
     border-radius: var(--r-pill);
-    background: var(--tint);
+    background: transparent;
     color: #fff;
     display: inline-flex;
     align-items: center;
@@ -305,24 +314,45 @@
     cursor: pointer;
     transition:
       opacity var(--dur-fast) var(--ease-out),
-      background var(--dur-base) var(--ease-out),
       color var(--dur-base) var(--ease-out),
       transform var(--dur-base) var(--ease-spring);
   }
 
+  .send::before {
+    content: "";
+    position: absolute;
+    inset: 5px;
+    border-radius: inherit;
+    background: var(--tint);
+    transition:
+      background var(--dur-base) var(--ease-out),
+      transform var(--dur-base) var(--ease-spring);
+  }
+
+  .send svg {
+    position: relative;
+    z-index: 1;
+  }
+
   .send:disabled {
     opacity: 0;
-    transform: scale(0.5);
     cursor: default;
     pointer-events: none;
   }
 
-  .send:not(:disabled):active {
+  .send:disabled::before {
     transform: scale(0.88);
   }
 
-  .send.stop {
+  .send:not(:disabled):active::before {
+    transform: scale(0.88);
+  }
+
+  .send.stop::before {
     background: var(--tint-soft);
+  }
+
+  .send.stop {
     color: var(--tint);
   }
 

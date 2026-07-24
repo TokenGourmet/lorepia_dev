@@ -162,6 +162,12 @@ describe("native product boundary", () => {
     expect(nativeBackSwift).toContain(
       '"window.dispatchEvent(new Event(\'lorepia:native-room-info\'))"',
     );
+    expect(nativeBackSwift).toContain(
+      'target.accessibilityLabel = "대화 설정 열기"',
+    );
+    expect(nativeBackSwift).not.toContain(
+      'target.accessibilityLabel = "세라핀"',
+    );
     expect(nativeBackSwift).not.toMatch(
       /interactiveContentPopGestureRecognizer\??\.(?:delegate|addTarget)/u,
     );
@@ -179,12 +185,20 @@ describe("native product boundary", () => {
     );
   });
 
-  it("gives Android safe-area ownership to native padding exactly once", () => {
+  it("gives Android safe-area and IME ownership to one native WebView boundary", () => {
     expect(androidActivity).not.toContain(".style");
     expect(androidActivity).not.toContain("evaluateJavascript");
+    expect(androidActivity).toContain("WindowInsetsCompat.Type.systemBars()");
+    expect(androidActivity).toContain("WindowInsetsCompat.Type.displayCutout()");
+    expect(androidActivity).toContain("WindowInsetsCompat.Type.ime()");
     expect(androidActivity).toContain(
-      "view.setPadding(0, bars.top, 0, bars.bottom)",
+      "imeVisible = insets.isVisible(WindowInsetsCompat.Type.ime())",
     );
+    expect(androidActivity).toContain("layoutParams.setMargins(");
+    expect(androidActivity).toContain(
+      ".setInsets(WindowInsetsCompat.Type.ime(), Insets.NONE)",
+    );
+    expect(androidActivity).toContain(".setInsets(safeTypes, Insets.NONE)");
     expect(androidActivity).toContain("ViewCompat.requestApplyInsets(webView)");
     expect(appTemplate).toContain(
       '<script src="%sveltekit.assets%/platform-init.js"></script>',

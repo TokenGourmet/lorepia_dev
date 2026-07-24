@@ -33,6 +33,59 @@ describe("app preferences controller", () => {
     );
   });
 
+  it("migrates and persists a configuration-only provider selection", async () => {
+    const vertexPreferences: VersionedAppPreferences = {
+      ...initial,
+      value: {
+        ...initial.value,
+        selectedProviderId: "google-vertex-ai",
+      },
+    };
+    const applied: AppPreferences[] = [];
+    const updateAppPreferences = vi.fn(
+      async (_revision: number, value: AppPreferences) => ({
+        revision: 4,
+        value,
+      }),
+    );
+    const controller = createAppPreferencesController(
+      {
+        getAppPreferences: vi.fn(async () => vertexPreferences),
+        updateAppPreferences,
+      },
+      (value) => applied.push(value),
+    );
+
+    await controller.hydrate();
+    await controller.flush();
+
+    expect(controller.current.selectedProviderId).toBe("openai");
+    expect(applied.at(0)?.selectedProviderId).toBe("openai");
+    expect(updateAppPreferences).toHaveBeenCalledWith(
+      3,
+      expect.objectContaining({ selectedProviderId: "openai" }),
+    );
+    expect(controller.saving).toBe(false);
+  });
+
+  it("does not allow a configuration-only provider to be selected again", async () => {
+    const updateAppPreferences = vi.fn();
+    const controller = createAppPreferencesController(
+      {
+        getAppPreferences: vi.fn(async () => initial),
+        updateAppPreferences,
+      },
+      () => undefined,
+    );
+    await controller.hydrate();
+
+    controller.setProvider("google-vertex-ai");
+    await controller.flush();
+
+    expect(controller.current.selectedProviderId).toBe("anthropic");
+    expect(updateAppPreferences).not.toHaveBeenCalled();
+  });
+
   it("preserves edits made while hydration is in flight", async () => {
     let resolveLoad: (value: VersionedAppPreferences) => void = () => undefined;
     const load = new Promise<VersionedAppPreferences>((resolve) => {
@@ -213,5 +266,78 @@ describe("app preferences controller", () => {
       selectedProviderId: "deepseek",
       defaultMode: "story",
     });
+  });
+
+  it("retries a failed hydration without discarding the local edit", async () => {
+    const getAppPreferences = vi
+      .fn<() => Promise<VersionedAppPreferences>>()
+      .mockRejectedValueOnce(new Error("storage offline"))
+      .mockResolvedValueOnce(initial);
+    const updateAppPreferences = vi.fn(
+      async (_revision: number, value: AppPreferences) => ({
+        revision: 4,
+        value,
+      }),
+    );
+    const controller = createAppPreferencesController(
+      { getAppPreferences, updateAppPreferences },
+      () => undefined,
+    );
+
+    await controller.hydrate();
+    expect(controller.unavailable).toBe(true);
+
+    controller.setTheme("light");
+    expect(controller.saving).toBe(true);
+    await controller.retry();
+
+    expect(getAppPreferences).toHaveBeenCalledTimes(2);
+    expect(updateAppPreferences).toHaveBeenCalledWith(
+      3,
+      expect.objectContaining({ theme: "light" }),
+    );
+    expect(controller.unavailable).toBe(false);
+    expect(controller.saving).toBe(false);
+    expect(controller.current.theme).toBe("light");
+  });
+
+  it("refreshes the revision before retrying a failed write", async () => {
+    const getAppPreferences = vi
+      .fn<() => Promise<VersionedAppPreferences>>()
+      .mockResolvedValueOnce(initial)
+      .mockResolvedValueOnce({ ...initial, revision: 8 });
+    const updateAppPreferences = vi
+      .fn<
+        (
+          revision: number,
+          value: AppPreferences,
+        ) => Promise<VersionedAppPreferences>
+      >()
+      .mockRejectedValueOnce(new Error("write failed"))
+      .mockImplementationOnce(async (_revision, value) => ({
+        revision: 9,
+        value,
+      }));
+    const controller = createAppPreferencesController(
+      { getAppPreferences, updateAppPreferences },
+      () => undefined,
+    );
+    await controller.hydrate();
+
+    controller.setDefaultMode("chat");
+    expect(controller.saving).toBe(true);
+    await controller.flush();
+    expect(controller.unavailable).toBe(true);
+    expect(controller.saving).toBe(false);
+
+    await controller.retry();
+
+    expect(getAppPreferences).toHaveBeenCalledTimes(2);
+    expect(updateAppPreferences).toHaveBeenLastCalledWith(
+      8,
+      expect.objectContaining({ defaultMode: "chat" }),
+    );
+    expect(controller.unavailable).toBe(false);
+    expect(controller.saving).toBe(false);
   });
 });

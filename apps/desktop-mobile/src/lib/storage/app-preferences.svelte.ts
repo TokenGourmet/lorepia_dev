@@ -1,9 +1,10 @@
 import type { ThreadMode } from "$lib/chat/types";
 import { theme, type ThemePreference } from "$lib/design/theme.svelte";
 import { activeProviderProfile } from "$lib/providers/active-profile.svelte";
-import type {
-  ApiKeyProviderId,
-  LlmProviderId,
+import {
+  getLlmProvider,
+  type ApiKeyProviderId,
+  type LlmProviderId,
 } from "$lib/providers/catalog";
 
 import { storageClient, type AppPreferences } from "./client";
@@ -33,6 +34,22 @@ function copyPreferences(value: AppPreferences): AppPreferences {
   });
 }
 
+function supportedProviderId(providerId: LlmProviderId): LlmProviderId {
+  return getLlmProvider(providerId).status === "first-chat-ready"
+    ? providerId
+    : DEFAULT_PREFERENCES.selectedProviderId;
+}
+
+function migratePreferences(value: AppPreferences): AppPreferences {
+  const selectedProviderId = supportedProviderId(value.selectedProviderId);
+  return selectedProviderId === value.selectedProviderId
+    ? value
+    : {
+        ...value,
+        selectedProviderId,
+      };
+}
+
 function applyToProduct(value: AppPreferences): void {
   theme.set(value.theme);
   activeProviderProfile.restoreNonSecretSettings(
@@ -48,6 +65,7 @@ export function createAppPreferencesController(
   let current = $state<AppPreferences>(DEFAULT_PREFERENCES);
   let hydrated = $state(false);
   let unavailable = $state(false);
+  let saving = $state(false);
   let revision = 0;
   let generation = 0;
   let persistedGeneration = 0;
@@ -99,13 +117,28 @@ export function createAppPreferencesController(
   };
 
   const hydrate = (): Promise<void> => {
-    hydration ??= (async () => {
+    if (hydrated && !unavailable) {
+      return Promise.resolve();
+    }
+    if (hydration !== null) {
+      return hydration;
+    }
+
+    const request = (async () => {
       try {
         const loaded = await client.getAppPreferences();
         revision = loaded.revision;
         hydrated = true;
         unavailable = false;
-        setCurrent(mergeHydratedPreferences(loaded.value));
+        const merged = mergeHydratedPreferences(loaded.value);
+        const migrated = migratePreferences(merged);
+        const migrationRequired =
+          migrated.selectedProviderId !== merged.selectedProviderId;
+        setCurrent(migrated);
+        if (migrationRequired) {
+          generation += 1;
+          saving = true;
+        }
         if (generation === 0) {
           persistedGeneration = generation;
         } else {
@@ -114,9 +147,16 @@ export function createAppPreferencesController(
       } catch {
         hydrated = true;
         unavailable = true;
+        saving = false;
       }
     })();
-    return hydration;
+    hydration = request;
+    void request.finally(() => {
+      if (hydration === request) {
+        hydration = null;
+      }
+    });
+    return request;
   };
 
   const queueWrite = (): Promise<void> => {
@@ -127,8 +167,12 @@ export function createAppPreferencesController(
         if (!hydrated) {
           await hydrate();
         }
-        if (unavailable || persistedGeneration >= generation) return;
+        if (unavailable || persistedGeneration >= generation) {
+          saving = false;
+          return;
+        }
 
+        saving = true;
         const writeGeneration = generation;
         const writeValue = copyPreferences(current);
         const saved = await client.updateAppPreferences(revision, writeValue);
@@ -136,10 +180,12 @@ export function createAppPreferencesController(
         persistedGeneration = writeGeneration;
         if (generation === writeGeneration) {
           setCurrent(saved.value);
+          saving = false;
         }
       })
       .catch(() => {
         unavailable = true;
+        saving = false;
       });
     return writeTail;
   };
@@ -169,6 +215,7 @@ export function createAppPreferencesController(
     if (change.defaultMode !== undefined) touchedFields.add("defaultMode");
     if (touchedModelId !== undefined) touchedModelIds.add(touchedModelId);
     generation += 1;
+    saving = true;
     setCurrent({
       ...current,
       ...change,
@@ -188,8 +235,31 @@ export function createAppPreferencesController(
     get unavailable(): boolean {
       return unavailable;
     },
+    get saving(): boolean {
+      return saving;
+    },
     hydrate,
+    async retry(): Promise<void> {
+      clearTimer();
+      if (!unavailable && hydrated) {
+        if (persistedGeneration < generation) {
+          saving = true;
+          await queueWrite();
+        }
+        return;
+      }
+
+      unavailable = false;
+      hydrated = false;
+      saving = persistedGeneration < generation;
+      await hydrate();
+      if (!unavailable && persistedGeneration < generation) {
+        saving = true;
+        await queueWrite();
+      }
+    },
     setProvider(providerId: LlmProviderId): void {
+      if (supportedProviderId(providerId) !== providerId) return;
       update({ selectedProviderId: providerId });
     },
     setModelId(providerId: ApiKeyProviderId, modelId: string): void {

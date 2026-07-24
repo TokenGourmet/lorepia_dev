@@ -49,4 +49,35 @@ describe("provider settings surface", () => {
     expect(source).toContain("appPreferences.setTheme");
     expect(source).toContain("appPreferences.setDefaultMode");
   });
+
+  it("makes preference and credential failures recoverable in place", () => {
+    expect(source).toContain("appPreferences.unavailable");
+    expect(source).toContain("appPreferences.retry()");
+    expect(source).toContain("retryCredentialStatus");
+    expect(source).toContain("설정을 기기에 저장하지 못했습니다");
+    expect(source).toContain("상태 확인 실패");
+  });
+
+  it("shows official setup guidance and labels unavailable providers honestly", () => {
+    expect(source).toContain("selectedProvider.documentationUrl");
+    expect(source).toContain("공식 문서 주소");
+    expect(source).not.toContain('target="_blank"');
+    expect(source).toContain(
+      'provider.status === "configuration-only"',
+    );
+    expect(source).toContain("현재 버전에서는 연결할 수 없습니다");
+    expect(source).not.toContain("연결 후 모델 목록에서 선택");
+  });
+
+  it("keeps compact settings controls at a 44px minimum hit height", () => {
+    expect(source).toMatch(
+      /\.segment button\s*\{[\s\S]*?min-height:\s*var\(--size-touch\)/,
+    );
+    expect(source).toMatch(
+      /\.setting-input input\s*\{[\s\S]*?min-height:\s*var\(--size-touch\)/,
+    );
+    expect(source).toMatch(
+      /\.remove\s*\{[\s\S]*?min-height:\s*var\(--size-touch\)/,
+    );
+  });
 });

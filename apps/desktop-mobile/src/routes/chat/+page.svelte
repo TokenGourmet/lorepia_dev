@@ -1,10 +1,14 @@
 <script lang="ts">
-  import { onDestroy, onMount } from "svelte";
+  import { onDestroy, onMount, tick, untrack } from "svelte";
   import { goto } from "$app/navigation";
   import { page } from "$app/state";
 
   import "$lib/design/tokens.css";
 
+  import {
+    characterChatTitle,
+    findSampleCharacter,
+  } from "$lib/characters/sample";
   import Composer from "$lib/chat/Composer.svelte";
   import {
     createFrameChunkBuffer,
@@ -24,12 +28,16 @@
     firstChatInputBlockReason,
   } from "$lib/providers/first-chat-request";
   import {
-    loadOrCreateFirstChat,
+    FIRST_CHAT_CHARACTER_ID,
+    loadOrCreateCharacterChat,
     toChatMessage,
   } from "$lib/storage/chat-history";
-  import { boundedTailById } from "$lib/storage/bounded-history-window";
   import { appPreferences } from "$lib/storage/app-preferences.svelte";
-  import { storageClient } from "$lib/storage/client";
+  import {
+    MAX_MESSAGE_PAGE,
+    storageClient,
+    type MessageCursor,
+  } from "$lib/storage/client";
   import Avatar from "$lib/ui/Avatar.svelte";
   import { activateBackSwipeSurface } from "$lib/ui/back-swipe-surface";
   import { chatRoomPrefs } from "$lib/chat/room-prefs.svelte";
@@ -37,10 +45,26 @@
   import {
     connectNativeBack,
     requestNativeBackPop,
+    shouldOptimisticallyArmNativeBack,
+    usesNativeBackChrome,
   } from "$lib/ui/native-back";
+  import {
+    prependOlderMessages,
+    preservedPrependScrollTop,
+  } from "./history-pagination";
 
-  const characterName = "세라핀";
-  const characterInitial = "세";
+  const fallbackCharacter = findSampleCharacter(FIRST_CHAT_CHARACTER_ID)!;
+  const requestedCharacterId = $derived(
+    page.url.searchParams.get("character") ?? FIRST_CHAT_CHARACTER_ID,
+  );
+  const character = $derived(
+    findSampleCharacter(requestedCharacterId) ?? fallbackCharacter,
+  );
+  const characterName = $derived(character.name);
+  const characterInitial = $derived(character.initial);
+  const chatHref = $derived(
+    `/chat?character=${encodeURIComponent(character.id)}`,
+  );
   const STREAM_TEXT_BLOCK_CHARACTERS = 8_192;
   const NATIVE_ROOM_INFO_EVENT = "lorepia:native-room-info";
 
@@ -49,9 +73,22 @@
   let activeDeltaBuffer: FrameChunkBuffer | null = null;
   let chatId = $state<string | null>(null);
   let storageUnavailable = $state(false);
+  let historyHasMore = $state(false);
+  let olderCursor = $state<MessageCursor | null>(null);
+  let loadingOlder = $state(false);
+  let olderLoadFailed = $state(false);
+  let olderLoadAttempted = $state(false);
+  let olderRequestId = 0;
+  let suppressNextAutoScroll = false;
   let historyEpoch = 0;
+  let initializedCharacterId: string | null = null;
   let disposed = false;
   let nativeBackActive = $state(false);
+  const infoHref = $derived(
+    `${chatHref.replace("/chat?", "/chat/info?")}${
+      chatId === null ? "" : `&chatId=${encodeURIComponent(chatId)}`
+    }`,
+  );
 
   let messages = $state<ChatMessage[]>([]);
   const sendBlockReason = $derived(
@@ -89,7 +126,19 @@
     navigateBack();
   }
 
-  async function initializeHistory(): Promise<void> {
+  async function openInfo(event?: MouseEvent): Promise<void> {
+    event?.preventDefault();
+    await goto(infoHref, {
+      state: {
+        backHref: chatHref,
+      },
+    });
+  }
+
+  async function initializeHistory(
+    targetCharacterId = character.id,
+    targetTitle = characterChatTitle(character.name),
+  ): Promise<void> {
     const epoch = ++historyEpoch;
     try {
       // A hard WebView reload loses the old JS control token while the native
@@ -97,16 +146,30 @@
       // wait for durable terminal state, then read canonical SQLite history.
       await resetProviderStreamOwner();
       await appPreferences.hydrate();
-      const loaded = await loadOrCreateFirstChat();
+      const loaded = await loadOrCreateCharacterChat(
+        targetCharacterId,
+        targetTitle,
+      );
       if (disposed || epoch !== historyEpoch) return;
       chatRoomPrefs.seedDefault(appPreferences.current.defaultMode);
       chatId = loaded.chat.id;
-      messages = [...boundedTailById(loaded.messages)];
+      messages = [...loaded.messages];
+      historyHasMore = loaded.hasMore;
+      olderCursor = loaded.olderCursor;
+      loadingOlder = false;
+      olderLoadFailed = false;
+      olderLoadAttempted = false;
       storageUnavailable = false;
     } catch {
       if (disposed || epoch !== historyEpoch) return;
       chatId = null;
       messages = [];
+      historyHasMore = false;
+      olderCursor = null;
+      loadingOlder = false;
+      olderLoadFailed = false;
+      olderLoadAttempted = false;
+      olderRequestId += 1;
       storageUnavailable = true;
     }
   }
@@ -117,13 +180,93 @@
     try {
       const loaded = await storageClient.loadChatMessages(targetChatId);
       if (disposed || epoch !== historyEpoch || chatId !== targetChatId) return;
-      messages = [
-        ...boundedTailById(loaded.items.map(toChatMessage)),
-      ];
+      messages = loaded.items.map(toChatMessage);
+      historyHasMore = loaded.hasMore;
+      olderCursor = loaded.olderCursor;
+      loadingOlder = false;
+      olderLoadFailed = false;
+      olderLoadAttempted = false;
+      olderRequestId += 1;
       storageUnavailable = false;
     } catch {
       if (!disposed && epoch === historyEpoch) {
         storageUnavailable = true;
+      }
+    }
+  }
+
+  async function loadOlderHistory(): Promise<void> {
+    const targetChatId = chatId;
+    const requestedCursor = olderCursor;
+    if (
+      targetChatId === null ||
+      requestedCursor === null ||
+      !historyHasMore ||
+      loadingOlder
+    ) {
+      return;
+    }
+
+    const requestId = ++olderRequestId;
+    const region = scrollRegion;
+    const previousHeight = region?.scrollHeight ?? 0;
+    const previousTop = region?.scrollTop ?? 0;
+    loadingOlder = true;
+    olderLoadFailed = false;
+    olderLoadAttempted = true;
+
+    try {
+      const loaded = await storageClient.loadChatMessages(
+        targetChatId,
+        MAX_MESSAGE_PAGE,
+        requestedCursor,
+      );
+      if (
+        disposed ||
+        requestId !== olderRequestId ||
+        chatId !== targetChatId ||
+        olderCursor?.chatId !== requestedCursor.chatId ||
+        olderCursor.ordinal !== requestedCursor.ordinal
+      ) {
+        return;
+      }
+
+      const merged = prependOlderMessages(
+        messages,
+        loaded.items.map(toChatMessage),
+      );
+      const inserted = merged.length > messages.length;
+      historyHasMore = loaded.hasMore;
+      olderCursor = loaded.olderCursor;
+      olderLoadFailed = false;
+
+      if (inserted) {
+        suppressNextAutoScroll = true;
+        messages = merged;
+        await tick();
+        if (scrollRegion === region && region !== null) {
+          region.scrollTop = preservedPrependScrollTop(
+            previousTop,
+            previousHeight,
+            region.scrollHeight,
+          );
+        }
+      }
+    } catch {
+      if (
+        !disposed &&
+        requestId === olderRequestId &&
+        chatId === targetChatId
+      ) {
+        olderLoadFailed = true;
+      }
+    } finally {
+      if (
+        !disposed &&
+        requestId === olderRequestId &&
+        chatId === targetChatId
+      ) {
+        loadingOlder = false;
       }
     }
   }
@@ -185,23 +328,21 @@
     const nonce = `${Date.now()}-${crypto.randomUUID()}`;
     const assistantId = `assistant-${nonce}`;
     messages = [
-      ...boundedTailById([
-        ...messages,
-        {
-          id: `user-${nonce}`,
-          role: "user" as const,
-          text,
-          sentAt: new Date(),
-        },
-        {
-          id: assistantId,
-          role: "character" as const,
-          text: "",
-          streamingChunks: [],
-          sentAt: new Date(),
-          streaming: true,
-        },
-      ]),
+      ...messages,
+      {
+        id: `user-${nonce}`,
+        role: "user" as const,
+        text,
+        sentAt: new Date(),
+      },
+      {
+        id: assistantId,
+        role: "character" as const,
+        text: "",
+        streamingChunks: [],
+        sentAt: new Date(),
+        streaming: true,
+      },
     ];
 
     let failureShown = false;
@@ -305,30 +446,68 @@
     }
   }
 
+  function activateCharacter(
+    targetCharacterId: string,
+    targetTitle: string,
+  ): void {
+    if (initializedCharacterId === targetCharacterId) return;
+    initializedCharacterId = targetCharacterId;
+    historyEpoch += 1;
+    cancelPendingDeltaRender();
+    const handle = activeStream;
+    activeStream = null;
+    if (handle !== null) {
+      void handle.cancel().catch(() => undefined);
+    }
+    chatId = null;
+    messages = [];
+    historyHasMore = false;
+    olderCursor = null;
+    loadingOlder = false;
+    olderLoadFailed = false;
+    olderLoadAttempted = false;
+    olderRequestId += 1;
+    storageUnavailable = false;
+    void initializeHistory(targetCharacterId, targetTitle);
+  }
+
+  $effect(() => {
+    const targetCharacterId = character.id;
+    const targetTitle = characterChatTitle(character.name);
+    untrack(() => activateCharacter(targetCharacterId, targetTitle));
+  });
+
   onMount(() => {
     const stopKeyboardInset = keyboardInset.start();
     let disconnectNativeBack = (): void => undefined;
     let nativeBackDisposed = false;
+    const nativePlatform =
+      document.documentElement.dataset.nativePlatform;
+    nativeBackActive =
+      shouldOptimisticallyArmNativeBack(nativePlatform);
     const openNativeRoomInfo = (): void => {
-      if (!nativeBackDisposed) void goto("/chat/info");
+      if (!nativeBackDisposed) void openInfo();
     };
     window.addEventListener(NATIVE_ROOM_INFO_EVENT, openNativeRoomInfo);
 
-    void connectNativeBack(() => {
-      if (nativeBackDisposed) return;
-      nativeBackActive = false;
-      navigateBack();
-    }).then((connection) => {
-      if (nativeBackDisposed) {
-        connection.disconnect();
-        return;
-      }
-      disconnectNativeBack = connection.disconnect;
-      nativeBackActive =
-        connection.status.active && connection.status.gestureEnabled;
-    });
+    if (nativePlatform === "ios") {
+      void connectNativeBack(() => {
+        if (nativeBackDisposed) return;
+        nativeBackActive = false;
+        navigateBack();
+      }).then((connection) => {
+        if (nativeBackDisposed) {
+          connection.disconnect();
+          return;
+        }
+        disconnectNativeBack = connection.disconnect;
+        nativeBackActive = usesNativeBackChrome(
+          connection.status,
+          nativePlatform,
+        );
+      });
+    }
 
-    void initializeHistory();
     return () => {
       nativeBackDisposed = true;
       window.removeEventListener(
@@ -353,6 +532,10 @@
     void keyboardInset.value;
     const region = scrollRegion;
     if (region) {
+      if (suppressNextAutoScroll) {
+        suppressNextAutoScroll = false;
+        return;
+      }
       requestAnimationFrame(() => {
         region.scrollTop = region.scrollHeight;
       });
@@ -361,7 +544,7 @@
 </script>
 
 <svelte:head>
-  <title>LorePia — 대화</title>
+  <title>LorePia — {characterName} 대화</title>
 </svelte:head>
 
 <div
@@ -377,6 +560,8 @@
       class="back"
       href="/"
       aria-label="이전 화면으로 돌아가기"
+      aria-hidden={nativeBackActive}
+      tabindex={nativeBackActive ? -1 : undefined}
       onclick={handleBackClick}
     >
       <svg
@@ -398,9 +583,10 @@
          entry — Messages has no ⋯ in the chat bar. -->
     <a
       class="identity lp-state-layer"
-      href="/chat/info"
+      href={infoHref}
       aria-hidden={nativeBackActive}
       tabindex={nativeBackActive ? -1 : undefined}
+      onclick={openInfo}
     >
       <Avatar initial={characterInitial} size={36} />
       <span class="name">
@@ -433,14 +619,41 @@
       <div class="empty-thread">
         <Avatar initial={characterInitial} size={72} />
         <p class="empty-name">{characterName}</p>
-        <p class="empty-tagline">달빛 서고의 사서</p>
-        <p class="empty-hint">
-          {storageUnavailable
-            ? "로컬 저장소를 사용할 수 없어 대화를 불러오지 못했습니다"
-            : "첫 인사를 건네보세요"}
-        </p>
+        <p class="empty-tagline">{character.tagline}</p>
+        {#if storageUnavailable}
+          <div class="empty-hint error" role="alert">
+            <span>로컬 저장소를 사용할 수 없어 대화를 불러오지 못했습니다</span>
+            <button type="button" onclick={() => void initializeHistory()}>
+              다시 시도
+            </button>
+          </div>
+        {:else}
+          <p class="empty-hint">첫 인사를 건네보세요</p>
+        {/if}
       </div>
     {:else}
+      {#if historyHasMore || olderLoadAttempted}
+        <div class="history-pagination" aria-live="polite">
+          {#if loadingOlder}
+            <p role="status">이전 메시지를 불러오는 중…</p>
+          {:else if olderLoadFailed}
+            <p role="alert">이전 메시지를 불러오지 못했습니다.</p>
+            <button
+              type="button"
+              aria-label="이전 메시지 다시 불러오기"
+              onclick={() => void loadOlderHistory()}
+            >
+              다시 시도
+            </button>
+          {:else if historyHasMore}
+            <button type="button" onclick={() => void loadOlderHistory()}>
+              이전 메시지 불러오기
+            </button>
+          {:else}
+            <p role="status">대화의 처음입니다</p>
+          {/if}
+        </div>
+      {/if}
       <MessageThread
         {messages}
         mode={chatRoomPrefs.mode}
@@ -593,6 +806,38 @@
     scroll-behavior: smooth;
   }
 
+  .history-pagination {
+    min-height: var(--size-touch);
+    padding: var(--sp-2) var(--sp-4) 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: var(--sp-2);
+    color: var(--text-faint);
+    font-size: var(--fs-caption);
+    text-align: center;
+  }
+
+  .history-pagination p {
+    margin: 0;
+  }
+
+  .history-pagination button {
+    min-height: var(--size-touch);
+    padding: 0 var(--sp-4);
+    border: 0;
+    border-radius: var(--r-pill);
+    background: transparent;
+    color: var(--tint);
+    font: inherit;
+    font-weight: 600;
+    cursor: pointer;
+  }
+
+  .history-pagination button:active {
+    background: var(--tint-soft);
+  }
+
   .empty-thread {
     position: relative;
     height: 100%;
@@ -644,6 +889,25 @@
     border-radius: var(--r-pill);
     font-size: var(--fs-label);
     color: var(--text-mid);
+  }
+
+  .empty-hint.error {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: var(--sp-2);
+    border-radius: var(--r-card);
+  }
+
+  .empty-hint button {
+    min-height: 32px;
+    padding: 0 var(--sp-3);
+    border: 0.5px solid var(--hairline);
+    border-radius: var(--r-pill);
+    background: var(--surface-card);
+    color: var(--text-strong);
+    font: inherit;
+    cursor: pointer;
   }
 
   .composer-slot {

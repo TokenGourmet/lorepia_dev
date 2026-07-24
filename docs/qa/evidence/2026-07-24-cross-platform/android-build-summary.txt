@@ -1,0 +1,21 @@
+2026-07-24 QA command transcript excerpt
+
+Command:
+ANDROID_HOME=/Users/codexer/Library/Android/lorepia-sdk \
+NDK_HOME=/Users/codexer/Library/Android/lorepia-sdk/ndk/28.2.13676358 \
+npm run tauri -- android build --debug --target aarch64 --apk --ci
+
+Result:
+- Frontend production build and built-boundary verification completed.
+- Rust aarch64-linux-android dev profile completed in 1m 06s.
+- liblorepia_app_lib.so was produced and linked into jniLibs.
+- APK assembly did not start because Gradle could not locate a Java Runtime.
+- Command exit code: 1.
+
+Relevant terminal output:
+The operation couldn’t be completed. Unable to locate a Java Runtime.
+failed to build APK: Failed to assemble APK
+
+Classification:
+ENV-01 BLOCKED by the local QA environment. This is not classified as an app
+source compilation failure, and a current-tree APK was not produced.

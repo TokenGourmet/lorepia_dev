@@ -61,7 +61,9 @@ function cursorIsStrictlyOlder(
   );
 }
 
-export async function loadOrCreateFirstChat(
+export async function loadOrCreateCharacterChat(
+  characterId: string,
+  title: string,
   client: ChatStorageClient = storageClient,
 ): Promise<LoadedChatHistory> {
   const seenChatIds = new Set<string>();
@@ -76,7 +78,7 @@ export async function loadOrCreateFirstChat(
         throw new Error("INVALID_CHAT_PAGINATION");
       }
       seenChatIds.add(candidate.id);
-      if (candidate.characterId === FIRST_CHAT_CHARACTER_ID) {
+      if (candidate.characterId === characterId) {
         chat = candidate;
         break;
       }
@@ -103,7 +105,7 @@ export async function loadOrCreateFirstChat(
     if (!exhausted) {
       throw new Error("CHAT_SCAN_LIMIT_EXCEEDED");
     }
-    chat = await client.createChat(FIRST_CHAT_CHARACTER_ID, FIRST_CHAT_TITLE);
+    chat = await client.createChat(characterId, title);
   }
   const page = await client.loadChatMessages(chat.id);
   const window = createBoundedHistoryWindow(page);
@@ -113,4 +115,14 @@ export async function loadOrCreateFirstChat(
     hasMore: window.hasMore,
     olderCursor: window.olderCursor,
   });
+}
+
+export function loadOrCreateFirstChat(
+  client: ChatStorageClient = storageClient,
+): Promise<LoadedChatHistory> {
+  return loadOrCreateCharacterChat(
+    FIRST_CHAT_CHARACTER_ID,
+    FIRST_CHAT_TITLE,
+    client,
+  );
 }

@@ -1,0 +1,261 @@
+--------- beginning of main
+07-24 01:57:52.672  7461  7461 I .lorepia.client: Late-enabling -Xcheck:jni
+07-24 01:57:52.726  7461  7461 I .lorepia.client: Using CollectorTypeCMC GC.
+07-24 01:57:52.743  7461  7461 D nativeloader: Load libframework-connectivity-tiramisu-jni.so using APEX ns com_android_tethering for caller /apex/com.android.tethering/javalib/framework-connectivity-t.jar: ok
+07-24 01:57:53.232  7461  7461 D nativeloader: Configuring clns-9 for other apk /data/app/~~fqrweRT_KtNLtnZxwDtxFQ==/dev.lorepia.client-OlR5-K9RNfiTG5RdUF6_ig==/base.apk. target_sdk_version=36, uses_libraries=, library_path=/data/app/~~fqrweRT_KtNLtnZxwDtxFQ==/dev.lorepia.client-OlR5-K9RNfiTG5RdUF6_ig==/lib/arm64:/data/app/~~fqrweRT_KtNLtnZxwDtxFQ==/dev.lorepia.client-OlR5-K9RNfiTG5RdUF6_ig==/base.apk!/lib/arm64-v8a, permitted_path=/data:/mnt/expand:/data/user/0/dev.lorepia.client
+07-24 01:57:53.235  7461  7461 I .lorepia.client: AssetManager2(0xb400007125bad8f8) locale list changing from [] to [en-US]
+07-24 01:57:53.240  7461  7461 V GraphicsEnvironment: Currently set values for:
+07-24 01:57:53.240  7461  7461 V GraphicsEnvironment:   angle_gl_driver_selection_pkgs=[]
+07-24 01:57:53.240  7461  7461 V GraphicsEnvironment:   angle_gl_driver_selection_values=[]
+07-24 01:57:53.240  7461  7461 V GraphicsEnvironment: dev.lorepia.client is not listed in per-application setting
+07-24 01:57:53.241  7461  7461 V GraphicsEnvironment: ANGLE allowlist from config: com.dreamgames.royalmatch com.dts.freefiremax com.dxx.firenow com.gramgames.mergedragons com.ludo.king com.mojang.minecraftpe com.my.defense com.nintendo.zaka com.os.airforce com.playrix.fishdomdd.gplay io.teslatech.callbreak jp.konami.prospia net.peakgames.toonblast
+07-24 01:57:53.241  7461  7461 V GraphicsEnvironment: dev.lorepia.client is not listed in ANGLE allowlist or settings, returning default
+07-24 01:57:53.242  7461  7461 V GraphicsEnvironment: Neither updatable production driver nor prerelease driver is supported.
+--------- beginning of system
+07-24 01:57:53.353  7461  7476 I DisplayManager: Choreographer implicitly registered for the refresh rate.
+07-24 01:57:53.355  7461  7461 I .lorepia.client: AssetManager2(0xb400007125ba42f8) locale list changing from [] to [en-US]
+07-24 01:57:53.381  7461  7461 D AppCompatDelegate: Checking for metadata for AppLocalesMetadataHolderService : Service not found
+07-24 01:57:53.383  7461  7461 I .lorepia.client: AssetManager2(0xb400007125bb1778) locale list changing from [] to [en-US]
+07-24 01:57:53.398  7461  7461 E ashmem  : Pinning is deprecated since Android Q. Please use trim or other methods.
+07-24 01:57:53.399  7461  7476 I EGL_emulation: Opening libGLESv1_CM_emulation.so
+07-24 01:57:53.399  7461  7476 I EGL_emulation: Opening libGLESv2_emulation.so
+07-24 01:57:53.404  7461  7476 W HWUI    : Failed to choose config with EGL_SWAP_BEHAVIOR_PRESERVED, retrying without...
+07-24 01:57:53.404  7461  7476 W HWUI    : Failed to initialize 101010-2 format, error = EGL_SUCCESS
+07-24 01:57:53.407  7461  7461 D CompatChangeReporter: Compat change id reported: 377864165; UID 10221; state: ENABLED
+07-24 01:57:53.408  7461  7461 D DesktopModeFlags: Toggle override initialized to: OVERRIDE_UNSET
+07-24 01:57:53.440  7461  7461 D nativeloader: Load /data/app/~~fqrweRT_KtNLtnZxwDtxFQ==/dev.lorepia.client-OlR5-K9RNfiTG5RdUF6_ig==/base.apk!/lib/arm64-v8a/liblorepia_app_lib.so using class loader ns clns-9 (caller=/data/app/~~fqrweRT_KtNLtnZxwDtxFQ==/dev.lorepia.client-OlR5-K9RNfiTG5RdUF6_ig==/base.apk!classes6.dex): ok
+07-24 01:57:53.476  7461  7461 I .lorepia.client: hiddenapi: Accessing hidden method Landroid/view/ViewGroup;->makeOptionalFitsSystemWindows()V (runtime_flags=0, domain=platform, api=unsupported) from Landroidx/appcompat/widget/ViewUtils; (domain=app) using reflection: allowed
+07-24 01:57:53.489  7461  7461 W HWUI    : Unknown dataspace 0
+07-24 01:57:53.506  7461  7461 I .lorepia.client: AssetManager2(0xb400007125baf838) locale list changing from [] to [en-US]
+07-24 01:57:53.506  7461  7461 I WebViewFactory: Loading com.google.android.webview version 133.0.6943.137 (code 694313732)
+07-24 01:57:53.506  7461  7461 I .lorepia.client: AssetManager2(0xb400007125bb1458) locale list changing from [] to [en-US]
+07-24 01:57:53.507  7461  7461 I .lorepia.client: AssetManager2(0xb400007125baebb8) locale list changing from [] to [en-US]
+07-24 01:57:53.508  7461  7461 I .lorepia.client: AssetManager2(0xb400007125babff8) locale list changing from [] to [en-US]
+07-24 01:57:53.509  7461  7461 I .lorepia.client: AssetManager2(0xb400007125bae578) locale list changing from [] to [en-US]
+07-24 01:57:53.509  7461  7461 V ResourcesManager: The following library key has been added: ResourcesKey{ mHash=bf96b9dd mResDir=null mSplitDirs=[] mOverlayDirs=[] mLibDirs=[/data/app/~~gpmFUbSJsE3j6CR1TKNPvA==/com.google.android.webview-I6rLLB_FXSA9WeiobqWXGQ==/WebViewGoogle.apk,/data/app/~~isMGCVgJ7GK-A4CwEwbgSA==/com.google.android.trichromelibrary_694313732-wfZnONLsvqF7ALIh0W09nQ==/TrichromeLibrary.apk,/system_ext/framework/androidx.window.extensions.jar] mDisplayId=0 mOverrideConfig=v36 mCompatInfo={420dpi always-compat} mLoaders=[]}
+07-24 01:57:53.510  7461  7461 W .lorepia.client: Failed to find entry 'classes.dex': Entry not found
+07-24 01:57:53.510  7461  7461 D nativeloader: Configuring clns-10 for other apk /data/app/~~isMGCVgJ7GK-A4CwEwbgSA==/com.google.android.trichromelibrary_694313732-wfZnONLsvqF7ALIh0W09nQ==/TrichromeLibrary.apk. target_sdk_version=34, uses_libraries=ALL, library_path=/data/app/~~gpmFUbSJsE3j6CR1TKNPvA==/com.google.android.webview-I6rLLB_FXSA9WeiobqWXGQ==/lib/arm64:/data/app/~~gpmFUbSJsE3j6CR1TKNPvA==/com.google.android.webview-I6rLLB_FXSA9WeiobqWXGQ==/WebViewGoogle.apk!/lib/arm64-v8a:/data/app/~~isMGCVgJ7GK-A4CwEwbgSA==/com.google.android.trichromelibrary_694313732-wfZnONLsvqF7ALIh0W09nQ==/TrichromeLibrary.apk!/lib/arm64-v8a, permitted_path=/data:/mnt/expand
+07-24 01:57:53.511  7461  7461 D ApplicationLoaders: Returning zygote-cached class loader: /system_ext/framework/androidx.window.extensions.jar
+07-24 01:57:53.512  7461  7461 D nativeloader: Configuring clns-11 for other apk /data/app/~~gpmFUbSJsE3j6CR1TKNPvA==/com.google.android.webview-I6rLLB_FXSA9WeiobqWXGQ==/WebViewGoogle.apk. target_sdk_version=34, uses_libraries=, library_path=/data/app/~~gpmFUbSJsE3j6CR1TKNPvA==/com.google.android.webview-I6rLLB_FXSA9WeiobqWXGQ==/lib/arm64:/data/app/~~gpmFUbSJsE3j6CR1TKNPvA==/com.google.android.webview-I6rLLB_FXSA9WeiobqWXGQ==/WebViewGoogle.apk!/lib/arm64-v8a:/data/app/~~isMGCVgJ7GK-A4CwEwbgSA==/com.google.android.trichromelibrary_694313732-wfZnONLsvqF7ALIh0W09nQ==/TrichromeLibrary.apk!/lib/arm64-v8a, permitted_path=/data:/mnt/expand
+07-24 01:57:53.535  7461  7461 I cr_WVCFactoryProvider: version=133.0.6943.137 (694313732) minSdkVersion=29 isBundle=false multiprocess=true packageId=2
+07-24 01:57:53.536  7461  7461 I .lorepia.client: AssetManager2(0xb400007125babcd8) locale list changing from [] to [en-US]
+07-24 01:57:53.545  7461  7461 D nativeloader: Load /data/app/~~isMGCVgJ7GK-A4CwEwbgSA==/com.google.android.trichromelibrary_694313732-wfZnONLsvqF7ALIh0W09nQ==/TrichromeLibrary.apk!/lib/arm64-v8a/libmonochrome_64.so using class loader ns clns-11 (caller=/data/app/~~gpmFUbSJsE3j6CR1TKNPvA==/com.google.android.webview-I6rLLB_FXSA9WeiobqWXGQ==/WebViewGoogle.apk): ok
+07-24 01:57:53.548  7461  7461 D nativeloader: Load /system/lib64/libwebviewchromium_plat_support.so using class loader ns clns-11 (caller=/data/app/~~gpmFUbSJsE3j6CR1TKNPvA==/com.google.android.webview-I6rLLB_FXSA9WeiobqWXGQ==/WebViewGoogle.apk): ok
+07-24 01:57:53.550  7461  7487 I chromium: [0724/015753.549986:INFO:variations_seed_loader.cc(67)] Failed to open file for reading.: No such file or directory (2)
+07-24 01:57:53.550  7461  7487 I cr_VariationsUtils: Failed reading seed file "/data/user/0/dev.lorepia.client/app_webview/variations_seed_new"
+07-24 01:57:53.550  7461  7478 I RustStdoutStderr: [0724/015753.549986:INFO:variations_seed_loader.cc(67)] Failed to open file for reading.: No such file or directory (2)
+07-24 01:57:53.556  7461  7461 I cr_LibraryLoader: Successfully loaded native library
+07-24 01:57:53.557  7461  7461 I cr_CachingUmaRecorder: Flushed 6 samples from 6 histograms, 0 samples were dropped.
+07-24 01:57:53.558  7461  7461 I cr_VariationsUtils: Loaded seed with age 140367s
+07-24 01:57:53.560  7461  7461 I cr_CombinedPProvider: #registerProvider() provider:WV.C8@8a82904 isPolicyCacheEnabled:false policyProvidersSize:0
+07-24 01:57:53.561  7461  7461 I cr_PolicyProvider: #setManagerAndSource() 0
+07-24 01:57:53.595  7461  7461 I cr_CombinedPProvider: #linkNativeInternal() 1
+07-24 01:57:53.596  7461  7461 I cr_AppResProvider: #getApplicationRestrictionsFromUserManager() Bundle[EMPTY_PARCEL]
+07-24 01:57:53.596  7461  7461 I cr_PolicyProvider: #notifySettingsAvailable() 0
+07-24 01:57:53.596  7461  7461 I cr_CombinedPProvider: #onSettingsAvailable() 0
+07-24 01:57:53.596  7461  7461 I cr_CombinedPProvider: #flushPolicies()
+07-24 01:57:53.630  7461  7503 W chromium: [WARNING:dns_config_service_android.cc(81)] Failed to read DnsConfig.
+07-24 01:57:53.630  7461  7478 I RustStdoutStderr: [WARNING:dns_config_service_android.cc(81)] Failed to read DnsConfig.
+07-24 01:57:53.632  7461  7461 I .lorepia.client: AssetManager2(0xb400007125bb0e18) locale list changing from [] to [en-US]
+07-24 01:57:53.635  7461  7461 I .lorepia.client: AssetManager2(0xb400007125bad5d8) locale list changing from [] to [en-US]
+07-24 01:57:53.729  7461  7461 V Tauri/Plugin: Tauri plugin: pluginId: path, command: getDataDir
+07-24 01:57:53.734  7461  7524 I CameraManagerGlobal: Connecting to camera service
+07-24 01:57:53.774  7461  7461 W libc    : Access denied finding property "vendor.mesa.log"
+07-24 01:57:53.774  7461  7461 W libc    : Access denied finding property "vendor.mesa.log.file"
+07-24 01:57:53.774  7461  7461 E MESA    : Failed to open rendernode: No such file or directory
+07-24 01:57:53.805  7461  7461 D vulkan  : searching for layers in '/data/app/~~fqrweRT_KtNLtnZxwDtxFQ==/dev.lorepia.client-OlR5-K9RNfiTG5RdUF6_ig==/lib/arm64'
+07-24 01:57:53.805  7461  7461 D vulkan  : searching for layers in '/data/app/~~fqrweRT_KtNLtnZxwDtxFQ==/dev.lorepia.client-OlR5-K9RNfiTG5RdUF6_ig==/base.apk!/lib/arm64-v8a'
+07-24 01:57:53.811  7461  7461 W libc    : Access denied finding property "vendor.mesa.vk.trace.per.submit"
+07-24 01:57:53.811  7461  7461 W libc    : Access denied finding property "vendor.mesa.gallium.print.optio"
+07-24 01:57:53.811  7461  7461 W libc    : Access denied finding property "vendor.mesa.vk.trace.frame"
+07-24 01:57:53.820  7461  7461 W libc    : Access denied finding property "vendor.mesa.vk.wsi.headless.swa"
+07-24 01:57:53.858  7461  7461 V Tauri/Plugin: Tauri plugin: pluginId: path, command: getDataDir
+07-24 01:57:53.889  7461  7509 W cr_media: BLUETOOTH_CONNECT permission is missing.
+07-24 01:57:53.913  7461  7529 W chromium: [WARNING:viz_main_impl.cc(85)] VizNullHypothesis is disabled (not a warning)
+07-24 01:57:53.913  7461  7478 I RustStdoutStderr: [WARNING:viz_main_impl.cc(85)] VizNullHypothesis is disabled (not a warning)
+07-24 01:57:53.916  7461  7509 W cr_media: getBluetoothAdapter() requires BLUETOOTH permission
+07-24 01:57:53.916  7461  7509 W cr_media: registerBluetoothIntentsIfNeeded: Requires BLUETOOTH permission
+07-24 01:57:54.032  7461  7461 D InsetsController: hide(ime(), fromIme=false)
+07-24 01:57:54.032  7461  7461 I ImeTracker: dev.lorepia.client:b3fb5462: onCancelled at PHASE_CLIENT_ALREADY_HIDDEN
+07-24 01:57:54.863  7461  7466 I .lorepia.client: Compiler allocated 5111KB to compile void android.view.ViewRootImpl.performTraversals()
+07-24 01:57:54.893  7461  7478 I RustStdoutStderr: s_glBindAttribLocation: bind attrib 0 name resolveLevel_and_idx
+07-24 01:57:54.893  7461  7478 I RustStdoutStderr: s_glBindAttribLocation: bind attrib 1 name p01
+07-24 01:57:54.893  7461  7478 I RustStdoutStderr: s_glBindAttribLocation: bind attrib 2 name p23
+07-24 01:57:54.893  7461  7478 I RustStdoutStderr: s_glBindAttribLocation: bind attrib 3 name fanPointAttrib
+07-24 01:57:54.907  7461  7478 I RustStdoutStderr: s_glBindAttribLocation: bind attrib 0 name position
+07-24 01:57:54.907  7461  7478 I RustStdoutStderr: s_glBindAttribLocation: bind attrib 1 name color
+07-24 01:57:54.911  7461  7478 I RustStdoutStderr: s_glBindAttribLocation: bind attrib 0 name inPosition
+07-24 01:57:54.912  7461  7478 I RustStdoutStderr: s_glBindAttribLocation: bind attrib 1 name inColor
+07-24 01:57:54.912  7461  7478 I RustStdoutStderr: s_glBindAttribLocation: bind attrib 2 name inCircleEdge
+07-24 01:57:54.915  7461  7478 I RustStdoutStderr: s_glBindAttribLocation: bind attrib 0 name inPosition
+07-24 01:57:54.915  7461  7478 I RustStdoutStderr: s_glBindAttribLocation: bind attrib 1 name inColor
+07-24 01:57:54.915  7461  7478 I RustStdoutStderr: s_glBindAttribLocation: bind attrib 2 name inTextureCoords
+07-24 01:57:54.920  7461  7478 I RustStdoutStderr: s_glBindAttribLocation: bind attrib 0 name fillBounds
+07-24 01:57:54.921  7461  7478 I RustStdoutStderr: s_glBindAttribLocation: bind attrib 1 name color
+07-24 01:57:54.921  7461  7478 I RustStdoutStderr: s_glBindAttribLocation: bind attrib 2 name locations
+07-24 01:57:54.924  7461  7478 I RustStdoutStderr: s_glBindAttribLocation: bind attrib 0 name position
+07-24 01:57:54.924  7461  7478 I RustStdoutStderr: s_glBindAttribLocation: bind attrib 1 name color
+07-24 01:57:54.939  7461  7478 I RustStdoutStderr: s_glBindAttribLocation: bind attrib 0 name inPosition
+07-24 01:57:54.939  7461  7478 I RustStdoutStderr: s_glBindAttribLocation: bind attrib 1 name inColor
+07-24 01:57:54.939  7461  7478 I RustStdoutStderr: s_glBindAttribLocation: bind attrib 2 name inCircleEdge
+07-24 01:57:54.942  7461  7478 I RustStdoutStderr: s_glBindAttribLocation: bind attrib 0 name a_vertex
+07-24 01:57:54.943  7461  7478 I RustStdoutStderr: s_glBindAttribLocation: bind attrib 0 name position
+07-24 01:57:54.943  7461  7478 I RustStdoutStderr: s_glBindAttribLocation: bind attrib 1 name localCoord
+07-24 01:57:54.947  7461  7478 I RustStdoutStderr: s_glBindAttribLocation: bind attrib 0 name position
+07-24 01:57:54.947  7461  7478 I RustStdoutStderr: s_glBindAttribLocation: bind attrib 1 name localCoord
+07-24 01:57:54.950  7461  7478 I RustStdoutStderr: s_glBindAttribLocation: bind attrib 0 name position
+07-24 01:57:54.951  7461  7478 I RustStdoutStderr: s_glBindAttribLocation: bind attrib 1 name localCoord
+07-24 01:57:54.955  7461  7478 I RustStdoutStderr: s_glBindAttribLocation: bind attrib 0 name position
+07-24 01:57:54.955  7461  7478 I RustStdoutStderr: s_glBindAttribLocation: bind attrib 1 name localCoord
+07-24 01:57:54.957  7461  7478 I RustStdoutStderr: s_glBindAttribLocation: bind attrib 0 name position
+07-24 01:57:54.957  7461  7478 I RustStdoutStderr: s_glBindAttribLocation: bind attrib 1 name color
+07-24 01:57:54.957  7461  7478 I RustStdoutStderr: s_glBindAttribLocation: bind attrib 2 name localCoord
+07-24 01:57:54.960  7461  7478 I RustStdoutStderr: s_glBindAttribLocation: bind attrib 0 name inPosition
+07-24 01:57:54.960  7461  7478 I RustStdoutStderr: s_glBindAttribLocation: bind attrib 1 name inColor
+07-24 01:57:54.960  7461  7478 I RustStdoutStderr: s_glBindAttribLocation: bind attrib 2 name inCircleEdge
+07-24 01:57:54.978  7461  7478 I RustStdoutStderr: s_glBindAttribLocation: bind attrib 0 name position
+07-24 01:57:54.978  7461  7478 I RustStdoutStderr: s_glBindAttribLocation: bind attrib 1 name color
+07-24 01:57:54.978  7461  7478 I RustStdoutStderr: s_glBindAttribLocation: bind attrib 2 name localCoord
+07-24 01:57:54.983  7461  7478 I RustStdoutStderr: s_glBindAttribLocation: bind attrib 0 name position
+07-24 01:57:54.983  7461  7478 I RustStdoutStderr: s_glBindAttribLocation: bind attrib 1 name localCoord
+07-24 01:57:54.992  7461  7478 I RustStdoutStderr: s_glBindAttribLocation: bind attrib 0 name position
+07-24 01:57:54.997  7461  7478 I RustStdoutStderr: s_glBindAttribLocation: bind attrib 1 name color
+07-24 01:57:54.997  7461  7478 I RustStdoutStderr: s_glBindAttribLocation: bind attrib 0 name position
+07-24 01:57:54.997  7461  7478 I RustStdoutStderr: s_glBindAttribLocation: bind attrib 1 name color
+07-24 01:57:54.997  7461  7478 I RustStdoutStderr: s_glBindAttribLocation: bind attrib 2 name localCoord
+07-24 01:57:55.003  7461  7478 I RustStdoutStderr: s_glBindAttribLocation: bind attrib 0 name position
+07-24 01:57:55.003  7461  7478 I RustStdoutStderr: s_glBindAttribLocation: bind attrib 1 name color
+07-24 01:57:55.003  7461  7478 I RustStdoutStderr: s_glBindAttribLocation: bind attrib 2 name localCoord
+07-24 01:57:55.007  7461  7478 I RustStdoutStderr: s_glBindAttribLocation: bind attrib 0 name position
+07-24 01:57:55.007  7461  7478 I RustStdoutStderr: s_glBindAttribLocation: bind attrib 1 name color
+07-24 01:57:55.007  7461  7478 I RustStdoutStderr: s_glBindAttribLocation: bind attrib 2 name localCoord
+07-24 01:57:55.010  7461  7478 I RustStdoutStderr: s_glBindAttribLocation: bind attrib 0 name position
+07-24 01:57:55.010  7461  7478 I RustStdoutStderr: s_glBindAttribLocation: bind attrib 1 name color
+07-24 01:57:55.016  7461  7478 I RustStdoutStderr: s_glBindAttribLocation: bind attrib 0 name position
+07-24 01:57:55.016  7461  7478 I RustStdoutStderr: s_glBindAttribLocation: bind attrib 1 name color
+07-24 01:57:55.016  7461  7478 I RustStdoutStderr: s_glBindAttribLocation: bind attrib 2 name localCoord
+07-24 01:57:55.019  7461  7478 I RustStdoutStderr: s_glBindAttribLocation: bind attrib 0 name position
+07-24 01:57:55.020  7461  7478 I RustStdoutStderr: s_glBindAttribLocation: bind attrib 1 name color
+07-24 01:57:55.020  7461  7478 I RustStdoutStderr: s_glBindAttribLocation: bind attrib 2 name localCoord
+07-24 01:57:55.023  7461  7478 I RustStdoutStderr: s_glBindAttribLocation: bind attrib 0 name position
+07-24 01:57:55.023  7461  7478 I RustStdoutStderr: s_glBindAttribLocation: bind attrib 1 name color
+07-24 01:57:55.028  7461  7478 I RustStdoutStderr: s_glBindAttribLocation: bind attrib 0 name resolveLevel_and_idx
+07-24 01:57:55.028  7461  7478 I RustStdoutStderr: s_glBindAttribLocation: bind attrib 1 name p01
+07-24 01:57:55.028  7461  7478 I RustStdoutStderr: s_glBindAttribLocation: bind attrib 2 name p23
+07-24 01:57:55.028  7461  7478 I RustStdoutStderr: s_glBindAttribLocation: bind attrib 3 name fanPointAttrib
+07-24 01:57:55.112  7461  7478 I RustStdoutStderr: s_glBindAttribLocation: bind attrib 0 name position
+07-24 01:57:55.112  7461  7478 I RustStdoutStderr: s_glBindAttribLocation: bind attrib 1 name color
+07-24 01:57:55.112  7461  7478 I RustStdoutStderr: s_glBindAttribLocation: bind attrib 2 name localCoord
+07-24 01:57:55.112  7461  7478 I RustStdoutStderr: s_glBindAttribLocation: bind attrib 3 name texSubset
+07-24 01:57:55.321  7461  7478 I RustStdoutStderr: s_glBindAttribLocation: bind attrib 0 name position
+07-24 01:57:55.322  7461  7478 I RustStdoutStderr: s_glBindAttribLocation: bind attrib 1 name localCoord
+07-24 01:57:55.322  7461  7478 I RustStdoutStderr: s_glBindAttribLocation: bind attrib 2 name texSubset
+07-24 01:57:55.511  7461  7478 I RustStdoutStderr: s_glBindAttribLocation: bind attrib 0 name inPosition
+07-24 01:57:55.511  7461  7478 I RustStdoutStderr: s_glBindAttribLocation: bind attrib 1 name inColor
+07-24 01:57:55.511  7461  7478 I RustStdoutStderr: s_glBindAttribLocation: bind attrib 2 name inCircleEdge
+07-24 01:57:59.094  7461  7563 D ProfileInstaller: Installing profile for dev.lorepia.client
+07-24 01:58:10.581  7461  7467 I .lorepia.client: Background concurrent mark compact GC freed 5634KB AllocSpace bytes, 15(484KB) LOS objects, 49% free, 4286KB/8572KB, paused 69us,4.061ms total 120.986ms
+07-24 01:58:10.659  7461  7478 I RustStdoutStderr: s_glBindAttribLocation: bind attrib 0 name inPosition
+07-24 01:58:10.659  7461  7478 I RustStdoutStderr: s_glBindAttribLocation: bind attrib 1 name inColor
+07-24 01:58:10.659  7461  7478 I RustStdoutStderr: s_glBindAttribLocation: bind attrib 2 name inCircleEdge
+07-24 01:58:10.661  7461  7478 I RustStdoutStderr: s_glBindAttribLocation: bind attrib 0 name position
+07-24 01:58:10.661  7461  7478 I RustStdoutStderr: s_glBindAttribLocation: bind attrib 1 name localCoord
+07-24 01:58:10.663  7461  7478 I RustStdoutStderr: s_glBindAttribLocation: bind attrib 0 name position
+07-24 01:58:10.663  7461  7478 I RustStdoutStderr: s_glBindAttribLocation: bind attrib 1 name color
+07-24 01:58:10.680  7461  7478 I RustStdoutStderr: s_glBindAttribLocation: bind attrib 0 name position
+07-24 01:58:10.680  7461  7478 I RustStdoutStderr: s_glBindAttribLocation: bind attrib 1 name color
+07-24 01:58:10.680  7461  7478 I RustStdoutStderr: s_glBindAttribLocation: bind attrib 2 name localCoord
+07-24 01:58:10.687  7461  7478 I RustStdoutStderr: s_glBindAttribLocation: bind attrib 0 name position
+07-24 01:58:10.687  7461  7478 I RustStdoutStderr: s_glBindAttribLocation: bind attrib 1 name color
+07-24 01:58:10.716  7461  7478 I RustStdoutStderr: s_glBindAttribLocation: bind attrib 0 name inPosition
+07-24 01:58:10.716  7461  7478 I RustStdoutStderr: s_glBindAttribLocation: bind attrib 1 name inColor
+07-24 01:58:10.716  7461  7478 I RustStdoutStderr: s_glBindAttribLocation: bind attrib 2 name inQuadEdge
+07-24 01:58:10.758  7461  7478 I RustStdoutStderr: s_glBindAttribLocation: bind attrib 0 name radii_selector
+07-24 01:58:10.758  7461  7478 I RustStdoutStderr: s_glBindAttribLocation: bind attrib 1 name corner_and_radius_outsets
+07-24 01:58:10.758  7461  7478 I RustStdoutStderr: s_glBindAttribLocation: bind attrib 2 name aa_bloat_and_coverage
+07-24 01:58:10.758  7461  7478 I RustStdoutStderr: s_glBindAttribLocation: bind attrib 3 name radii_x
+07-24 01:58:10.758  7461  7478 I RustStdoutStderr: s_glBindAttribLocation: bind attrib 4 name radii_y
+07-24 01:58:10.758  7461  7478 I RustStdoutStderr: s_glBindAttribLocation: bind attrib 5 name skew
+07-24 01:58:10.758  7461  7478 I RustStdoutStderr: s_glBindAttribLocation: bind attrib 6 name translate_and_localrotate
+07-24 01:58:10.758  7461  7478 I RustStdoutStderr: s_glBindAttribLocation: bind attrib 7 name color
+07-24 01:58:10.761  7461  7478 I RustStdoutStderr: s_glBindAttribLocation: bind attrib 0 name position
+07-24 01:58:10.761  7461  7478 I RustStdoutStderr: s_glBindAttribLocation: bind attrib 1 name color
+07-24 01:58:10.761  7461  7478 I RustStdoutStderr: s_glBindAttribLocation: bind attrib 2 name localCoord
+07-24 01:58:10.801  7461  7478 I RustStdoutStderr: s_glBindAttribLocation: bind attrib 0 name position
+07-24 01:58:10.801  7461  7478 I RustStdoutStderr: s_glBindAttribLocation: bind attrib 1 name color
+07-24 01:58:10.801  7461  7478 I RustStdoutStderr: s_glBindAttribLocation: bind attrib 2 name localCoord
+07-24 01:58:10.881  7461  7478 I RustStdoutStderr: s_glBindAttribLocation: bind attrib 0 name position
+07-24 01:58:10.881  7461  7478 I RustStdoutStderr: s_glBindAttribLocation: bind attrib 1 name localCoord
+07-24 01:58:11.224  7461  7478 I RustStdoutStderr: s_glBindAttribLocation: bind attrib 0 name position
+07-24 01:58:11.224  7461  7478 I RustStdoutStderr: s_glBindAttribLocation: bind attrib 1 name color
+07-24 01:58:14.685  7461  7478 I RustStdoutStderr: s_glBindAttribLocation: bind attrib 0 name position
+07-24 01:58:14.685  7461  7478 I RustStdoutStderr: s_glBindAttribLocation: bind attrib 1 name localCoord
+07-24 01:58:14.758  7461  7467 I .lorepia.client: Background concurrent mark compact GC freed 4164KB AllocSpace bytes, 0(0B) LOS objects, 49% free, 4142KB/8284KB, paused 251us,10.058ms total 56.447ms
+07-24 01:58:14.891  7461  7478 I RustStdoutStderr: s_glBindAttribLocation: bind attrib 0 name position
+07-24 01:58:14.891  7461  7478 I RustStdoutStderr: s_glBindAttribLocation: bind attrib 1 name localCoord
+07-24 01:58:14.908  7461  7478 I RustStdoutStderr: s_glBindAttribLocation: bind attrib 0 name position
+07-24 01:58:14.908  7461  7478 I RustStdoutStderr: s_glBindAttribLocation: bind attrib 1 name localCoord
+07-24 01:58:14.915  7461  7478 I RustStdoutStderr: s_glBindAttribLocation: bind attrib 0 name position
+07-24 01:58:14.915  7461  7478 I RustStdoutStderr: s_glBindAttribLocation: bind attrib 1 name localCoord
+07-24 01:58:14.917  7461  7478 I RustStdoutStderr: s_glBindAttribLocation: bind attrib 0 name position
+07-24 01:58:14.917  7461  7478 I RustStdoutStderr: s_glBindAttribLocation: bind attrib 1 name localCoord
+07-24 01:58:14.996  7461  7478 I RustStdoutStderr: s_glBindAttribLocation: bind attrib 0 name position
+07-24 01:58:14.996  7461  7478 I RustStdoutStderr: s_glBindAttribLocation: bind attrib 1 name localCoord
+07-24 01:58:38.925  7461  7478 I RustStdoutStderr: s_glBindAttribLocation: bind attrib 0 name inPosition
+07-24 01:58:38.925  7461  7478 I RustStdoutStderr: s_glBindAttribLocation: bind attrib 1 name inCoverage
+07-24 01:59:03.718  7461  7461 I Choreographer: Skipped 38 frames!  The application may be doing too much work on its main thread.
+07-24 01:59:04.959  7461  7461 I Choreographer: Skipped 38 frames!  The application may be doing too much work on its main thread.
+07-24 01:59:05.349  7461  7471 I HWUI    : Davey! duration=2053ms; Flags=0, FrameTimelineVsyncId=728655, IntendedVsync=360358858053102, Vsync=360359491386410, InputEventId=-153205021, HandleInputStart=360359508301143, AnimationStart=360359509519560, PerformTraversalsStart=360359659880477, DrawStart=360359659944727, FrameDeadline=360360124719718, FrameStartTime=360359505248935, FrameInterval=16666666, WorkloadTarget=16666666, SyncQueued=360359697074268, SyncStart=360359796713185, IssueDrawCommandsStart=360359796774727, SwapBuffers=360360654790560, FrameCompleted=360361011529019, DequeueBufferDuration=79243083, QueueBufferDuration=301709, GpuCompleted=360361011529019, SwapBuffersCompleted=360360735963894, DisplayPresentTime=0, CommandSubmissionCompleted=360360654790560, 
+07-24 01:59:06.262  7461  7532 I HWUI    : Davey! duration=1724ms; Flags=0, FrameTimelineVsyncId=728677, IntendedVsync=360359524719742, Vsync=360359841386396, InputEventId=-751951622, HandleInputStart=360359867959560, AnimationStart=360359894451268, PerformTraversalsStart=360360003932352, DrawStart=360360011845893, FrameDeadline=360361041386348, FrameStartTime=360359854073185, FrameInterval=16666666, WorkloadTarget=16666666, SyncQueued=360360012203018, SyncStart=360360736445394, IssueDrawCommandsStart=360360737700352, SwapBuffers=360361131572352, FrameCompleted=360361973527061, DequeueBufferDuration=86459625, QueueBufferDuration=169000, GpuCompleted=360361973527061, SwapBuffersCompleted=360361220176311, DisplayPresentTime=0, CommandSubmissionCompleted=360361131572352, 
+07-24 01:59:06.569  7461  7461 I Choreographer: Skipped 61 frames!  The application may be doing too much work on its main thread.
+07-24 01:59:06.622  7461  7532 I HWUI    : Davey! duration=1256ms; Flags=0, FrameTimelineVsyncId=728707, IntendedVsync=360360891386354, Vsync=360360908053020, InputEventId=0, HandleInputStart=360360914927810, AnimationStart=360360914928894, PerformTraversalsStart=360361016643102, DrawStart=360361016700769, FrameDeadline=360361991386310, FrameStartTime=360360914903727, FrameInterval=16666666, WorkloadTarget=16666666, SyncQueued=360361017018435, SyncStart=360361220229186, IssueDrawCommandsStart=360361286768352, SwapBuffers=360362163106103, FrameCompleted=360362350776811, DequeueBufferDuration=4292, QueueBufferDuration=635541, GpuCompleted=360362350724353, SwapBuffersCompleted=360362350776811, DisplayPresentTime=0, CommandSubmissionCompleted=360362163106103, 
+07-24 01:59:07.602  7461  7461 I Choreographer: Skipped 60 frames!  The application may be doing too much work on its main thread.
+07-24 01:59:07.606  7461  7471 I HWUI    : Davey! duration=1145ms; Flags=0, FrameTimelineVsyncId=728714, IntendedVsync=360361058053014, Vsync=360361308053004, InputEventId=0, HandleInputStart=360361312995602, AnimationStart=360361312996852, PerformTraversalsStart=360361416416102, DrawStart=360361417354602, FrameDeadline=360362374719628, FrameStartTime=360361312787727, FrameInterval=16666666, WorkloadTarget=16666666, SyncQueued=360361418047727, SyncStart=360362350896811, IssueDrawCommandsStart=360362351335853, SwapBuffers=360362393009394, FrameCompleted=360363136717603, DequeueBufferDuration=5000, QueueBufferDuration=229083, GpuCompleted=360363136717603, SwapBuffersCompleted=360363059658853, DisplayPresentTime=0, CommandSubmissionCompleted=360362393009394, 
+07-24 01:59:08.594  7461  7461 I Choreographer: Skipped 55 frames!  The application may be doing too much work on its main thread.
+07-24 01:59:09.080  7461  7471 I HWUI    : Davey! duration=2664ms; Flags=0, FrameTimelineVsyncId=728729, IntendedVsync=360361324719670, Vsync=360362341386296, InputEventId=-449157224, HandleInputStart=360362358150769, AnimationStart=360362358152103, PerformTraversalsStart=360362360431936, DrawStart=360362360713728, FrameDeadline=360363158052930, FrameStartTime=360362356819436, FrameInterval=16666666, WorkloadTarget=16666666, SyncQueued=360362360927103, SyncStart=360363059774561, IssueDrawCommandsStart=360363059816978, SwapBuffers=360363924720395, FrameCompleted=360364687632146, DequeueBufferDuration=5041, QueueBufferDuration=17850917, GpuCompleted=360364687632146, SwapBuffersCompleted=360363942899062, DisplayPresentTime=0, CommandSubmissionCompleted=360363924720395, 
+07-24 01:59:10.328  7461  7471 I HWUI    : Davey! duration=2798ms; Flags=0, FrameTimelineVsyncId=728751, IntendedVsync=360362374719628, Vsync=360363374719588, InputEventId=-13711250, HandleInputStart=360363393409687, AnimationStart=360363401640478, PerformTraversalsStart=360363450842895, DrawStart=360363450928853, FrameDeadline=360364708052868, FrameStartTime=360363389150562, FrameInterval=16666666, WorkloadTarget=16666666, SyncQueued=360363457420187, SyncStart=360363942999354, IssueDrawCommandsStart=360363943486437, SwapBuffers=360364866130104, FrameCompleted=360365658456813, DequeueBufferDuration=3000, QueueBufferDuration=206792, GpuCompleted=360365658456813, SwapBuffersCompleted=360364900543646, DisplayPresentTime=0, CommandSubmissionCompleted=360364866130104, 
+07-24 01:59:10.662  7461  7461 I Choreographer: Skipped 83 frames!  The application may be doing too much work on its main thread.
+07-24 01:59:10.835  7461  7471 I HWUI    : Davey! duration=2613ms; Flags=0, FrameTimelineVsyncId=728773, IntendedVsync=360363458052918, Vsync=360364374719548, InputEventId=-277520326, HandleInputStart=360364391722020, AnimationStart=360364391754770, PerformTraversalsStart=360364423692687, DrawStart=360364423759520, FrameDeadline=360365691386162, FrameStartTime=360364381816645, FrameInterval=16666666, WorkloadTarget=16666666, SyncQueued=360364424751479, SyncStart=360364900656729, IssueDrawCommandsStart=360364900689646, SwapBuffers=360366427666896, FrameCompleted=360366547054855, DequeueBufferDuration=2750, QueueBufferDuration=139708, GpuCompleted=360366547054855, SwapBuffersCompleted=360366445446563, DisplayPresentTime=0, CommandSubmissionCompleted=360366427666896, 
+07-24 01:59:11.537  7461  7461 I Choreographer: Skipped 46 frames!  The application may be doing too much work on its main thread.
+07-24 01:59:11.780  7461  7532 I HWUI    : Davey! duration=1441ms; Flags=0, FrameTimelineVsyncId=728788, IntendedVsync=360364558052874, Vsync=360365024719522, InputEventId=0, HandleInputStart=360365048311812, AnimationStart=360365048313187, PerformTraversalsStart=360365049059479, DrawStart=360365049209354, FrameDeadline=360366574719460, FrameStartTime=360365041362854, FrameInterval=16666666, WorkloadTarget=16666666, SyncQueued=360365049869937, SyncStart=360366446474855, IssueDrawCommandsStart=360366446509855, SwapBuffers=360367192046147, FrameCompleted=360367396260230, DequeueBufferDuration=3916, QueueBufferDuration=2167791, GpuCompleted=360367396260230, SwapBuffersCompleted=360367218129397, DisplayPresentTime=0, CommandSubmissionCompleted=360367192046147, 
+07-24 01:59:12.804  7461  7461 I Choreographer: Skipped 34 frames!  The application may be doing too much work on its main thread.
+07-24 01:59:14.194  7461  7532 I HWUI    : Davey! duration=3696ms; Flags=0, FrameTimelineVsyncId=728803, IntendedVsync=360365058052854, Vsync=360366441386132, InputEventId=0, HandleInputStart=360366450865480, AnimationStart=360366450866355, PerformTraversalsStart=360366462641480, DrawStart=360366462688855, FrameDeadline=360367424719426, FrameStartTime=360366449482396, FrameInterval=16666666, WorkloadTarget=16666666, SyncQueued=360366463615355, SyncStart=360367218277855, IssueDrawCommandsStart=360367218316855, SwapBuffers=360368265238106, FrameCompleted=360369509690106, DequeueBufferDuration=3291, QueueBufferDuration=39712791, GpuCompleted=360369509690106, SwapBuffersCompleted=360368364623772, DisplayPresentTime=0, CommandSubmissionCompleted=360368265238106, 
+07-24 01:59:15.274  7461  7461 I Choreographer: Skipped 93 frames!  The application may be doing too much work on its main thread.
+07-24 01:59:17.219  7461  7532 I HWUI    : Davey! duration=3331ms; Flags=0, FrameTimelineVsyncId=728855, IntendedVsync=360368008052736, Vsync=360368024719402, InputEventId=0, HandleInputStart=360368038492105, AnimationStart=360368038492647, PerformTraversalsStart=360368039922522, DrawStart=360368039979105, FrameDeadline=360369541386008, FrameStartTime=360368038488480, FrameInterval=16666666, WorkloadTarget=16666666, SyncQueued=360368053287564, SyncStart=360368364825189, IssueDrawCommandsStart=360368364864772, SwapBuffers=360370870908399, FrameCompleted=360371650803899, DequeueBufferDuration=19125, QueueBufferDuration=1004417, GpuCompleted=360371650803899, SwapBuffersCompleted=360370883567107, DisplayPresentTime=0, CommandSubmissionCompleted=360370870908399, 
+07-24 01:59:17.680  7461  7472 I HWUI    : Davey! duration=3616ms; Flags=0, FrameTimelineVsyncId=728862, IntendedVsync=360368024719402, Vsync=360368591386046, InputEventId=0, HandleInputStart=360368596680689, AnimationStart=360368596683772, PerformTraversalsStart=360369031692981, DrawStart=360369031950564, FrameDeadline=360371674719256, FrameStartTime=360368591710772, FrameInterval=16666666, WorkloadTarget=16666666, SyncQueued=360369517894398, SyncStart=360370883821649, IssueDrawCommandsStart=360370959915232, SwapBuffers=360371547205649, FrameCompleted=360373007628983, DequeueBufferDuration=1292084668, QueueBufferDuration=220458, GpuCompleted=360372823663274, SwapBuffersCompleted=360373007628983, DisplayPresentTime=0, CommandSubmissionCompleted=360371547205649, 
+07-24 01:59:18.370  7461  7461 I Choreographer: Skipped 39 frames!  The application may be doing too much work on its main thread.
+07-24 01:59:18.539  7461  7472 I HWUI    : Davey! duration=1264ms; Flags=0, FrameTimelineVsyncId=728950, IntendedVsync=360372891385874, Vsync=360373008052536, InputEventId=0, HandleInputStart=360373073868983, AnimationStart=360373073871775, PerformTraversalsStart=360373075149150, DrawStart=360373077013275, FrameDeadline=360372908052540, FrameStartTime=360373008518400, FrameInterval=16666666, WorkloadTarget=16666666, SyncQueued=360373077702608, SyncStart=360373080699108, IssueDrawCommandsStart=360373082340358, SwapBuffers=360373825854525, FrameCompleted=360374158510067, DequeueBufferDuration=3166, QueueBufferDuration=293834, GpuCompleted=360374158510067, SwapBuffersCompleted=360374143877733, DisplayPresentTime=0, CommandSubmissionCompleted=360373825854525, 
+07-24 01:59:19.591  7461  7472 I HWUI    : Davey! duration=1320ms; Flags=0, FrameTimelineVsyncId=728965, IntendedVsync=360373091385866, Vsync=360373408052520, InputEventId=0, HandleInputStart=360373465779108, AnimationStart=360373465780608, PerformTraversalsStart=360373468660941, DrawStart=360373468769233, FrameDeadline=360374191385822, FrameStartTime=360373414339108, FrameInterval=16666666, WorkloadTarget=16666666, SyncQueued=360373469138608, SyncStart=360374143972275, IssueDrawCommandsStart=360374160631650, SwapBuffers=360374211806608, FrameCompleted=360375087112192, DequeueBufferDuration=188447333, QueueBufferDuration=270708, GpuCompleted=360375087112192, SwapBuffersCompleted=360374400953234, DisplayPresentTime=0, CommandSubmissionCompleted=360374211806608, 
+07-24 01:59:22.941  7461  7532 I HWUI    : Davey! duration=746ms; Flags=0, FrameTimelineVsyncId=729225, IntendedVsync=360377791385678, Vsync=360377908052340, InputEventId=0, HandleInputStart=360377913587610, AnimationStart=360377913588402, PerformTraversalsStart=360377914625902, DrawStart=360377914668444, FrameDeadline=360378291385658, FrameStartTime=360377912878610, FrameInterval=16666666, WorkloadTarget=16666666, SyncQueued=360377915090610, SyncStart=360377959478985, IssueDrawCommandsStart=360377959500902, SwapBuffers=360378400177944, FrameCompleted=360378582144194, DequeueBufferDuration=3458, QueueBufferDuration=5774709, GpuCompleted=360378582144194, SwapBuffersCompleted=360378514443485, DisplayPresentTime=0, CommandSubmissionCompleted=360378400177944, 
+07-24 01:59:34.638  7461  7467 I .lorepia.client: Background concurrent mark compact GC freed 4096KB AllocSpace bytes, 0(0B) LOS objects, 49% free, 4210KB/8420KB, paused 104us,12.008ms total 30.436ms
+07-24 02:00:11.549  7461  7467 I .lorepia.client: Background concurrent mark compact GC freed 4032KB AllocSpace bytes, 0(0B) LOS objects, 49% free, 4274KB/8548KB, paused 108us,11.731ms total 61.317ms
+07-24 02:00:40.473  7461  7478 I RustStdoutStderr: s_glBindAttribLocation: bind attrib 0 name position
+07-24 02:00:40.473  7461  7478 I RustStdoutStderr: s_glBindAttribLocation: bind attrib 1 name color
+07-24 02:00:40.479  7461  7478 I RustStdoutStderr: s_glBindAttribLocation: bind attrib 0 name position
+07-24 02:00:40.479  7461  7478 I RustStdoutStderr: s_glBindAttribLocation: bind attrib 1 name localCoord
+07-24 02:00:40.604  7461  7478 I RustStdoutStderr: s_glBindAttribLocation: bind attrib 0 name position
+07-24 02:00:40.604  7461  7478 I RustStdoutStderr: s_glBindAttribLocation: bind attrib 1 name color
+07-24 02:00:40.604  7461  7478 I RustStdoutStderr: s_glBindAttribLocation: bind attrib 2 name localCoord
+07-24 02:00:53.754  7461  7467 I .lorepia.client: Background concurrent mark compact GC freed 4160KB AllocSpace bytes, 0(0B) LOS objects, 49% free, 4242KB/8484KB, paused 224us,13.983ms total 35.400ms
+07-24 02:01:00.198  7461  7467 I .lorepia.client: Background concurrent mark compact GC freed 4668KB AllocSpace bytes, 0(0B) LOS objects, 49% free, 4246KB/8492KB, paused 182us,20.480ms total 141.115ms
+07-24 02:02:00.562  7461  7478 I RustStdoutStderr: s_glBindAttribLocation: bind attrib 0 name position
+07-24 02:02:00.562  7461  7478 I RustStdoutStderr: s_glBindAttribLocation: bind attrib 1 name color
+07-24 02:02:00.562  7461  7478 I RustStdoutStderr: s_glBindAttribLocation: bind attrib 2 name localCoord
+07-24 02:02:00.571  7461  7478 I RustStdoutStderr: s_glBindAttribLocation: bind attrib 0 name position
+07-24 02:02:00.571  7461  7478 I RustStdoutStderr: s_glBindAttribLocation: bind attrib 1 name localCoord
+07-24 02:02:15.744  7461  7478 I RustStdoutStderr: s_glBindAttribLocation: bind attrib 0 name inPosition
+07-24 02:02:15.744  7461  7478 I RustStdoutStderr: s_glBindAttribLocation: bind attrib 1 name inColor
+07-24 02:02:15.744  7461  7478 I RustStdoutStderr: s_glBindAttribLocation: bind attrib 2 name inCircleEdge
+07-24 02:02:37.517  7461  7478 I RustStdoutStderr: s_glBindAttribLocation: bind attrib 0 name inPosition
+07-24 02:02:37.517  7461  7478 I RustStdoutStderr: s_glBindAttribLocation: bind attrib 1 name inColor
+07-24 02:02:37.517  7461  7478 I RustStdoutStderr: s_glBindAttribLocation: bind attrib 2 name inCircleEdge
+07-24 02:02:37.523  7461  7478 I RustStdoutStderr: s_glBindAttribLocation: bind attrib 0 name position
+07-24 02:02:37.523  7461  7478 I RustStdoutStderr: s_glBindAttribLocation: bind attrib 1 name color
+07-24 02:02:41.524  7461  7478 I RustStdoutStderr: s_glBindAttribLocation: bind attrib 0 name position
+07-24 02:02:41.524  7461  7478 I RustStdoutStderr: s_glBindAttribLocation: bind attrib 1 name localCoord
+07-24 02:02:46.166  7461  7478 I RustStdoutStderr: s_glBindAttribLocation: bind attrib 0 name inPosition
+07-24 02:02:46.166  7461  7478 I RustStdoutStderr: s_glBindAttribLocation: bind attrib 1 name inColor
+07-24 02:02:46.166  7461  7478 I RustStdoutStderr: s_glBindAttribLocation: bind attrib 2 name inCircleEdge
+07-24 02:03:42.671  7461  7478 I RustStdoutStderr: s_glBindAttribLocation: bind attrib 0 name position
+07-24 02:03:42.671  7461  7478 I RustStdoutStderr: s_glBindAttribLocation: bind attrib 1 name localCoord
+07-24 02:03:42.843  7461  7461 I VRI[MainActivity]: Reporting drop result: true

@@ -44,7 +44,7 @@ export interface LlmProviderDefinition {
 const modelField = Object.freeze({
   id: "modelId",
   label: "모델 ID",
-  placeholder: "연결 후 모델 목록에서 선택",
+  placeholder: "공식 문서의 모델 ID를 직접 입력",
   required: true,
 } satisfies ProviderSetupField);
 
@@ -100,7 +100,7 @@ export const LLM_PROVIDER_CATALOG = Object.freeze([
   fixedProvider({
     id: "deepseek",
     label: "DeepSeek",
-    description: "DeepSeek API의 현재 모델 목록을 연결 시 조회합니다.",
+    description: "DeepSeek API와 공식 문서의 모델 ID를 사용합니다.",
     authKind: "api-key",
     authLabel: "DeepSeek API 키",
     origin: "https://api.deepseek.com",
@@ -127,7 +127,8 @@ export const LLM_PROVIDER_CATALOG = Object.freeze([
   Object.freeze({
     id: "google-vertex-ai",
     label: "Vertex AI Gemini",
-    description: "Google Cloud 프로젝트와 OAuth로 Vertex AI의 Gemini를 사용합니다.",
+    description:
+      "Google Cloud OAuth와 프로젝트 연결은 아직 지원 예정입니다.",
     authKind: "google-cloud-oauth",
     authLabel: "Google Cloud 로그인",
     target: Object.freeze({

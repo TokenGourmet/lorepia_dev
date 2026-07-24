@@ -1,0 +1,2 @@
+19:07-24 02:05:34.558  7883  7883 E ashmem  : Pinning is deprecated since Android Q. Please use trim or other methods.
+68:07-24 02:05:36.571  7883  7883 E MESA    : Failed to open rendernode: No such file or directory

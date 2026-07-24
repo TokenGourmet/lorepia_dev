@@ -1,0 +1,2 @@
+Bad window command, or no windows match: insets
+Use -h for help.

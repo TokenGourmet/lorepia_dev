@@ -1,0 +1,194 @@
+--------- beginning of main
+07-24 02:05:33.967  7883  7883 I .lorepia.client: Late-enabling -Xcheck:jni
+07-24 02:05:34.014  7883  7883 I .lorepia.client: Using CollectorTypeCMC GC.
+07-24 02:05:34.033  7883  7883 D nativeloader: Load libframework-connectivity-tiramisu-jni.so using APEX ns com_android_tethering for caller /apex/com.android.tethering/javalib/framework-connectivity-t.jar: ok
+07-24 02:05:34.398  7883  7883 D nativeloader: Configuring clns-9 for other apk /data/app/~~fqrweRT_KtNLtnZxwDtxFQ==/dev.lorepia.client-OlR5-K9RNfiTG5RdUF6_ig==/base.apk. target_sdk_version=36, uses_libraries=, library_path=/data/app/~~fqrweRT_KtNLtnZxwDtxFQ==/dev.lorepia.client-OlR5-K9RNfiTG5RdUF6_ig==/lib/arm64:/data/app/~~fqrweRT_KtNLtnZxwDtxFQ==/dev.lorepia.client-OlR5-K9RNfiTG5RdUF6_ig==/base.apk!/lib/arm64-v8a, permitted_path=/data:/mnt/expand:/data/user/0/dev.lorepia.client
+07-24 02:05:34.406  7883  7883 I .lorepia.client: AssetManager2(0xb400007125bad8f8) locale list changing from [] to [en-US]
+07-24 02:05:34.415  7883  7883 V GraphicsEnvironment: Currently set values for:
+07-24 02:05:34.415  7883  7883 V GraphicsEnvironment:   angle_gl_driver_selection_pkgs=[]
+07-24 02:05:34.415  7883  7883 V GraphicsEnvironment:   angle_gl_driver_selection_values=[]
+07-24 02:05:34.416  7883  7883 V GraphicsEnvironment: dev.lorepia.client is not listed in per-application setting
+07-24 02:05:34.417  7883  7883 V GraphicsEnvironment: ANGLE allowlist from config: com.dreamgames.royalmatch com.dts.freefiremax com.dxx.firenow com.gramgames.mergedragons com.ludo.king com.mojang.minecraftpe com.my.defense com.nintendo.zaka com.os.airforce com.playrix.fishdomdd.gplay io.teslatech.callbreak jp.konami.prospia net.peakgames.toonblast
+07-24 02:05:34.417  7883  7883 V GraphicsEnvironment: dev.lorepia.client is not listed in ANGLE allowlist or settings, returning default
+07-24 02:05:34.417  7883  7883 V GraphicsEnvironment: Neither updatable production driver nor prerelease driver is supported.
+--------- beginning of system
+07-24 02:05:34.483  7883  7897 I DisplayManager: Choreographer implicitly registered for the refresh rate.
+07-24 02:05:34.502  7883  7883 I .lorepia.client: AssetManager2(0xb400007125baad38) locale list changing from [] to [en-US]
+07-24 02:05:34.542  7883  7883 D AppCompatDelegate: Checking for metadata for AppLocalesMetadataHolderService : Service not found
+07-24 02:05:34.548  7883  7883 I .lorepia.client: AssetManager2(0xb400007125badc18) locale list changing from [] to [en-US]
+07-24 02:05:34.558  7883  7883 E ashmem  : Pinning is deprecated since Android Q. Please use trim or other methods.
+07-24 02:05:34.563  7883  7897 I EGL_emulation: Opening libGLESv1_CM_emulation.so
+07-24 02:05:34.564  7883  7897 I EGL_emulation: Opening libGLESv2_emulation.so
+07-24 02:05:34.590  7883  7883 D CompatChangeReporter: Compat change id reported: 377864165; UID 10221; state: ENABLED
+07-24 02:05:34.594  7883  7883 D DesktopModeFlags: Toggle override initialized to: OVERRIDE_UNSET
+07-24 02:05:34.597  7883  7897 W HWUI    : Failed to choose config with EGL_SWAP_BEHAVIOR_PRESERVED, retrying without...
+07-24 02:05:34.597  7883  7897 W HWUI    : Failed to initialize 101010-2 format, error = EGL_SUCCESS
+07-24 02:05:34.816  7883  7883 D nativeloader: Load /data/app/~~fqrweRT_KtNLtnZxwDtxFQ==/dev.lorepia.client-OlR5-K9RNfiTG5RdUF6_ig==/base.apk!/lib/arm64-v8a/liblorepia_app_lib.so using class loader ns clns-9 (caller=/data/app/~~fqrweRT_KtNLtnZxwDtxFQ==/dev.lorepia.client-OlR5-K9RNfiTG5RdUF6_ig==/base.apk!classes6.dex): ok
+07-24 02:05:35.146  7883  7883 I .lorepia.client: hiddenapi: Accessing hidden method Landroid/view/ViewGroup;->makeOptionalFitsSystemWindows()V (runtime_flags=0, domain=platform, api=unsupported) from Landroidx/appcompat/widget/ViewUtils; (domain=app) using reflection: allowed
+07-24 02:05:35.193  7883  7883 W HWUI    : Unknown dataspace 0
+07-24 02:05:35.220  7883  7883 I Choreographer: Skipped 44 frames!  The application may be doing too much work on its main thread.
+07-24 02:05:35.394  7883  7894 I HWUI    : Davey! duration=887ms; Flags=1, FrameTimelineVsyncId=792418, IntendedVsync=360750258037446, Vsync=360750991370750, InputEventId=0, HandleInputStart=360751008754580, AnimationStart=360751008767913, PerformTraversalsStart=360751008903246, DrawStart=360751081613871, FrameDeadline=360750274704112, FrameStartTime=360751007715830, FrameInterval=16666666, WorkloadTarget=16666666, SyncQueued=360751083936830, SyncStart=360751097156371, IssueDrawCommandsStart=360751097328746, SwapBuffers=360751117908246, FrameCompleted=360751158567622, DequeueBufferDuration=5792, QueueBufferDuration=537625, GpuCompleted=360751158567622, SwapBuffersCompleted=360751149489288, DisplayPresentTime=0, CommandSubmissionCompleted=360751117908246, 
+07-24 02:05:35.431  7883  7883 I .lorepia.client: AssetManager2(0xb400007125ba4618) locale list changing from [] to [en-US]
+07-24 02:05:35.432  7883  7883 I WebViewFactory: Loading com.google.android.webview version 133.0.6943.137 (code 694313732)
+07-24 02:05:35.438  7883  7883 I .lorepia.client: AssetManager2(0xb400007125baebb8) locale list changing from [] to [en-US]
+07-24 02:05:35.440  7883  7883 I .lorepia.client: AssetManager2(0xb400007125babff8) locale list changing from [] to [en-US]
+07-24 02:05:35.441  7883  7883 I .lorepia.client: AssetManager2(0xb400007125bae578) locale list changing from [] to [en-US]
+07-24 02:05:35.443  7883  7883 I .lorepia.client: AssetManager2(0xb400007125babcd8) locale list changing from [] to [en-US]
+07-24 02:05:35.443  7883  7883 V ResourcesManager: The following library key has been added: ResourcesKey{ mHash=bf96b9dd mResDir=null mSplitDirs=[] mOverlayDirs=[] mLibDirs=[/data/app/~~gpmFUbSJsE3j6CR1TKNPvA==/com.google.android.webview-I6rLLB_FXSA9WeiobqWXGQ==/WebViewGoogle.apk,/data/app/~~isMGCVgJ7GK-A4CwEwbgSA==/com.google.android.trichromelibrary_694313732-wfZnONLsvqF7ALIh0W09nQ==/TrichromeLibrary.apk,/system_ext/framework/androidx.window.extensions.jar] mDisplayId=0 mOverrideConfig=v36 mCompatInfo={420dpi always-compat} mLoaders=[]}
+07-24 02:05:35.512  7883  7883 W .lorepia.client: Failed to find entry 'classes.dex': Entry not found
+07-24 02:05:35.515  7883  7883 D nativeloader: Configuring clns-10 for other apk /data/app/~~isMGCVgJ7GK-A4CwEwbgSA==/com.google.android.trichromelibrary_694313732-wfZnONLsvqF7ALIh0W09nQ==/TrichromeLibrary.apk. target_sdk_version=34, uses_libraries=ALL, library_path=/data/app/~~gpmFUbSJsE3j6CR1TKNPvA==/com.google.android.webview-I6rLLB_FXSA9WeiobqWXGQ==/lib/arm64:/data/app/~~gpmFUbSJsE3j6CR1TKNPvA==/com.google.android.webview-I6rLLB_FXSA9WeiobqWXGQ==/WebViewGoogle.apk!/lib/arm64-v8a:/data/app/~~isMGCVgJ7GK-A4CwEwbgSA==/com.google.android.trichromelibrary_694313732-wfZnONLsvqF7ALIh0W09nQ==/TrichromeLibrary.apk!/lib/arm64-v8a, permitted_path=/data:/mnt/expand
+07-24 02:05:35.516  7883  7883 D ApplicationLoaders: Returning zygote-cached class loader: /system_ext/framework/androidx.window.extensions.jar
+07-24 02:05:35.519  7883  7883 D nativeloader: Configuring clns-11 for other apk /data/app/~~gpmFUbSJsE3j6CR1TKNPvA==/com.google.android.webview-I6rLLB_FXSA9WeiobqWXGQ==/WebViewGoogle.apk. target_sdk_version=34, uses_libraries=, library_path=/data/app/~~gpmFUbSJsE3j6CR1TKNPvA==/com.google.android.webview-I6rLLB_FXSA9WeiobqWXGQ==/lib/arm64:/data/app/~~gpmFUbSJsE3j6CR1TKNPvA==/com.google.android.webview-I6rLLB_FXSA9WeiobqWXGQ==/WebViewGoogle.apk!/lib/arm64-v8a:/data/app/~~isMGCVgJ7GK-A4CwEwbgSA==/com.google.android.trichromelibrary_694313732-wfZnONLsvqF7ALIh0W09nQ==/TrichromeLibrary.apk!/lib/arm64-v8a, permitted_path=/data:/mnt/expand
+07-24 02:05:35.609  7883  7883 I cr_WVCFactoryProvider: version=133.0.6943.137 (694313732) minSdkVersion=29 isBundle=false multiprocess=true packageId=2
+07-24 02:05:35.612  7883  7883 I .lorepia.client: AssetManager2(0xb400007125bb0198) locale list changing from [] to [en-US]
+07-24 02:05:35.673  7883  7883 D nativeloader: Load /data/app/~~isMGCVgJ7GK-A4CwEwbgSA==/com.google.android.trichromelibrary_694313732-wfZnONLsvqF7ALIh0W09nQ==/TrichromeLibrary.apk!/lib/arm64-v8a/libmonochrome_64.so using class loader ns clns-11 (caller=/data/app/~~gpmFUbSJsE3j6CR1TKNPvA==/com.google.android.webview-I6rLLB_FXSA9WeiobqWXGQ==/WebViewGoogle.apk): ok
+07-24 02:05:35.717  7883  7883 D nativeloader: Load /system/lib64/libwebviewchromium_plat_support.so using class loader ns clns-11 (caller=/data/app/~~gpmFUbSJsE3j6CR1TKNPvA==/com.google.android.webview-I6rLLB_FXSA9WeiobqWXGQ==/WebViewGoogle.apk): ok
+07-24 02:05:35.796  7883  7883 I cr_LibraryLoader: Successfully loaded native library
+07-24 02:05:35.797  7883  7910 I chromium: [INFO:variations_seed_loader.cc(67)] Failed to open file for reading.: No such file or directory (2)
+07-24 02:05:35.798  7883  7910 I cr_VariationsUtils: Failed reading seed file "/data/user/0/dev.lorepia.client/app_webview/variations_seed_new"
+07-24 02:05:35.799  7883  7899 I RustStdoutStderr: [INFO:variations_seed_loader.cc(67)] Failed to open file for reading.: No such file or directory (2)
+07-24 02:05:35.802  7883  7883 I cr_CachingUmaRecorder: Flushed 6 samples from 6 histograms, 0 samples were dropped.
+07-24 02:05:35.823  7883  7883 I cr_VariationsUtils: Loaded seed with age 140830s
+07-24 02:05:35.831  7883  7883 I cr_CombinedPProvider: #registerProvider() provider:WV.C8@af9949c isPolicyCacheEnabled:false policyProvidersSize:0
+07-24 02:05:35.833  7883  7883 I cr_PolicyProvider: #setManagerAndSource() 0
+07-24 02:05:35.859  7883  7883 I cr_CombinedPProvider: #linkNativeInternal() 1
+07-24 02:05:35.879  7883  7883 I cr_AppResProvider: #getApplicationRestrictionsFromUserManager() Bundle[EMPTY_PARCEL]
+07-24 02:05:35.879  7883  7883 I cr_PolicyProvider: #notifySettingsAvailable() 0
+07-24 02:05:35.892  7883  7883 I cr_CombinedPProvider: #onSettingsAvailable() 0
+07-24 02:05:35.892  7883  7883 I cr_CombinedPProvider: #flushPolicies()
+07-24 02:05:36.126  7883  7915 W chromium: [WARNING:dns_config_service_android.cc(81)] Failed to read DnsConfig.
+07-24 02:05:36.148  7883  7883 I .lorepia.client: AssetManager2(0xb400007125bb1458) locale list changing from [] to [en-US]
+07-24 02:05:36.169  7883  7899 I RustStdoutStderr: [WARNING:dns_config_service_android.cc(81)] Failed to read DnsConfig.
+07-24 02:05:36.190  7883  7883 I .lorepia.client: AssetManager2(0xb400007125bac638) locale list changing from [] to [en-US]
+07-24 02:05:36.508  7883  7883 V Tauri/Plugin: Tauri plugin: pluginId: path, command: getDataDir
+07-24 02:05:36.517  7883  7883 V Tauri/Plugin: Tauri plugin: pluginId: path, command: getDataDir
+07-24 02:05:36.518  7883  7949 I CameraManagerGlobal: Connecting to camera service
+07-24 02:05:36.571  7883  7883 W libc    : Access denied finding property "vendor.mesa.log"
+07-24 02:05:36.571  7883  7883 W libc    : Access denied finding property "vendor.mesa.log.file"
+07-24 02:05:36.571  7883  7883 E MESA    : Failed to open rendernode: No such file or directory
+07-24 02:05:36.629  7883  7883 D vulkan  : searching for layers in '/data/app/~~fqrweRT_KtNLtnZxwDtxFQ==/dev.lorepia.client-OlR5-K9RNfiTG5RdUF6_ig==/lib/arm64'
+07-24 02:05:36.630  7883  7883 D vulkan  : searching for layers in '/data/app/~~fqrweRT_KtNLtnZxwDtxFQ==/dev.lorepia.client-OlR5-K9RNfiTG5RdUF6_ig==/base.apk!/lib/arm64-v8a'
+07-24 02:05:36.640  7883  7883 W libc    : Access denied finding property "vendor.mesa.vk.trace.per.submit"
+07-24 02:05:36.640  7883  7883 W libc    : Access denied finding property "vendor.mesa.gallium.print.optio"
+07-24 02:05:36.641  7883  7883 W libc    : Access denied finding property "vendor.mesa.vk.trace.frame"
+07-24 02:05:36.654  7883  7883 W libc    : Access denied finding property "vendor.mesa.vk.wsi.headless.swa"
+07-24 02:05:36.745  7883  7928 W cr_media: BLUETOOTH_CONNECT permission is missing.
+07-24 02:05:36.746  7883  7928 W cr_media: getBluetoothAdapter() requires BLUETOOTH permission
+07-24 02:05:36.746  7883  7928 W cr_media: registerBluetoothIntentsIfNeeded: Requires BLUETOOTH permission
+07-24 02:05:36.761  7883  7958 W chromium: [WARNING:viz_main_impl.cc(85)] VizNullHypothesis is disabled (not a warning)
+07-24 02:05:36.762  7883  7899 I RustStdoutStderr: [WARNING:viz_main_impl.cc(85)] VizNullHypothesis is disabled (not a warning)
+07-24 02:05:36.798  7883  7883 D InsetsController: hide(ime(), fromIme=false)
+07-24 02:05:36.798  7883  7883 I ImeTracker: dev.lorepia.client:de2f8cea: onCancelled at PHASE_CLIENT_ALREADY_HIDDEN
+07-24 02:05:37.411  7883  7887 I .lorepia.client: Compiler allocated 5111KB to compile void android.view.ViewRootImpl.performTraversals()
+07-24 02:05:37.514  7883  7899 I RustStdoutStderr: s_glBindAttribLocation: bind attrib 0 name position
+07-24 02:05:37.514  7883  7899 I RustStdoutStderr: s_glBindAttribLocation: bind attrib 1 name color
+07-24 02:05:37.524  7883  7899 I RustStdoutStderr: s_glBindAttribLocation: bind attrib 0 name position
+07-24 02:05:37.524  7883  7899 I RustStdoutStderr: s_glBindAttribLocation: bind attrib 1 name color
+07-24 02:05:37.524  7883  7899 I RustStdoutStderr: s_glBindAttribLocation: bind attrib 2 name localCoord
+07-24 02:05:37.534  7883  7899 I RustStdoutStderr: s_glBindAttribLocation: bind attrib 0 name position
+07-24 02:05:37.534  7883  7899 I RustStdoutStderr: s_glBindAttribLocation: bind attrib 1 name color
+07-24 02:05:37.534  7883  7899 I RustStdoutStderr: s_glBindAttribLocation: bind attrib 2 name localCoord
+07-24 02:05:37.547  7883  7899 I RustStdoutStderr: s_glBindAttribLocation: bind attrib 0 name position
+07-24 02:05:37.547  7883  7899 I RustStdoutStderr: s_glBindAttribLocation: bind attrib 1 name color
+07-24 02:05:37.547  7883  7899 I RustStdoutStderr: s_glBindAttribLocation: bind attrib 2 name localCoord
+07-24 02:05:37.556  7883  7899 I RustStdoutStderr: s_glBindAttribLocation: bind attrib 0 name position
+07-24 02:05:37.556  7883  7899 I RustStdoutStderr: s_glBindAttribLocation: bind attrib 1 name color
+07-24 02:05:37.564  7883  7899 I RustStdoutStderr: s_glBindAttribLocation: bind attrib 0 name position
+07-24 02:05:37.564  7883  7899 I RustStdoutStderr: s_glBindAttribLocation: bind attrib 1 name localCoord
+07-24 02:05:37.587  7883  7899 I RustStdoutStderr: s_glBindAttribLocation: bind attrib 0 name position
+07-24 02:05:37.587  7883  7899 I RustStdoutStderr: s_glBindAttribLocation: bind attrib 1 name color
+07-24 02:05:37.587  7883  7899 I RustStdoutStderr: s_glBindAttribLocation: bind attrib 2 name localCoord
+07-24 02:05:37.599  7883  7899 I RustStdoutStderr: s_glBindAttribLocation: bind attrib 0 name position
+07-24 02:05:37.599  7883  7899 I RustStdoutStderr: s_glBindAttribLocation: bind attrib 1 name color
+07-24 02:05:37.599  7883  7899 I RustStdoutStderr: s_glBindAttribLocation: bind attrib 2 name localCoord
+07-24 02:05:37.611  7883  7899 I RustStdoutStderr: s_glBindAttribLocation: bind attrib 0 name position
+07-24 02:05:37.611  7883  7899 I RustStdoutStderr: s_glBindAttribLocation: bind attrib 1 name color
+07-24 02:05:37.624  7883  7899 I RustStdoutStderr: s_glBindAttribLocation: bind attrib 0 name resolveLevel_and_idx
+07-24 02:05:37.625  7883  7899 I RustStdoutStderr: s_glBindAttribLocation: bind attrib 1 name p01
+07-24 02:05:37.625  7883  7899 I RustStdoutStderr: s_glBindAttribLocation: bind attrib 2 name p23
+07-24 02:05:37.625  7883  7899 I RustStdoutStderr: s_glBindAttribLocation: bind attrib 3 name fanPointAttrib
+07-24 02:05:37.827  7883  7899 I RustStdoutStderr: s_glBindAttribLocation: bind attrib 0 name inPosition
+07-24 02:05:37.827  7883  7899 I RustStdoutStderr: s_glBindAttribLocation: bind attrib 1 name inColor
+07-24 02:05:37.827  7883  7899 I RustStdoutStderr: s_glBindAttribLocation: bind attrib 2 name inTextureCoords
+07-24 02:05:37.903  7883  7899 I RustStdoutStderr: s_glBindAttribLocation: bind attrib 0 name inPosition
+07-24 02:05:37.903  7883  7899 I RustStdoutStderr: s_glBindAttribLocation: bind attrib 1 name inColor
+07-24 02:05:37.903  7883  7899 I RustStdoutStderr: s_glBindAttribLocation: bind attrib 2 name inCircleEdge
+07-24 02:05:37.915  7883  7899 I RustStdoutStderr: s_glBindAttribLocation: bind attrib 0 name a_vertex
+07-24 02:05:37.919  7883  7899 I RustStdoutStderr: s_glBindAttribLocation: bind attrib 0 name position
+07-24 02:05:37.919  7883  7899 I RustStdoutStderr: s_glBindAttribLocation: bind attrib 1 name localCoord
+07-24 02:05:37.930  7883  7899 I RustStdoutStderr: s_glBindAttribLocation: bind attrib 0 name position
+07-24 02:05:37.930  7883  7899 I RustStdoutStderr: s_glBindAttribLocation: bind attrib 1 name localCoord
+07-24 02:05:37.941  7883  7899 I RustStdoutStderr: s_glBindAttribLocation: bind attrib 0 name position
+07-24 02:05:37.942  7883  7899 I RustStdoutStderr: s_glBindAttribLocation: bind attrib 1 name localCoord
+07-24 02:05:37.951  7883  7899 I RustStdoutStderr: s_glBindAttribLocation: bind attrib 0 name position
+07-24 02:05:37.951  7883  7899 I RustStdoutStderr: s_glBindAttribLocation: bind attrib 1 name localCoord
+07-24 02:05:37.960  7883  7899 I RustStdoutStderr: s_glBindAttribLocation: bind attrib 0 name position
+07-24 02:05:37.960  7883  7899 I RustStdoutStderr: s_glBindAttribLocation: bind attrib 1 name color
+07-24 02:05:37.960  7883  7899 I RustStdoutStderr: s_glBindAttribLocation: bind attrib 2 name localCoord
+07-24 02:05:37.972  7883  7899 I RustStdoutStderr: s_glBindAttribLocation: bind attrib 0 name resolveLevel_and_idx
+07-24 02:05:37.972  7883  7899 I RustStdoutStderr: s_glBindAttribLocation: bind attrib 1 name p01
+07-24 02:05:37.972  7883  7899 I RustStdoutStderr: s_glBindAttribLocation: bind attrib 2 name p23
+07-24 02:05:37.972  7883  7899 I RustStdoutStderr: s_glBindAttribLocation: bind attrib 3 name fanPointAttrib
+07-24 02:05:37.979  7883  7899 I RustStdoutStderr: s_glBindAttribLocation: bind attrib 0 name position
+07-24 02:05:37.979  7883  7899 I RustStdoutStderr: s_glBindAttribLocation: bind attrib 1 name color
+07-24 02:05:37.986  7883  7899 I RustStdoutStderr: s_glBindAttribLocation: bind attrib 0 name inPosition
+07-24 02:05:37.986  7883  7899 I RustStdoutStderr: s_glBindAttribLocation: bind attrib 1 name inColor
+07-24 02:05:37.986  7883  7899 I RustStdoutStderr: s_glBindAttribLocation: bind attrib 2 name inCircleEdge
+07-24 02:05:37.992  7883  7899 I RustStdoutStderr: s_glBindAttribLocation: bind attrib 0 name fillBounds
+07-24 02:05:37.992  7883  7899 I RustStdoutStderr: s_glBindAttribLocation: bind attrib 1 name color
+07-24 02:05:37.992  7883  7899 I RustStdoutStderr: s_glBindAttribLocation: bind attrib 2 name locations
+07-24 02:05:38.027  7883  7899 I RustStdoutStderr: s_glBindAttribLocation: bind attrib 0 name position
+07-24 02:05:38.027  7883  7899 I RustStdoutStderr: s_glBindAttribLocation: bind attrib 1 name color
+07-24 02:05:38.027  7883  7899 I RustStdoutStderr: s_glBindAttribLocation: bind attrib 2 name localCoord
+07-24 02:05:38.055  7883  7899 I RustStdoutStderr: s_glBindAttribLocation: bind attrib 0 name inPosition
+07-24 02:05:38.055  7883  7899 I RustStdoutStderr: s_glBindAttribLocation: bind attrib 1 name inColor
+07-24 02:05:38.055  7883  7899 I RustStdoutStderr: s_glBindAttribLocation: bind attrib 2 name inCircleEdge
+07-24 02:05:38.062  7883  7899 I RustStdoutStderr: s_glBindAttribLocation: bind attrib 0 name position
+07-24 02:05:38.062  7883  7899 I RustStdoutStderr: s_glBindAttribLocation: bind attrib 1 name color
+07-24 02:05:38.072  7883  7899 I RustStdoutStderr: s_glBindAttribLocation: bind attrib 0 name inPosition
+07-24 02:05:38.072  7883  7899 I RustStdoutStderr: s_glBindAttribLocation: bind attrib 1 name inColor
+07-24 02:05:38.072  7883  7899 I RustStdoutStderr: s_glBindAttribLocation: bind attrib 2 name inCircleEdge
+07-24 02:05:38.078  7883  7899 I RustStdoutStderr: s_glBindAttribLocation: bind attrib 0 name position
+07-24 02:05:38.078  7883  7899 I RustStdoutStderr: s_glBindAttribLocation: bind attrib 1 name color
+07-24 02:05:38.159  7883  7899 I RustStdoutStderr: s_glBindAttribLocation: bind attrib 0 name position
+07-24 02:05:38.159  7883  7899 I RustStdoutStderr: s_glBindAttribLocation: bind attrib 1 name color
+07-24 02:05:38.159  7883  7899 I RustStdoutStderr: s_glBindAttribLocation: bind attrib 2 name localCoord
+07-24 02:05:38.159  7883  7899 I RustStdoutStderr: s_glBindAttribLocation: bind attrib 3 name texSubset
+07-24 02:05:38.251  7883  7899 I RustStdoutStderr: s_glBindAttribLocation: bind attrib 0 name position
+07-24 02:05:38.252  7883  7899 I RustStdoutStderr: s_glBindAttribLocation: bind attrib 1 name localCoord
+07-24 02:05:38.252  7883  7899 I RustStdoutStderr: s_glBindAttribLocation: bind attrib 2 name texSubset
+07-24 02:05:40.539  7883  7986 D ProfileInstaller: Installing profile for dev.lorepia.client
+07-24 02:05:55.139  7883  7888 I .lorepia.client: Background concurrent mark compact GC freed 5658KB AllocSpace bytes, 15(484KB) LOS objects, 49% free, 4306KB/8612KB, paused 1.095ms,2.250ms total 241.011ms
+07-24 02:05:55.267  7883  7899 I RustStdoutStderr: s_glBindAttribLocation: bind attrib 0 name radii_selector
+07-24 02:05:55.267  7883  7899 I RustStdoutStderr: s_glBindAttribLocation: bind attrib 1 name corner_and_radius_outsets
+07-24 02:05:55.267  7883  7899 I RustStdoutStderr: s_glBindAttribLocation: bind attrib 2 name aa_bloat_and_coverage
+07-24 02:05:55.267  7883  7899 I RustStdoutStderr: s_glBindAttribLocation: bind attrib 3 name radii_x
+07-24 02:05:55.267  7883  7899 I RustStdoutStderr: s_glBindAttribLocation: bind attrib 4 name radii_y
+07-24 02:05:55.267  7883  7899 I RustStdoutStderr: s_glBindAttribLocation: bind attrib 5 name skew
+07-24 02:05:55.267  7883  7899 I RustStdoutStderr: s_glBindAttribLocation: bind attrib 6 name translate_and_localrotate
+07-24 02:05:55.267  7883  7899 I RustStdoutStderr: s_glBindAttribLocation: bind attrib 7 name color
+07-24 02:05:55.289  7883  7899 I RustStdoutStderr: s_glBindAttribLocation: bind attrib 0 name position
+07-24 02:05:55.289  7883  7899 I RustStdoutStderr: s_glBindAttribLocation: bind attrib 1 name color
+07-24 02:05:55.289  7883  7899 I RustStdoutStderr: s_glBindAttribLocation: bind attrib 2 name localCoord
+07-24 02:05:55.298  7883  7899 I RustStdoutStderr: s_glBindAttribLocation: bind attrib 0 name inPosition
+07-24 02:05:55.299  7883  7899 I RustStdoutStderr: s_glBindAttribLocation: bind attrib 1 name inColor
+07-24 02:05:55.299  7883  7899 I RustStdoutStderr: s_glBindAttribLocation: bind attrib 2 name inCircleEdge
+07-24 02:05:55.395  7883  7899 I RustStdoutStderr: s_glBindAttribLocation: bind attrib 0 name position
+07-24 02:05:55.395  7883  7899 I RustStdoutStderr: s_glBindAttribLocation: bind attrib 1 name localCoord
+07-24 02:05:55.403  7883  7899 I RustStdoutStderr: s_glBindAttribLocation: bind attrib 0 name position
+07-24 02:05:55.403  7883  7899 I RustStdoutStderr: s_glBindAttribLocation: bind attrib 1 name color
+07-24 02:05:55.434  7883  7899 I RustStdoutStderr: s_glBindAttribLocation: bind attrib 0 name position
+07-24 02:05:55.434  7883  7899 I RustStdoutStderr: s_glBindAttribLocation: bind attrib 1 name color
+07-24 02:05:55.434  7883  7899 I RustStdoutStderr: s_glBindAttribLocation: bind attrib 2 name localCoord
+07-24 02:05:55.450  7883  7899 I RustStdoutStderr: s_glBindAttribLocation: bind attrib 0 name inPosition
+07-24 02:05:55.450  7883  7899 I RustStdoutStderr: s_glBindAttribLocation: bind attrib 1 name inColor
+07-24 02:05:55.450  7883  7899 I RustStdoutStderr: s_glBindAttribLocation: bind attrib 2 name inQuadEdge
+07-24 02:05:55.484  7883  7899 I RustStdoutStderr: s_glBindAttribLocation: bind attrib 0 name position
+07-24 02:05:55.484  7883  7899 I RustStdoutStderr: s_glBindAttribLocation: bind attrib 1 name localCoord
+07-24 02:05:55.576  7883  7899 I RustStdoutStderr: s_glBindAttribLocation: bind attrib 0 name position
+07-24 02:05:55.576  7883  7899 I RustStdoutStderr: s_glBindAttribLocation: bind attrib 1 name color
+07-24 02:05:55.614  7883  7899 I RustStdoutStderr: s_glBindAttribLocation: bind attrib 0 name position
+07-24 02:05:55.615  7883  7899 I RustStdoutStderr: s_glBindAttribLocation: bind attrib 1 name color
+07-24 02:05:55.615  7883  7899 I RustStdoutStderr: s_glBindAttribLocation: bind attrib 2 name localCoord
+07-24 02:05:55.747  7883  7899 I RustStdoutStderr: s_glBindAttribLocation: bind attrib 0 name position
+07-24 02:05:55.747  7883  7899 I RustStdoutStderr: s_glBindAttribLocation: bind attrib 1 name localCoord

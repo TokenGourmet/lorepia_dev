@@ -4,6 +4,7 @@
   import "$lib/design/tokens.css";
 
   import LargeTitleHeader from "$lib/ui/LargeTitleHeader.svelte";
+  import { activateBackSwipeSurface } from "$lib/ui/back-swipe-surface";
   import { edgeSwipeBack } from "$lib/ui/edge-back";
 
   interface PreviewResult {
@@ -39,16 +40,32 @@
     quarantined: "격리됨",
     rejected: "거부됨",
   } as const;
+
+  function navigateBack(event?: MouseEvent): void {
+    event?.preventDefault();
+    void goto("/home", { replaceState: true });
+  }
 </script>
 
 <svelte:head>
   <title>LorePia — 가져오기</title>
 </svelte:head>
 
-<div class="screen" use:edgeSwipeBack={{ onBack: () => goto("/home") }}>
+<div
+  class="screen"
+  use:edgeSwipeBack={{
+    onBack: navigateBack,
+    getUnderlay: () => activateBackSwipeSurface("/home"),
+  }}
+>
   <LargeTitleHeader title="가져오기">
     {#snippet leading()}
-      <a class="back" href="/home" aria-label="홈으로 돌아가기">
+      <a
+        class="back"
+        href="/home"
+        aria-label="홈으로 돌아가기"
+        onclick={navigateBack}
+      >
         <svg
           viewBox="0 0 24 24"
           width="20"
